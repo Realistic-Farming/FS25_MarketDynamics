@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * FS25_UsedPlus - Find Unused Code Scanner
+ * FS25_MarketDynamics - Find Unused Code Scanner
  *
  * Scans the codebase for potentially orphaned:
  * - Lua files not registered in modDesc.xml
@@ -114,16 +114,18 @@ function findAllDialogs(modRoot) {
         }
     }
 
-    // Find XML dialog files in gui/
-    const xmlDir = path.join(modRoot, 'gui');
-    if (fs.existsSync(xmlDir)) {
-        const xmlFiles = findFiles(xmlDir, /Dialog\.xml$/);
-        for (const file of xmlFiles) {
-            const name = path.basename(file, '.xml');
-            if (dialogs[name]) {
-                dialogs[name].xml = file;
-            } else {
-                dialogs[name] = { lua: null, xml: file };
+    // Find XML dialog files in xml/gui/ (primary) and gui/ (settings page)
+    for (const xmlRelDir of [path.join('xml', 'gui'), 'gui']) {
+        const xmlDir = path.join(modRoot, xmlRelDir);
+        if (fs.existsSync(xmlDir)) {
+            const xmlFiles = findFiles(xmlDir, /Dialog\.xml$/);
+            for (const file of xmlFiles) {
+                const name = path.basename(file, '.xml');
+                if (dialogs[name]) {
+                    dialogs[name].xml = file;
+                } else {
+                    dialogs[name] = { lua: null, xml: file };
+                }
             }
         }
     }
@@ -275,19 +277,7 @@ function gatherStatistics(modRoot) {
     // Categories to track
     const categories = {
         'src/gui': 'GUI Screens',
-        'src/gui/financepanels': 'Finance Panels',
         'src/events': 'Network Events',
-        'src/managers': 'Managers',
-        'src/managers/usedvehicle': 'Used Vehicle Modules',
-        'src/extensions': 'Extensions',
-        'src/specializations': 'Specializations',
-        'src/specializations/maintenance': 'Maintenance Modules',
-        'src/utils': 'Utilities',
-        'src/data': 'Data Classes',
-        'src/settings': 'Settings',
-        'src/core': 'Core',
-        'vehicles': 'Vehicles',
-        'placeables': 'Placeables'
     };
 
     // Initialize categories
@@ -369,7 +359,7 @@ function gatherStatistics(modRoot) {
     stats.lua.largestFiles = stats.lua.largestFiles.slice(0, 10);
 
     // Count XML files
-    const xmlDirs = ['gui', 'translations'];
+    const xmlDirs = ['gui', path.join('xml', 'gui'), 'translations'];
     for (const dir of xmlDirs) {
         const dirPath = path.join(modRoot, dir);
         if (fs.existsSync(dirPath)) {
@@ -541,36 +531,22 @@ function gatherModInfo(modRoot) {
 
     // Detect features from code patterns
     const featurePatterns = [
-        { pattern: /FinanceManager|FinanceDeal/g, feature: 'Vehicle/Equipment Financing', icon: '💰' },
-        { pattern: /LeaseDeal|LeaseVehicle/g, feature: 'Vehicle Leasing', icon: '📋' },
-        { pattern: /LandLeaseDeal|LandLeaseEvent/g, feature: 'Land Leasing', icon: '🏞️' },
-        { pattern: /CreditSystem|CreditScore/g, feature: 'Dynamic Credit Scoring (300-850)', icon: '📊' },
-        { pattern: /TakeLoanDialog|TakeLoanEvent/g, feature: 'Collateral-Based Cash Loans', icon: '🏦' },
-        { pattern: /UsedVehicleManager|UsedVehicleSearch/g, feature: 'Used Vehicle Marketplace', icon: '🚜' },
-        { pattern: /VehicleSaleManager|VehicleSaleListing/g, feature: 'Agent-Based Vehicle Sales', icon: '🏷️' },
-        { pattern: /NegotiationDialog|SellerResponseDialog/g, feature: 'Price Negotiation System', icon: '🤝' },
-        { pattern: /InspectionReport|VehicleInspection/g, feature: 'Vehicle Inspection Reports', icon: '🔍' },
-        { pattern: /RepairDialog|RepairVehicleEvent/g, feature: 'Partial Repair System (1-100%)', icon: '🔧' },
-        { pattern: /TiresDialog|MaintenanceTires/g, feature: 'Tire Replacement System', icon: '⚙️' },
-        { pattern: /FluidsDialog|MaintenanceFluids/g, feature: 'Fluid Service (Oil/Hydraulic)', icon: '🛢️' },
-        { pattern: /FieldServiceKit/g, feature: 'Field Service Kit (Roadside Repairs)', icon: '🧰' },
-        { pattern: /OBDScanner|DiagnosisData/g, feature: 'OBD Scanner Diagnostics', icon: '📟' },
-        { pattern: /MaintenanceReliability|MaintenanceEngine/g, feature: 'Component Reliability System', icon: '⚡' },
-        { pattern: /TradeInCalculations|tradeIn/gi, feature: 'Trade-In System', icon: '🔄' },
-        { pattern: /DepreciationCalculations/g, feature: 'Realistic Depreciation', icon: '📉' },
-        { pattern: /DifficultyScalingManager/g, feature: 'Difficulty-Based Pricing', icon: '⚖️' },
-        { pattern: /BankInterestManager/g, feature: 'Bank Interest on Cash', icon: '💵' },
-        { pattern: /PaymentTracker|PaymentHistory/g, feature: 'Payment History Tracking', icon: '📅' },
-        { pattern: /RepossessionDialog/g, feature: 'Vehicle Repossession System', icon: '🚨' },
-        { pattern: /FinanceManagerFrame/g, feature: 'ESC Menu Finance Manager', icon: '📱' },
-        { pattern: /FinancialDashboard/g, feature: 'Financial Dashboard', icon: '📈' }
+        { pattern: /MarketEngine/g, feature: 'Dynamic Market Engine', icon: '📈' },
+        { pattern: /WorldEventSystem/g, feature: 'World Event System', icon: '🌍' },
+        { pattern: /FuturesMarket/g, feature: 'Futures Market Trading', icon: '💹' },
+        { pattern: /MarketSerializer/g, feature: 'Market Data Persistence', icon: '💾' },
+        { pattern: /PriceHook/g, feature: 'Price Hook Integration', icon: '🔌' },
+        { pattern: /MDMContractDialog/g, feature: 'Contract System', icon: '📋' },
+        { pattern: /MDMHUD/g, feature: 'Market HUD Display', icon: '🖥️' },
+        { pattern: /MarketScreen/g, feature: 'Market Screen UI', icon: '📊' },
+        { pattern: /AdminCommands/g, feature: 'Admin Console Commands', icon: '💻' },
     ];
 
     // Detect cross-mod compatibility
     const crossModPatterns = [
-        { pattern: /RVB|RealisticVehicleBreakdown/gi, mod: 'FS25_RealisticVehicleBreakdown (RVB)', icon: '🔗' },
-        { pattern: /UYT|UsedYourTool/gi, mod: 'FS25_UsedYourTool (UYT)', icon: '🔗' },
-        { pattern: /ModCompatibility/g, mod: 'Generic Mod Compatibility Layer', icon: '🔌' }
+        { pattern: /BCIntegration/g, mod: 'FS25_BetterContracts integration', icon: '🔗' },
+        { pattern: /UPIntegration/g, mod: 'FS25_UsedPlus integration', icon: '🔗' },
+        { pattern: /RWEIntegration/g, mod: 'FS25_RandomWorldEvents integration', icon: '🔗' },
     ];
 
     // Scan source files for features
@@ -599,8 +575,8 @@ function gatherModInfo(modRoot) {
         }
     }
 
-    // Count settings from UsedPlusSettings
-    const settingsPath = path.join(modRoot, 'src', 'settings', 'UsedPlusSettings.lua');
+    // Count settings from MDMEventConfig
+    const settingsPath = path.join(modRoot, 'src', 'MDMEventConfig.lua');
     if (fs.existsSync(settingsPath)) {
         const settingsContent = fs.readFileSync(settingsPath, 'utf8');
         const settingRegex = /["'](\w+)["']\s*[=:]/g;
@@ -617,7 +593,7 @@ function gatherModInfo(modRoot) {
 
     // Scan for console commands
     modInfo.consoleCommands = [];
-    const mainPath = path.join(modRoot, 'src', 'main.lua');
+    const mainPath = path.join(modRoot, 'main.lua');
     if (fs.existsSync(mainPath)) {
         const mainContent = fs.readFileSync(mainPath, 'utf8');
         const cmdRegex = /addConsoleCommand\s*\(\s*"([^"]+)"\s*,\s*"([^"]+)"/g;
@@ -971,7 +947,7 @@ function main() {
     const verbose = args.includes('--verbose') || args.includes('-v');
     const checkFunctions = args.includes('--check-functions') || args.includes('-f');
 
-    console.log(`\n${colors.bold}${colors.cyan}=== FS25_UsedPlus Unused Code Scanner ===${colors.reset}\n`);
+    console.log(`\n${colors.bold}${colors.cyan}=== FS25_MarketDynamics Unused Code Scanner ===${colors.reset}\n`);
 
     const modRoot = getModRoot();
     console.log(`Mod root: ${modRoot}\n`);

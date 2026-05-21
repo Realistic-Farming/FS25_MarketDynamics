@@ -124,9 +124,9 @@ foreach ($file in $LuaFiles) {
             }
         }
 
-        # Check for debug code (skip comments and the core logging file itself)
-        if (-not $isComment -and $line -match '\bprint\s*\(' -and $line -notmatch 'MarketDynamics\.log' -and $RelPath -notmatch 'MarketDynamicsCore\.lua') {
-            Add-Warning -File $RelPath -Category "DEBUG_CODE" -Line $lineNum -Message "Raw print() - use MDM.log* instead"
+        # Check for debug code (skip comments, logger, dev tools, and AdminCommands where print() is intentional for console output)
+        if (-not $isComment -and $line -match '\bprint\s*\(' -and $RelPath -notmatch 'Logger\.lua' -and $RelPath -notmatch '^tools\\' -and $RelPath -notmatch 'AdminCommands\.lua') {
+            Add-Warning -File $RelPath -Category "DEBUG_CODE" -Line $lineNum -Message "Raw print() - use the mod logger instead"
         }
     }
 }
