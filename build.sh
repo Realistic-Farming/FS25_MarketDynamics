@@ -43,6 +43,7 @@ if command -v zip &>/dev/null; then
         --exclude "./__MACOSX/*" \
         --exclude "./*.DS_Store" \
         --exclude "./*.zip" \
+        --exclude "./tools/*" 
         --exclude "./xml/MDMEventConfig_example.xml"
     echo "  Built via zip"
 else
