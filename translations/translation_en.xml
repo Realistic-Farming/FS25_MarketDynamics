@@ -80,8 +80,6 @@
         <text name="mdm_screen_collecting"       text="Price history builds as time passes — check back soon" />
         <text name="mdm_screen_select_crop"      text="Select a commodity" />
         <text name="mdm_screen_no_events"        text="Markets are calm. Events may appear as conditions shift." />
-        <text name="mdm_screen_col_intensity"    text="Intensity" />
-        <text name="mdm_screen_col_time_left"    text="Time Left" />
         <text name="mdm_screen_new_contract"     text="N: New Contract" />
         <text name="mdm_screen_no_contracts"     text="No contracts yet. Press N to create one." />
         <text name="mdm_screen_at_risk"          text="AT RISK" />
@@ -266,8 +264,6 @@
         <text name="mdm_evt_ft_title_suffix"   text=" — Custom Fill Types" />
 
         <!-- Input action display names -->
-        <text name="input_MDM_MARKET_SCREEN" text="Open Market Screen" />
-        <text name="input_MDM_CREATE_CONTRACT" text="Create Futures Contract" />
         <text name="input_MDM_SETTINGS_PANEL" text="Market Dynamics Settings" />
         <text name="mdm_bc_dialog_suppressed" text="FS25_FuturesMission is active and handles contract creation. Use the Contracts page (ESC menu) to create futures contracts. Get it on GitHub: search FS25_FuturesMission by Mmtrx." />
     </texts>
