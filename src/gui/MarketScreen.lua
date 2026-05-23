@@ -668,11 +668,11 @@ function MDMMarketScreen:_buildCommodityData()
     local sortAsc   = self.sortAscending
     table.sort(self.commodities, function(a, b)
         if sortField == SORT_PRICE then
-            return sortAsc and (a.current < b.current) or (a.current > b.current)
+            if sortAsc then return a.current < b.current else return a.current > b.current end
         elseif sortField == SORT_CHANGE then
-            return sortAsc and (a.changePct < b.changePct) or (a.changePct > b.changePct)
+            if sortAsc then return a.changePct < b.changePct else return a.changePct > b.changePct end
         else
-            return sortAsc and (a.title < b.title) or (a.title > b.title)
+            if sortAsc then return a.title < b.title else return a.title > b.title end
         end
     end)
 
