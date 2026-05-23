@@ -41,11 +41,14 @@ local MDM_isInsideSellHook = false
 -- EconomyManager reference — used only for MDMGetVanillaPrice, never patched.
 -- ---------------------------------------------------------------------------
 
-local origEconGetPrice = nil
+-- We intentionally do NOT capture EconomyManager.getPricePerLiter at source time.
+-- Economy mods (e.g. Realistic Economy) hook getPricePerLiter after MDM sources,
+-- so a source-time capture would always return vanilla prices regardless of those mods.
+-- By calling the live method at init() time we automatically pick up whatever base
+-- prices any economy mod has installed.
 
 if EconomyManager and EconomyManager.getPricePerLiter then
-    origEconGetPrice = EconomyManager.getPricePerLiter
-    MDMLog.info("PriceHook: EconomyManager.getPricePerLiter captured for vanilla snapshots")
+    MDMLog.info("PriceHook: EconomyManager.getPricePerLiter available for base price snapshots")
 else
     MDMLog.warn("PriceHook: EconomyManager.getPricePerLiter not found — MDMGetVanillaPrice will return nil")
 end
@@ -162,12 +165,12 @@ end
 -- Public helper: vanilla price snapshot for MarketEngine:init()
 -- ---------------------------------------------------------------------------
 
--- Returns the vanilla sell price for a fillType at neutral supply/demand (pressure = 0).
--- Reads from EconomyManager directly (never patched).
--- Returns nil if EconomyManager.getPricePerLiter was not captured.
+-- Returns the base sell price for a fillType at neutral supply/demand (pressure = 0).
+-- Calls the live getPricePerLiter so economy mods (e.g. Realistic Economy) that hook
+-- it after PriceHook sources are automatically used as MDM's price base.
 function MDMGetVanillaPrice(economyManager, fillTypeIndex)
-    if origEconGetPrice and economyManager then
-        return origEconGetPrice(economyManager, fillTypeIndex, 0)
+    if economyManager and type(economyManager.getPricePerLiter) == "function" then
+        return economyManager:getPricePerLiter(fillTypeIndex, 0)
     end
     return nil
 end

@@ -14,6 +14,11 @@ local TAB_CONTRACTS = 3
 
 local REFRESH_INTERVAL = 1000
 
+-- Commodity list sort fields
+local SORT_NAME   = "name"
+local SORT_PRICE  = "price"
+local SORT_CHANGE = "change"
+
 -- ---------------------------------------------------------------------------
 -- Constructor
 -- ---------------------------------------------------------------------------
@@ -33,6 +38,8 @@ function MDMMarketScreen.new()
     self.refreshTimer           = 0
     self.returnScreenName  = ""
     self.menuButtonInfo    = {}
+    self.sortField         = SORT_NAME
+    self.sortAscending     = true
     -- (dialogOpen and inline dialog state removed — MDMContractDialog handles its own state)
 
     return self
@@ -186,6 +193,7 @@ function MDMMarketScreen:onGuiSetupFinished()
     _setTextSafe(self.colHeaderCrop, "mdm_label_crop", "Crop")
     _setTextSafe(self.colHeaderPrice, "mdm_label_price", "Price")
     _setTextSafe(self.colHeaderChange, "mdm_label_change", "Change")
+    self:_updateSortHeaders()
     _setTextSafe(self.graphTitle, "mdm_screen_session_trend", "Session Price Trend")
     _setTextSafe(self.graphHint, "mdm_screen_collecting", "Collecting data...")
     _setTextSafe(self.eventsHeader, "mdm_screen_events_hdr", "ACTIVE EVENTS")
@@ -539,6 +547,36 @@ function MDMMarketScreen:mouseEvent(posX, posY, isDown, isUp, button, eventUsed)
                 end
             end
         end
+
+        -- Column header sort clicks (Prices tab only)
+        if self.activeTab == TAB_PRICES then
+            local cols = {
+                { el = self.colHeaderCrop,   field = SORT_NAME,   defaultAsc = true  },
+                { el = self.colHeaderPrice,  field = SORT_PRICE,  defaultAsc = false },
+                { el = self.colHeaderChange, field = SORT_CHANGE, defaultAsc = false },
+            }
+            for _, col in ipairs(cols) do
+                if col.el then
+                    local ap = col.el.absPosition
+                    local as = col.el.absSize
+                    if ap and as and
+                       posX >= ap[1] and posX <= ap[1] + as[1] and
+                       posY >= ap[2] and posY <= ap[2] + as[2] then
+                        if self.sortField == col.field then
+                            self.sortAscending = not self.sortAscending
+                        else
+                            self.sortField    = col.field
+                            self.sortAscending = col.defaultAsc
+                        end
+                        self:_buildCommodityData()
+                        self:_updateSortHeaders()
+                        if self.commodityList then self.commodityList:reloadData() end
+                        if self.selectedCropIndex > 0 then self:refreshPricesDetail() end
+                        return true
+                    end
+                end
+            end
+        end
     end
     return MDMMarketScreen:superClass().mouseEvent(self, posX, posY, isDown, isUp, button, eventUsed)
 end
@@ -594,6 +632,7 @@ end
 
 function MDMMarketScreen:rebuildAllData()
     self:_buildCommodityData()
+    self:_updateSortHeaders()
     self:_buildEventData()
     self:_buildContractData()
 end
@@ -625,10 +664,37 @@ function MDMMarketScreen:_buildCommodityData()
         end
     end
 
-    table.sort(self.commodities, function(a, b) return a.title < b.title end)
+    local sortField = self.sortField
+    local sortAsc   = self.sortAscending
+    table.sort(self.commodities, function(a, b)
+        if sortField == SORT_PRICE then
+            return sortAsc and (a.current < b.current) or (a.current > b.current)
+        elseif sortField == SORT_CHANGE then
+            return sortAsc and (a.changePct < b.changePct) or (a.changePct > b.changePct)
+        else
+            return sortAsc and (a.title < b.title) or (a.title > b.title)
+        end
+    end)
 
     if self.selectedCropIndex > #self.commodities then
         self.selectedCropIndex = math.max(1, #self.commodities)
+    end
+end
+
+function MDMMarketScreen:_updateSortHeaders()
+    local asc = self.sortAscending and " \226\150\178" or " \226\150\188"  -- ▲ / ▼ (UTF-8)
+    local function hdr(key, fallback, isActive)
+        local txt = (g_i18n and g_i18n:getText(key)) or fallback
+        return isActive and (txt .. asc) or txt
+    end
+    if self.colHeaderCrop then
+        self.colHeaderCrop:setText(hdr("mdm_screen_col_crop", "Crop", self.sortField == SORT_NAME))
+    end
+    if self.colHeaderPrice then
+        self.colHeaderPrice:setText(hdr("mdm_screen_col_price", "Price", self.sortField == SORT_PRICE))
+    end
+    if self.colHeaderChange then
+        self.colHeaderChange:setText(hdr("mdm_screen_col_change", "Change", self.sortField == SORT_CHANGE))
     end
 end
 
@@ -1034,6 +1100,9 @@ function MDMMarketScreen._performRegistration(modDir)
         _setById("detailChange", nil, "")
         _setById("detailVolatility", nil, "")
         _setById("detailModifiers", nil, "")
+
+        -- Apply initial sort header indicators
+        pcall(function() scr:_updateSortHeaders() end)
         return
     end
 
