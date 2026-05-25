@@ -13,7 +13,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(npx *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(xargs grep -l \"UserManager\\\\|getMasterUser\")",
+      "Skill(fs25-bump)",
+      "Skill(fs25-changelog)",
+      "Skill(fs25-issues)"
     ]
   }
 }

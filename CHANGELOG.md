@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0.1] - 2026-05-25
+
+### Fixed
+- Swapped out the ▲/▼ indicators since FS25 does not like it
+- Fixed `nill` error from missing l10n string
+- Updated all translation files (new keys have been added)
+
+---
+
+## [1.2.0.0] - 2026-05-24
+
+### Added
+- **Commodity list sorting** — Click the Crop, Price, or Change column header in the Prices tab to sort the list by that field. Click again to reverse the sort direction. An ▲/▼ indicator shows the active sort column and direction. Default remains alphabetical by name.
+
+### Fixed
+- **Realistic Economy Mod compatibility** — MDM now uses the live `EconomyManager.getPricePerLiter` at mission load time (not a source-time snapshot), so economy mods that adjust base prices after MDM loads are automatically picked up as MDM's price base. MDM's own volatility, world events, and futures contracts then apply on top.
+
+---
+
 ## [1.1.9.3] - 2026-05-05
 
 ### Fixed

@@ -76,6 +76,7 @@
         <text name="mdm_unit_game_days"       text="In-Game Days" />
         <text name="mdm_unit_real_days"       text="Real Days" />
         <text name="mdm_dialog_delivery_label" text="Leveringsvindue"/>
+		<text name="mdm_timescale_drift_warning" text="[EN] Time scale changed — real-day contract deadlines may be affected."/>
         <text name="mdm_dialog_no_crops" text="Ingen markedsdata tilgængelige endnu."/>
         <text name="mdm_screen_new_contract_btn" text="Ny kontrakt [N]"/>
 		<text name="mdm_custom_amount" text="[EN] Custom Amount"/>
@@ -121,6 +122,9 @@
 		<text name="mdm_delivered_value" text="[EN] Delivered value:  $%s  (%d%%)"/>
 		<text name="mdm_adm_hint_complete" text="[EN] Complete: force full payout now at locked price."/>
 		<text name="mdm_adm_hint_cancel" text="[EN] Cancel: remove contract — no payout, no penalty."/>
+		<text name="mdm_adm_btn_cancel" text="[EN] Cancel (No Penalty)"/>
+		<text name="mdm_adm_btn_forfeit" text="[EN] Forfeit (Penalty)"/>
+		<text name="mdm_adm_hint_forfeit" text="[EN] Forfeit: terminate contract immediately. A penalty will be applied to the undelivered portion."/>
 		<text name="mdm_current_price_fmt" text="[EN] Current price:  $%.0f / 1,000L"/>
 		<text name="mdm_change_from_base_fmt" text="[EN] Change from base:  %s%.1f%%"/>
 		<text name="mdm_summary_crop" text="[EN] Crop:          "/>
