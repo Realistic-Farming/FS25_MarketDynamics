@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0.1] - 2026-05-25
+
+### Fixed
+- Swapped out the ▲/▼ indicators since FS25 does not like it
+- Fixed `nill` error from missing l10n string
+- Updated all translation files (new keys have been added)
+
+---
+
 ## [1.2.0.0] - 2026-05-24
 
 ### Added

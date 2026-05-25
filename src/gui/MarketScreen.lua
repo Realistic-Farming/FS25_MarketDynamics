@@ -188,7 +188,7 @@ function MDMMarketScreen:onGuiSetupFinished()
     end
 
     _setTextSafe(self.categoryHeaderText, "mdm_screen_title", "Market Dynamics")
-    _setTextSafe(self.currentBalanceText, nil, "")
+    if self.currentBalanceText then self.currentBalanceText:setText("") end
     _setTextSafe(self.commoditiesHeader, "mdm_screen_commodities", "COMMODITIES")
     _setTextSafe(self.colHeaderCrop, "mdm_label_crop", "Crop")
     _setTextSafe(self.colHeaderPrice, "mdm_label_price", "Price")
@@ -653,7 +653,7 @@ function MDMMarketScreen:_buildCommodityData()
             table.insert(self.commodities, {
                 idx        = fillTypeIndex,
                 name       = fillType.name,
-                title      = fillType.title or fillType.name,
+                title      = fillType.title or fillType.name or tostring(fillTypeIndex),
                 current    = entry.current,
                 base       = entry.base,
                 changePct  = changePct,
@@ -668,11 +668,14 @@ function MDMMarketScreen:_buildCommodityData()
     local sortAsc   = self.sortAscending
     table.sort(self.commodities, function(a, b)
         if sortField == SORT_PRICE then
-            if sortAsc then return a.current < b.current else return a.current > b.current end
+            local ac, bc = a.current or 0, b.current or 0
+            if sortAsc then return ac < bc else return ac > bc end
         elseif sortField == SORT_CHANGE then
-            if sortAsc then return a.changePct < b.changePct else return a.changePct > b.changePct end
+            local ap, bp = a.changePct or 0, b.changePct or 0
+            if sortAsc then return ap < bp else return ap > bp end
         else
-            if sortAsc then return a.title < b.title else return a.title > b.title end
+            local at, bt = a.title or "", b.title or ""
+            if sortAsc then return at < bt else return at > bt end
         end
     end)
 
@@ -682,7 +685,7 @@ function MDMMarketScreen:_buildCommodityData()
 end
 
 function MDMMarketScreen:_updateSortHeaders()
-    local asc = self.sortAscending and " \226\150\178" or " \226\150\188"  -- ▲ / ▼ (UTF-8)
+    local asc = self.sortAscending and " ^" or " v"  -- ASCII sort indicators
     local function hdr(key, fallback, isActive)
         local txt = (g_i18n and g_i18n:getText(key)) or fallback
         return isActive and (txt .. asc) or txt

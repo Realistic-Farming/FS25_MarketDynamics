@@ -76,6 +76,7 @@
         <text name="mdm_unit_game_days"       text="In-Game Days" />
         <text name="mdm_unit_real_days"       text="Real Days" />
         <text name="mdm_dialog_delivery_label" text="Fenêtre de livraison"/>
+		<text name="mdm_timescale_drift_warning" text="[EN] Time scale changed — real-day contract deadlines may be affected."/>
         <text name="mdm_dialog_no_crops" text="Aucune donnée de marché disponible pour l'instant."/>
         <text name="mdm_screen_new_contract_btn" text="Nouveau contrat [N]"/>
 		<text name="mdm_custom_amount" text="Quantité personnalisée"/>
@@ -121,6 +122,9 @@
 		<text name="mdm_delivered_value" text="Valeur livrée : $%s (%d%%)"/>
 		<text name="mdm_adm_hint_complete" text="Terminer : forcer immédiatement le paiement complet au prix verrouillé."/>
 		<text name="mdm_adm_hint_cancel" text="Annuler : supprimer le contrat — aucun paiement, aucune pénalité."/>
+		<text name="mdm_adm_btn_cancel" text="[EN] Cancel (No Penalty)"/>
+		<text name="mdm_adm_btn_forfeit" text="[EN] Forfeit (Penalty)"/>
+		<text name="mdm_adm_hint_forfeit" text="[EN] Forfeit: terminate contract immediately. A penalty will be applied to the undelivered portion."/>
 		<text name="mdm_current_price_fmt" text="Prix actuel : $%.0f / 1 000L"/>
 		<text name="mdm_change_from_base_fmt" text="Variation par rapport à la base : %s%.1f%%"/>
 		<text name="mdm_summary_crop" text="Culture : "/>
