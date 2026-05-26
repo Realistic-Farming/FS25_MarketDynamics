@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Mild"/>
         <text name="mdm_hud_event_moderate" text="Måttlig"/>
         <text name="mdm_hud_event_severe" text="Svår"/>
-        <text name="mdm_screen_title" text="Marknadsdynamik"/>
+        <text name="mdm_screen_title" text="Marknadsdynamik" />
+        <text name="global_mdm_screen_title" text="Marknadsdynamik"/>
         <text name="mdm_screen_no_data" text="Inga prisuppgifter tillgängliga"/>
         <text name="mdm_screen_no_history" text="Ingen historik registrerad ännu"/>
         <text name="mdm_screen_close_hint" text="Tryck på ESC för att stänga"/>

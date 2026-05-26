@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Łagodne"/>
         <text name="mdm_hud_event_moderate" text="Umiarkowane"/>
         <text name="mdm_hud_event_severe" text="Poważne"/>
-        <text name="mdm_screen_title" text="Dynamika rynku"/>
+        <text name="mdm_screen_title" text="Dynamika rynku" />
+        <text name="global_mdm_screen_title" text="Dynamika rynku"/>
         <text name="mdm_screen_no_data" text="Brak danych cenowych"/>
         <text name="mdm_screen_no_history" text="Nie zapisano jeszcze żadnej historii"/>
         <text name="mdm_screen_close_hint" text="Naciśnij ESC, aby zamknąć"/>

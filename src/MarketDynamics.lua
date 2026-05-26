@@ -70,7 +70,7 @@ function MarketDynamics:onMissionLoaded(mission)
     self.isActive = true             -- PriceHook now routes through MDM
     BCIntegration.init(self.marketEngine, self.futuresMarket)
     UPIntegration.init()
-    MDMSettingsUI.initGui(self.modDir)
+    self.settingsPanel = MDMSettingsPanel.new(self.settings)
     
     MDMAdminCommands_register()
 

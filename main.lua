@@ -31,7 +31,6 @@ GuiOverlay.resolveFilename = Utils.overwrittenFunction(GuiOverlay.resolveFilenam
 -- ---------------------------------------------------------------------------
 
 local mdm = nil  -- will hold the MarketDynamics instance
-local MDMInputListener -- forward declaration (used by onStartMission)
 
 local function onLoad(mission)
     mdm = MarketDynamics.new(modDirectory, modName)
@@ -51,7 +50,6 @@ local function onStartMission(mission)
     if mdm then
         mdm:onStartMission(mission)
     end
-    MDMInputListener:registerActionEvents()
 end
 
 local function onUpdate(mission, dt)
@@ -89,65 +87,93 @@ local function onDelete(mission)
     end
 end
 
-MDMInputListener = {}
+-- ---------------------------------------------------------------------------
+-- Input Handling (RVB Pattern)
+-- ---------------------------------------------------------------------------
 
-function MDMInputListener:registerActionEvents()
+local function mdmSettingsActionCallback(self, actionName, inputValue, callbackState, isAnalog)
+    if inputValue <= 0 then return end
     if not mdm then return end
-    if self.isRegistered then return end
-    if g_inputBinding == nil then return end
-    self.isRegistered = true
+    -- Don't open while another dialog is showing
+    if g_gui and (g_gui:getIsGuiVisible() or g_gui:getIsDialogVisible()) then return end
+    mdm:toggleSettings()
+end
 
-    local function actionId(actionName)
-        if InputAction ~= nil and InputAction[actionName] ~= nil then
-            return InputAction[actionName]
+local function mdmMarketScreenActionCallback(self, actionName, inputValue, callbackState, isAnalog)
+    if inputValue <= 0 then return end
+    MDMMarketScreen.toggle()
+end
+
+local function mdmCreateContractActionCallback(self, actionName, inputValue, callbackState, isAnalog)
+    if inputValue <= 0 then return end
+    MDMMarketScreen.onGlobalCreateContract()
+end
+
+local function hookMDMInput()
+    if PlayerInputComponent == nil or PlayerInputComponent.registerActionEvents == nil then
+        print("[MDM] PlayerInputComponent.registerActionEvents not available")
+        return
+    end
+
+    local originalRegister = PlayerInputComponent.registerActionEvents
+    PlayerInputComponent.registerActionEvents = function(inputComponent, ...)
+        originalRegister(inputComponent, ...)
+
+        if inputComponent.player ~= nil and inputComponent.player.isOwner then
+            g_inputBinding:beginActionEventsModification(PlayerInputComponent.INPUT_CONTEXT_NAME)
+
+            -- Market Screen (F10)
+            local screenActionId = InputAction.MDM_MARKET_SCREEN
+            if screenActionId ~= nil then
+                local success, eventId = g_inputBinding:registerActionEvent(
+                    screenActionId, nil, mdmMarketScreenActionCallback,
+                    false, true, false, true
+                )
+                if success and eventId then
+                    g_inputBinding:setActionEventTextVisibility(eventId, false)
+                end
+            end
+
+            -- Create Contract (N)
+            local contractActionId = InputAction.MDM_CREATE_CONTRACT
+            if contractActionId ~= nil then
+                local success, eventId = g_inputBinding:registerActionEvent(
+                    contractActionId, nil, mdmCreateContractActionCallback,
+                    false, true, false, true
+                )
+                if success and eventId then
+                    g_inputBinding:setActionEventTextVisibility(eventId, false)
+                end
+            end
+
+            -- Settings (F5)
+            local settingsActionId = InputAction.MDM_OPEN_SETTINGS
+            if settingsActionId ~= nil then
+                local success, eventId = g_inputBinding:registerActionEvent(
+                    settingsActionId, nil, mdmSettingsActionCallback,
+                    false, true, false, true
+                )
+                if success and eventId then
+                    g_inputBinding:setActionEventTextVisibility(eventId, false)
+                    g_inputBinding:setActionEventActive(eventId, true)
+                    MDMLog.info("[MDM] F5 Settings panel toggle registered via hook")
+                end
+            end
+
+            g_inputBinding:endActionEventsModification()
         end
-        return actionName
-    end
-
-    -- Market Screen Toggle
-    local _, screenEventId = g_inputBinding:registerActionEvent(
-        actionId("MDM_MARKET_SCREEN"), nil, MDMMarketScreen.toggle,
-        false, true, false, true
-    )
-    if screenEventId then
-        g_inputBinding:setActionEventTextVisibility(screenEventId, false)
-        MDMLog.info("[MDM] F10 Market Screen toggle registered")
-    end
-
-    -- Create Contract Hotkey
-    local _, contractEventId = g_inputBinding:registerActionEvent(
-        actionId("MDM_CREATE_CONTRACT"), nil, MDMMarketScreen.onGlobalCreateContract,
-        false, true, false, true
-    )
-    if contractEventId then
-        g_inputBinding:setActionEventTextVisibility(contractEventId, false)
-        MDMLog.info("[MDM] N Contract hotkey registered")
     end
 end
 
--- Fallbacks to ensure it gets called depending on the exact FS25 event broadcast
-function MDMInputListener:loadMap(name)
-    self:registerActionEvents()
-end
-function MDMInputListener:onRegisterActionEvents()
-    self:registerActionEvents()
-end
-
-addModEventListener(MDMInputListener)
-
-local function ensureActionEvents(mission, dt)
-    if MDMInputListener and not MDMInputListener.isRegistered then
-        MDMInputListener:registerActionEvents()
-    end
-end
+-- Call hook at source time
+hookMDMInput()
 
 -- Attach to game hooks
 Mission00.load                  = Utils.prependedFunction(Mission00.load,                  onLoad)
 Mission00.loadMission00Finished = Utils.appendedFunction(Mission00.loadMission00Finished,  onLoadFinished)
 Mission00.onStartMission        = Utils.appendedFunction(Mission00.onStartMission,         onStartMission)
 FSBaseMission.update            = Utils.appendedFunction(FSBaseMission.update,             onUpdate)
-FSBaseMission.update            = Utils.appendedFunction(FSBaseMission.update,             ensureActionEvents)
 FSBaseMission.draw              = Utils.appendedFunction(FSBaseMission.draw,               onDraw)
 FSBaseMission.mouseEvent        = Utils.appendedFunction(FSBaseMission.mouseEvent,         onMouseEvent)
-FSBaseMission.saveSavegame = Utils.appendedFunction(FSBaseMission.saveSavegame, onSave)
+FSBaseMission.saveSavegame      = Utils.appendedFunction(FSBaseMission.saveSavegame,       onSave)
 FSBaseMission.delete            = Utils.appendedFunction(FSBaseMission.delete,             onDelete)

@@ -1,694 +1,600 @@
--- SettingsUI.lua
--- Adds a dedicated "Market Dynamics" tab to ESC > Settings.
--- All GUI elements are created programmatically (no g_gui:loadGui / XML needed).
--- g_gui:loadGui requires a proper frame subclass as controller — plain tables
--- and even bare GuiElement instances cause "missing method" crashes in Gui.lua.
---
--- Lifecycle:
---   1. initHooks()       — at source time: appends to InGameMenuSettingsFrame.onFrameOpen
---   2. MDMSettingsUI.initGui(modDir) — called from MarketDynamics:onMissionLoaded (marks ready)
---   3. onFrameOpen (first call) — builds all elements, inserts tab, hooks paging
---   4. onFrameOpen (subsequent) — refreshes element states from current settings
---
--- HOW TO ADD A NEW SETTING:
---   1. Add a default value to MarketDynamics.settings in MarketDynamics.lua
---   2. Add save/load in MarketSerializer.lua
---   3. Call _addBinary() or _addMulti() in _addSettingsElements()
---   4. Add a refresh line in _updateSettingsUI()
---   5. Add a callback handler in the Callback Handlers section below
---
--- Author: tison (dev-1)
+-- MDMSettingsPanel.lua
+-- Self-contained, drawn settings panel for Market Dynamics.
+-- Pattern based on SoilSettingsPanel (FS25_SoilFertilizer).
 
-MDMSettingsUI = {}
+---@class MDMSettingsPanel
+MDMSettingsPanel = {}
+local MDMSettingsPanel_mt = Class(MDMSettingsPanel)
 
--- ---------------------------------------------------------------------------
--- State
--- ---------------------------------------------------------------------------
+local MDM_MOD_NAME = g_currentModName
 
-local _modDir      = g_currentModDirectory  -- captured at source time
-local _guiLoaded   = false  -- g_gui:loadGui completed
-local _tabInserted = false  -- tab injected into settings frame
+-- ── i18n helper ───────────────────────────────────────────
+local function tr(key, fallback)
+    local modEnv = g_modEnvironments and g_modEnvironments[MDM_MOD_NAME]
+    local i18n   = (modEnv and modEnv.i18n) or g_i18n
+    if i18n then
+        local ok, text = pcall(function() return i18n:getText(key) end)
+        if ok and text and text ~= "" and text ~= ("$l10n_" .. key) then
+            return text
+        end
+    end
+    return fallback or key
+end
 
--- Stored element references (set in addSettingsElements, read in updateSettingsUI)
-local _elem = {}
+-- ── Panel geometry (normalized, Y=0 at bottom) ────────────
+local PW   = 0.62
+local PH   = 0.76
+local PX   = (1 - PW) / 2
+local PY   = (1 - PH) / 2
 
--- Option values for dropdowns (parallel to display strings)
-local VOLATILITY_VALUES      = { 0.5, 1.0, 1.5, 2.0 }
-local EVENT_FREQUENCY_VALUES = { 0.4, 1.0, 2.0 }
-local FUTURES_PENALTY_VALUES = { 0.08, 0.15, 0.25 }
+local TB_H = 0.052
+local IB_H = 0.046
+local PAD  = 0.018
 
--- ---------------------------------------------------------------------------
--- XML controller callbacks (called by the game from XML onClick="...")
--- ---------------------------------------------------------------------------
+local CX     = PX + PAD
+local CW     = PW - PAD * 2
+local CY_BOT = PY + IB_H + 0.010
+local CY_TOP = PY + PH - TB_H - 0.008
+local CH     = CY_TOP - CY_BOT
 
--- Called when the player clicks our tab button in the settings navigation bar.
-function MDMSettingsUI:onClickMDM()
-    local ps = g_inGameMenu and g_inGameMenu.pageSettings
-    if not ps or not MDMSettingsUI.modPageNr then return end
-    ps.subCategoryPaging:setState(MDMSettingsUI.modPageNr, true)
-    -- Set header text directly after setState — vanilla updateSubCategoryPages
-    -- runs inside setState and may show a missing-key error; this overrides it.
-    if ps.categoryHeaderText then
-        ps.categoryHeaderText:setText(g_i18n:getText("mdm_screen_title") or "Market Dynamics")
+-- Landing: category cards
+local CARD_GAP = 0.012
+local CARD_W   = (CW - CARD_GAP * 1) / 2 -- 2 cards wide for MDM
+local CARD_H   = 0.30
+local CARD_Y   = CY_BOT + (CH - CARD_H) / 2
+
+-- Category page rows
+local ROW_H    = 0.038
+local SEC_H    = 0.026
+local TOGGLE_W = 0.048
+local TOGGLE_H = 0.026
+local TOGGLE_GAP = 0.004
+local MULTI_W  = 0.175
+
+-- Text sizes
+local TS_TITLE = 0.018
+local TS_BODY  = 0.015
+local TS_SMALL = 0.013
+local TS_TINY  = 0.011
+
+-- ── Colors ────────────────────────────────────────────────
+local C = {
+    bg          = {0.04, 0.05, 0.09, 0.97},
+    title_bg    = {0.06, 0.08, 0.12, 1.0},
+    info_bg     = {0.03, 0.04, 0.07, 1.0},
+    border      = {0.90, 0.72, 0.20, 0.40}, -- Amber
+    shadow      = {0.00, 0.00, 0.00, 0.45},
+    divider     = {0.20, 0.22, 0.28, 0.55},
+    row_alt     = {1.00, 1.00, 1.00, 0.025},
+    row_hover   = {0.90, 0.72, 0.20, 0.08},
+    white       = {1.00, 1.00, 1.00, 1.0},
+    dim         = {0.55, 0.55, 0.60, 1.0},
+    hint        = {0.38, 0.38, 0.46, 1.0},
+    on_bg       = {0.22, 0.75, 0.33, 1.0},
+    off_bg      = {0.15, 0.16, 0.20, 1.0},
+    on_text     = {0.00, 0.00, 0.00, 1.0},
+    off_text    = {0.45, 0.46, 0.52, 1.0},
+    lock_bg     = {0.22, 0.14, 0.05, 0.70},
+    lock_text   = {0.88, 0.60, 0.18, 1.0},
+    card_hover  = {1.00, 1.00, 1.00, 0.04},
+    accent      = {0.90, 0.72, 0.20, 1.0},
+    accent_dim  = {0.55, 0.45, 0.12, 1.0},
+    close_hover = {0.88, 0.25, 0.25, 0.80},
+    back_hover  = {0.90, 0.72, 0.20, 0.18},
+    info_admin  = {0.32, 0.88, 0.44, 1.0},
+    info_no_adm = {0.88, 0.60, 0.18, 1.0},
+    info_mode   = {0.55, 0.55, 0.62, 1.0},
+}
+
+-- ── Multi-option definitions ───────────────────────────────
+local MULTI_OPTS = {
+    eventFrequency = {
+        values = { 0.4, 1.0, 2.0 },
+        labels = { "mdm_freq_rare", "mdm_freq_normal", "mdm_freq_frequent" },
+        i18n   = true,
+    },
+    futuresPenalty = {
+        values = { 0.08, 0.15, 0.25 },
+        labels = { "8%", "15%", "25%" },
+    }
+}
+
+-- ── Setting definitions ────────────────────────────────────
+local SETTING_DEFS = {
+    pricesEnabled          = { label = "mdm_set_prices_enabled",   desc = "mdm_desc_prices_enabled",   type = "bool" },
+    useRealDays            = { label = "mdm_set_use_real_days",    desc = "mdm_desc_use_real_days",    type = "bool" },
+    futuresPenalty         = { label = "mdm_set_futures_penalty",  desc = "mdm_desc_futures_penalty",  type = "multi" },
+    eventsEnabled          = { label = "mdm_set_events_enabled",   desc = "mdm_desc_events_enabled",   type = "bool" },
+    eventFrequency         = { label = "mdm_set_event_freq",       desc = "mdm_desc_event_freq",       type = "multi" },
+    showEventNotifications = { label = "mdm_set_event_notify",     desc = "mdm_desc_event_notify",     type = "bool" },
+    showContractHUD        = { label = "mdm_set_contract_hud",     desc = "mdm_desc_contract_hud",     type = "bool" },
+    debugMode              = { label = "mdm_set_debug_mode",       desc = "mdm_desc_debug_mode",       type = "bool" },
+}
+
+-- ── Category definitions ───────────────────────────────────
+local CATEGORIES = {
+    {
+        id       = "market",
+        labelKey = "mdm_cat_market",
+        descKey  = "mdm_cat_market_desc",
+        accent   = C.accent,
+        sections = {
+            { headerKey = "mdm_hdr_engine",   items = { "pricesEnabled", "useRealDays" } },
+            { headerKey = "mdm_hdr_futures",  items = { "futuresPenalty" } },
+        },
+    },
+    {
+        id       = "simulation",
+        labelKey = "mdm_cat_sim",
+        descKey  = "mdm_cat_sim_desc",
+        accent   = {0.32, 0.88, 0.44, 1.0}, -- Green for sim
+        sections = {
+            { headerKey = "mdm_hdr_events",   items = { "eventsEnabled", "eventFrequency", "showEventNotifications" } },
+            { headerKey = "mdm_hdr_display",  items = { "showContractHUD", "debugMode" } },
+        },
+    },
+}
+
+-- Pages
+local PAGE_LANDING  = "landing"
+local PAGE_CATEGORY = "category"
+local PAGE_ADMIN    = "admin"
+
+-- ── Constructor ───────────────────────────────────────────
+function MDMSettingsPanel.new(settings)
+    local self = setmetatable({}, MDMSettingsPanel_mt)
+    self.settings     = settings
+    self.fillOverlay  = nil
+    self.isVisible    = false
+    self.initialized  = false
+    self.page         = PAGE_LANDING
+    self.activeCatIdx = nil
+    self.mouseX       = 0
+    self.mouseY       = 0
+    self._clickRects  = {}
+    self.pageScrollPx = 0
+    return self
+end
+
+function MDMSettingsPanel:initialize()
+    if self.initialized then return end
+    if createImageOverlay then
+        self.fillOverlay = createImageOverlay("dataS/menu/base/graph_pixel.dds")
+    end
+    self.initialized = true
+end
+
+function MDMSettingsPanel:delete()
+    if self.fillOverlay then
+        delete(self.fillOverlay)
+        self.fillOverlay = nil
+    end
+    self.initialized = false
+end
+
+-- ── Visibility ────────────────────────────────────────────
+function MDMSettingsPanel:open()
+    if not self.initialized then self:initialize() end
+    self.isVisible    = true
+    self.page         = PAGE_LANDING
+    self.activeCatIdx = nil
+    self.pageScrollPx = 0
+    if g_inputBinding and g_inputBinding.setShowMouseCursor then
+        g_inputBinding:setShowMouseCursor(true, true)
     end
 end
 
--- ---------------------------------------------------------------------------
--- Initialisation — called from MarketDynamics:onMissionLoaded
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI.initGui(modDir)
-    if _guiLoaded then return end
-    -- All elements are built programmatically in _insertTab — nothing to load here.
-    _guiLoaded = true
-    MDMLog.info("SettingsUI: ready — tab will be built on first settings open")
+function MDMSettingsPanel:close()
+    self.isVisible = false
+    if g_inputBinding and g_inputBinding.setShowMouseCursor then
+        g_inputBinding:setShowMouseCursor(false)
+    end
 end
 
--- ---------------------------------------------------------------------------
--- Hook: InGameMenuSettingsFrame.onFrameOpen
--- 'self' is the InGameMenuSettingsFrame instance
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI.onFrameOpen(self)
-    if not _guiLoaded then return end
-
-    -- Re-validate on every open: if the frame was rebuilt, or SERVER SETTINGS
-    -- (MP) or another mod displaced our tab, detect it and allow re-insertion.
-    if _tabInserted and MDMSettingsUI.mdmTab then
-        local ps = g_inGameMenu and g_inGameMenu.pageSettings
-        local found = false
-        if ps then
-            for i, tab in ipairs(ps.subCategoryTabs) do
-                if tab == MDMSettingsUI.mdmTab then
-                    MDMSettingsUI.modPageNr = i  -- sync if position shifted
-                    found = true
-                    break
-                end
-            end
-        end
-        if not found then
-            _tabInserted = false
-            MDMSettingsUI.mdmTab         = nil
-            MDMSettingsUI.mdmPage        = nil
-            MDMSettingsUI.settingsLayout = nil
-        end
-    end
-
-    if not _tabInserted then
-        if MDMSettingsUI._insertTab() then
-            _tabInserted = true
-        else
-            return  -- not ready yet — try again next open
-        end
-    end
-
-    MDMSettingsUI._updateSettingsUI()
+function MDMSettingsPanel:toggle()
+    if self.isVisible then self:close() else self:open() end
 end
 
--- ---------------------------------------------------------------------------
--- Tab insertion — runs once, on the first settings frame open after initGui
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI._insertTab()
-    local ps = g_inGameMenu and g_inGameMenu.pageSettings
-    if not ps then
-        MDMLog.warn("SettingsUI: pageSettings not available yet")
-        return false
+-- ── Update / Main loop ────────────────────────────────────
+function MDMSettingsPanel:update(dt)
+    if not self.isVisible then return end
+    if g_inputBinding and g_inputBinding.setShowMouseCursor then
+        g_inputBinding:setShowMouseCursor(true, true)
     end
-
-    -- ── Position: always last tab ──────────────────────────────────────────
-    -- Use the larger of subCategoryTabs and subCategoryPages so we land after
-    -- any tab (e.g. the MP SERVER SETTINGS tab) that may be registered in one
-    -- array but not yet the other at the time of insertion.
-    local tabCount  = #ps.subCategoryTabs
-    local pageCount = ps.subCategoryPages and #ps.subCategoryPages or tabCount
-    local pos = math.max(tabCount, pageCount) + 1
-    MDMSettingsUI.modPageNr = pos
-
-    -- Helper: reparent element and insert at exact position (same as BC's addElementAtPosition)
-    local function addAt(element, target, insertPos)
-        if element.parent then element.parent:removeElement(element) end
-        table.insert(target.elements, insertPos, element)
-        element.parent = target
+    -- Auto-close when a game menu opens
+    if g_gui and (g_gui:getIsGuiVisible() or g_gui:getIsDialogVisible()) then
+        self:close()
     end
+end
 
-    -- ── Tab button ─────────────────────────────────────────────────────────
-    local mdmTab = ButtonElement.new()
-    mdmTab:loadProfile(g_gui:getProfile("fs25_subCategorySelectorTabbedTab"), true)
-    mdmTab.textUpperCase = false
-    mdmTab:setText(g_i18n:getText("mdm_screen_title") or "Market Dynamics")
-    mdmTab.target = MDMSettingsUI
-    mdmTab:setCallback("onClickCallback", "onClickMDM")
-    -- onGuiSetupFinished called AFTER adding to parent (needs parent context)
-    addAt(mdmTab, ps.subCategoryBox, pos)
-    mdmTab:onGuiSetupFinished()
-
-    -- ── Page container ─────────────────────────────────────────────────────
-    local mdmPage = GuiElement.new()
-    mdmPage:loadProfile(g_gui:getProfile("fs25_subCategorySelectorTabbedContainer"), true)
-
-    -- ── Scrolling layout (holds all settings rows) ─────────────────────────
-    local settingsLayout = ScrollingLayoutElement.new()
-    settingsLayout:loadProfile(g_gui:getProfile("fs25_settingsLayout"), true)
-    mdmPage:addElement(settingsLayout)
-    settingsLayout:onGuiSetupFinished()
-
-    -- ── Bottom separator (matches vanilla style) ───────────────────────────
-    local sep = BitmapElement.new()
-    sep:loadProfile(g_gui:getProfile("fs25_settingsTooltipSeparator"), true)
-    mdmPage:addElement(sep)
-    sep:onGuiSetupFinished()
-
-    -- onGuiSetupFinished on page AFTER children and AFTER adding to frame
-    addAt(mdmPage, ps.subCategoryPages[1].parent, pos)
-    mdmPage:onGuiSetupFinished()
-    mdmPage:setVisible(false)  -- hidden by default; shown only when our tab is active
-
-    -- Store references used by _addSettingsElements and _updateSettingsUI
-    MDMSettingsUI.mdmTab         = mdmTab
-    MDMSettingsUI.mdmPage        = mdmPage
-    MDMSettingsUI.settingsLayout = settingsLayout
-
-    ps:updateAbsolutePosition()
-
-    -- Wire page target for focus/navigation system
-    mdmPage:setTarget(ps, mdmPage.target)
-    -- Note: do NOT call setTarget on mdmTab — it would overwrite our MDMSettingsUI callback target
-
-    -- Register in the official arrays (the frame iterates these)
-    ps.subCategoryPages[pos] = mdmPage
-    ps.subCategoryTabs[pos]  = mdmTab
-
-    -- CRITICAL: add our page index as a new state in the paging MultiTextOption.
-    -- Without this, the nav arrows only cycle through vanilla states and never reach us.
-    if ps.subCategoryPaging then
-        ps.subCategoryPaging:addText(pos)
-    end
-
-    -- Re-layout the tab button row so our new button appears
-    ps.subCategoryBox:invalidateLayout()
-
-    -- Build settings content
-    MDMSettingsUI._addSettingsElements()
-
-    -- Register header icon/title.
-    -- onClickMDM (above) also calls categoryHeaderText:setText() directly after
-    -- setState, which is the reliable override for l10n lookup failures.
-    InGameMenuSettingsFrame.SUB_CATEGORY = InGameMenuSettingsFrame.SUB_CATEGORY or {}
-    InGameMenuSettingsFrame.SUB_CATEGORY.MARKET_DYNAMICS = pos
-    if InGameMenuSettingsFrame.HEADER_TITLES then
-        InGameMenuSettingsFrame.HEADER_TITLES[pos] = "mdm_settings_mdm_general"
-    end
-    if InGameMenuSettingsFrame.HEADER_SLICES then
-        -- Borrow the Game Settings icon (index 1) — a safe, guaranteed-valid slice
-        InGameMenuSettingsFrame.HEADER_SLICES[pos] = InGameMenuSettingsFrame.HEADER_SLICES[1]
-    end
-
-    -- Patch InGameMenuSettingsFrame.updateSubCategoryPages (the class method) so that
-    -- Q/E keyboard navigation (which calls this method directly, bypassing the paging
-    -- instance callback) also gets the correct header text for our tab.
-    -- Patch InGameMenuSettingsFrame.updateSubCategoryPages (the class method) so that
-    -- Q/E keyboard navigation (which calls this method directly, bypassing the paging
-    -- instance callback) also gets the correct header text for our tab.
-    -- Visibility is handled by vanilla (mdmPage is registered in subCategoryPages)
-    -- and by the setVisible(false) init above — do NOT touch visibility here or it
-    -- conflicts with BC and other mods that also append this function.
-    InGameMenuSettingsFrame.updateSubCategoryPages = Utils.appendedFunction(
-        InGameMenuSettingsFrame.updateSubCategoryPages,
-        function(self, state)
-            if state == MDMSettingsUI.modPageNr and self.categoryHeaderText then
-                self.categoryHeaderText:setText(g_i18n:getText("mdm_screen_title") or "Market Dynamics")
-            end
+-- ── Admin helper ──────────────────────────────────────────
+function MDMSettingsPanel:isAdmin()
+    if g_server ~= nil then return true end
+    if g_currentMission and g_currentMission.missionDynamicInfo then
+        if not g_currentMission.missionDynamicInfo.isMultiplayer then
+            return true
         end
-    )
+    end
+    if g_localPlayer and g_localPlayer.getIsAdmin then
+        return g_localPlayer:getIsAdmin()
+    end
+    return false
+end
 
-    -- Update FocusManager so keyboard/controller navigation finds our elements
-    local currentGui = FocusManager.currentGui
-    FocusManager:setGui(ps.name)
-    FocusManager:removeElement(mdmPage)
-    FocusManager:removeElement(mdmTab)
-    FocusManager:loadElementFromCustomValues(mdmPage)
-    FocusManager:loadElementFromCustomValues(mdmTab)
-    FocusManager:setGui(currentGui)
+function MDMSettingsPanel:getValue(id)
+    return self.settings and self.settings[id]
+end
 
-    settingsLayout:invalidateLayout()
+function MDMSettingsPanel:requestChange(id, value)
+    if not id or not self.settings then return end
+    
+    -- Local only vs Synced logic could go here
+    -- For now, apply directly and assume serializer handles sync/save
+    self.settings[id] = value
+    
+    if id == "debugMode" then
+        if MDMLog then MDMLog.debugEnabled = value end
+    end
+    
+    -- Optional: broadcast event if needed
+end
 
-    MDMLog.info("SettingsUI: 'Market Dynamics' tab inserted at position " .. pos)
+-- ── Drawing helpers ───────────────────────────────────────
+function MDMSettingsPanel:drawRect(x, y, w, h, col, alpha)
+    if not self.fillOverlay then return end
+    local a = alpha or col[4] or 1.0
+    setOverlayColor(self.fillOverlay, col[1], col[2], col[3], a)
+    renderOverlay(self.fillOverlay, x, y, w, h)
+end
+
+function MDMSettingsPanel:drawText(x, y, size, text, col, align, bold)
+    setTextColor(col[1], col[2], col[3], col[4] or 1.0)
+    setTextBold(bold == true)
+    setTextAlignment(align or RenderText.ALIGN_LEFT)
+    renderText(x, y, size, tostring(text))
+    -- Reset
+    setTextAlignment(RenderText.ALIGN_LEFT)
+    setTextBold(false)
+    setTextColor(1, 1, 1, 1)
+end
+
+function MDMSettingsPanel:registerClick(id, x, y, w, h, data)
+    table.insert(self._clickRects, {id = id, x = x, y = y, w = w, h = h, data = data})
+end
+
+function MDMSettingsPanel:hitTest(rx, ry, rw, rh, mx, my)
+    return mx >= rx and mx <= rx + rw and my >= ry and my <= ry + rh
+end
+
+-- ── Main draw entry ───────────────────────────────────────
+function MDMSettingsPanel:draw()
+    if not self.isVisible then return end
+    if not self.initialized then return end
+
+    self._clickRects = {}
+
+    -- Dark screen fade
+    self:drawRect(0, 0, 1, 1, {0, 0, 0, 1}, 0.38)
+
+    -- Panel shadow
+    self:drawRect(PX + 0.004, PY - 0.004, PW, PH, C.shadow, 0.55)
+
+    -- Panel background
+    self:drawRect(PX, PY, PW, PH, C.bg)
+
+    -- Border
+    local bw = 0.0015
+    local bc = self.activeCatIdx and CATEGORIES[self.activeCatIdx].accent or C.border
+    self:drawRect(PX,           PY,           PW, bw, bc)
+    self:drawRect(PX,           PY + PH - bw, PW, bw, bc)
+    self:drawRect(PX,           PY,           bw, PH, bc)
+    self:drawRect(PX + PW - bw, PY,           bw, PH, bc)
+
+    if self.page == PAGE_LANDING then
+        self:drawLandingPage()
+    elseif self.page == PAGE_CATEGORY then
+        self:drawCategoryPage()
+    elseif self.page == PAGE_ADMIN then
+        self:drawAdminPage()
+    end
+
+    self:drawTitleBar()
+    self:drawInfoBar()
+end
+
+-- ── Title bar ─────────────────────────────────────────────
+function MDMSettingsPanel:drawTitleBar()
+    local ty = PY + PH - TB_H
+    self:drawRect(PX, ty, PW, TB_H, C.title_bg)
+
+    local acc = (self.page == PAGE_ADMIN) and {0.88, 0.25, 0.25, 1.0}
+             or (self.activeCatIdx and CATEGORIES[self.activeCatIdx].accent)
+             or C.border
+    self:drawRect(PX, ty, 0.004, TB_H, acc)
+
+    local title = "MARKET DYNAMICS SETTINGS"
+    if self.page == PAGE_ADMIN then
+        title = title .. "  /  ADMIN"
+    elseif self.activeCatIdx then
+        local cat = CATEGORIES[self.activeCatIdx]
+        title = title .. "  /  " .. string.upper(tr(cat.labelKey, cat.id))
+    end
+    self:drawText(PX + 0.018, ty + TB_H * 0.32, TS_TITLE, title, C.white, RenderText.ALIGN_LEFT, true)
+
+    -- [X] close button
+    local cbW = 0.038
+    local cbH = TB_H * 0.60
+    local cbX = PX + PW - cbW - 0.010
+    local cbY = ty + (TB_H - cbH) / 2
+    local chov = self:hitTest(cbX, cbY, cbW, cbH, self.mouseX, self.mouseY)
+    self:drawRect(cbX, cbY, cbW, cbH, chov and C.close_hover or C.off_bg)
+    self:drawText(cbX + cbW * 0.5, cbY + cbH * 0.18, TS_SMALL, "X", C.white, RenderText.ALIGN_CENTER, true)
+    self:registerClick("close", cbX, cbY, cbW, cbH)
+end
+
+-- ── Info bar ──────────────────────────────────────────────
+function MDMSettingsPanel:drawInfoBar()
+    local iy = PY
+    self:drawRect(PX, iy, PW, IB_H, C.info_bg)
+    self:drawRect(PX, iy + IB_H - 0.001, PW, 0.001, C.divider)
+
+    local isAdmin = self:isAdmin()
+    local isMP    = g_currentMission and g_currentMission.missionDynamicInfo and g_currentMission.missionDynamicInfo.isMultiplayer
+
+    local adminText  = isAdmin and tr("mdm_panel_admin_yes", "Admin: Yes") or tr("mdm_panel_admin_no", "Admin: No")
+    local adminColor = isAdmin and C.info_admin or C.info_no_adm
+    local modeText   = isMP and tr("mdm_panel_multiplayer", "Multiplayer") or tr("mdm_panel_singleplayer", "Singleplayer")
+
+    local textY = iy + IB_H * 0.25
+    self:drawText(PX + PAD, textY, TS_SMALL, adminText, adminColor, RenderText.ALIGN_LEFT, true)
+    self:drawText(PX + PAD + 0.095, textY, TS_SMALL, "·  " .. modeText, C.info_mode, RenderText.ALIGN_LEFT, false)
+
+    if self.page == PAGE_CATEGORY or self.page == PAGE_ADMIN then
+        local bbW = 0.085
+        local bbH = IB_H * 0.62
+        local bbX = PX + PW - bbW - 0.014
+        local bbY = iy + (IB_H - bbH) / 2
+        local bhov = self:hitTest(bbX, bbY, bbW, bbH, self.mouseX, self.mouseY)
+        self:drawRect(bbX, bbY, bbW, bbH, bhov and C.back_hover or C.off_bg)
+        self:drawRect(bbX, bbY, 0.002, bbH, C.accent)
+        self:drawText(bbX + bbW * 0.5, bbY + bbH * 0.18, TS_SMALL, tr("mdm_btn_back", "Back"), C.white, RenderText.ALIGN_CENTER, false)
+        self:registerClick("back", bbX, bbY, bbW, bbH)
+    else
+        self:drawText(PX + PW - PAD, textY, TS_SMALL, "F5 TO CLOSE", C.hint, RenderText.ALIGN_RIGHT, false)
+    end
+end
+
+-- ── Landing page ──────────────────────────────────────────
+function MDMSettingsPanel:drawLandingPage()
+    local headerY = CY_BOT + CH - 0.040
+    self:drawText(PX + PW * 0.5, headerY, TS_SMALL, tr("mdm_panel_select_cat", "Select a category to configure"), C.hint, RenderText.ALIGN_CENTER, false)
+
+    for i, cat in ipairs(CATEGORIES) do
+        local cardX = CX + (i - 1) * (CARD_W + CARD_GAP)
+        self:drawCategoryCard(cardX, CARD_Y, CARD_W, CARD_H, cat, i)
+    end
+    
+    -- Admin button
+    local btnW = 0.090
+    local btnH = 0.030
+    local btnX = CX + CW - btnW
+    local btnY = CY_BOT + 0.005
+    local bhov = self:hitTest(btnX, btnY, btnW, btnH, self.mouseX, self.mouseY)
+    self:drawRect(btnX, btnY, btnW, btnH, bhov and {0.55, 0.08, 0.08, 0.95} or {0.22, 0.05, 0.05, 0.88})
+    self:drawRect(btnX, btnY, 0.003, btnH, {0.88, 0.25, 0.25, 1.0})
+    self:drawText(btnX + btnW * 0.5, btnY + btnH * 0.22, TS_SMALL, "ADMIN", bhov and C.white or {0.85, 0.35, 0.35, 1.0}, RenderText.ALIGN_CENTER, true)
+    self:registerClick("open_admin", btnX, btnY, btnW, btnH)
+end
+
+function MDMSettingsPanel:drawCategoryCard(x, y, w, h, cat, idx)
+    local hovered = self:hitTest(x, y, w, h, self.mouseX, self.mouseY)
+    self:drawRect(x, y, w, h, C.bg)
+    if hovered then self:drawRect(x, y, w, h, C.card_hover) end
+
+    -- Border
+    local bw = 0.0012
+    self:drawRect(x,         y,         w, bw, cat.accent, 0.30)
+    self:drawRect(x,         y + h - bw, w, bw, cat.accent, 0.30)
+    self:drawRect(x,         y,         bw, h,  cat.accent, 0.30)
+    self:drawRect(x + w - bw, y,         bw, h,  cat.accent, 0.30)
+
+    -- Accent bar
+    self:drawRect(x, y + h - 0.018, w, 0.018, cat.accent, hovered and 0.85 or 0.65)
+
+    -- Title
+    local titleY = y + h - 0.018 - 0.042
+    self:drawText(x + w * 0.5, titleY, TS_BODY, string.upper(tr(cat.labelKey, cat.id)), C.white, RenderText.ALIGN_CENTER, true)
+
+    -- Description
+    local descY = titleY - 0.036
+    local descStr = tr(cat.descKey, "")
+    for line in (descStr .. "\n"):gmatch("([^\n]*)\n") do
+        self:drawText(x + w * 0.5, descY, TS_SMALL, line, C.dim, RenderText.ALIGN_CENTER, false)
+        descY = descY - 0.020
+    end
+
+    -- Button
+    local bW = w - 0.024
+    local bH = 0.028
+    local bX = x + 0.012
+    local bY = y + 0.006
+    self:drawRect(bX, bY, bW, bH, hovered and cat.accent or C.off_bg, hovered and 0.20 or 1.0)
+    self:drawText(bX + bW * 0.5, bY + bH * 0.18, TS_SMALL, hovered and tr("mdm_btn_open", "Open") or tr("mdm_btn_configure", "Configure"), hovered and cat.accent or C.hint, RenderText.ALIGN_CENTER, false)
+
+    self:registerClick("cat_" .. idx, x, y, w, h)
+end
+
+-- ── Category page ─────────────────────────────────────────
+function MDMSettingsPanel:drawCategoryPage()
+    if not self.activeCatIdx then return end
+    local cat = CATEGORIES[self.activeCatIdx]
+    if not cat then return end
+
+    local curY = CY_TOP
+    local isAdmin = self:isAdmin()
+    local rowIdx = 0
+
+    for _, sec in ipairs(cat.sections) do
+        curY = curY - SEC_H
+        if curY < CY_BOT then break end
+
+        self:drawRect(CX, curY, CW, SEC_H, C.title_bg, 0.60)
+        self:drawRect(CX, curY, 0.003, SEC_H, cat.accent)
+        self:drawText(CX + 0.012, curY + SEC_H * 0.25, TS_SMALL, string.upper(tr(sec.headerKey, "")), cat.accent, RenderText.ALIGN_LEFT, true)
+
+        for _, sid in ipairs(sec.items) do
+            curY = curY - ROW_H
+            if curY < CY_BOT then break end
+            rowIdx = rowIdx + 1
+            self:drawSettingRow(CX, curY, CW, sid, rowIdx, isAdmin, cat.accent)
+        end
+        curY = curY - 0.005
+    end
+end
+
+-- ── Admin page ────────────────────────────────────────────
+function MDMSettingsPanel:drawAdminPage()
+    self:drawText(CX + CW * 0.5, CY_TOP - 0.100, TS_BODY, "ADMIN TOOLS COMING SOON", C.dim, RenderText.ALIGN_CENTER, true)
+end
+
+-- ── Setting row ───────────────────────────────────────────
+function MDMSettingsPanel:drawSettingRow(x, y, w, sid, rowIdx, isAdmin, accent)
+    local def = SETTING_DEFS[sid]
+    if not def then return end
+
+    if rowIdx % 2 == 0 then self:drawRect(x, y, w, ROW_H, C.row_alt) end
+    if self:hitTest(x, y, w, ROW_H, self.mouseX, self.mouseY) then self:drawRect(x, y, w, ROW_H, C.row_hover) end
+
+    local locked = false -- MDM might not need per-setting locking yet
+    local lx = x + 0.008
+    self:drawText(lx, y + ROW_H * 0.54, TS_BODY, tr(def.label, sid), C.white, RenderText.ALIGN_LEFT, true)
+    self:drawText(lx, y + ROW_H * 0.15, TS_TINY, tr(def.desc, ""), C.dim, RenderText.ALIGN_LEFT, false)
+
+    local ctrlX = x + w - 0.012
+    local ctrlY = y + (ROW_H - TOGGLE_H) / 2
+
+    if def.type == "multi" then
+        self:drawMultiControl(ctrlX, ctrlY, sid, locked)
+    else
+        self:drawToggleControl(ctrlX, ctrlY, sid, locked)
+    end
+
+    self:drawRect(x, y, w, 0.0005, C.divider, 0.35)
+end
+
+-- ── Toggle control [OFF] [ON] ─────────────────────────────
+function MDMSettingsPanel:drawToggleControl(rightX, y, sid, locked)
+    local val = self:getValue(sid)
+    local isOn = val == true
+
+    local offX = rightX - TOGGLE_W * 2 - TOGGLE_GAP
+    local onX  = rightX - TOGGLE_W
+
+    self:drawRect(offX, y, TOGGLE_W, TOGGLE_H, (not isOn) and C.dim or C.off_bg, (not isOn) and 0.90 or 0.60)
+    self:drawText(offX + TOGGLE_W * 0.5, y + TOGGLE_H * 0.20, TS_TINY, "OFF", (not isOn) and C.white or C.off_text, RenderText.ALIGN_CENTER, not isOn)
+
+    self:drawRect(onX, y, TOGGLE_W, TOGGLE_H, isOn and C.on_bg or C.off_bg, isOn and 1.0 or 0.60)
+    self:drawText(onX + TOGGLE_W * 0.5, y + TOGGLE_H * 0.20, TS_TINY, "ON", isOn and C.on_text or C.off_text, RenderText.ALIGN_CENTER, isOn)
+
+    if not locked then
+        self:registerClick("toggle_off_" .. sid, offX, y, TOGGLE_W, TOGGLE_H, {id = sid, value = false})
+        self:registerClick("toggle_on_"  .. sid, onX,  y, TOGGLE_W, TOGGLE_H, {id = sid, value = true})
+    end
+end
+
+-- ── Multi-select control [< Option >] ────────────────────
+function MDMSettingsPanel:drawMultiControl(rightX, y, sid, locked)
+    local opt = MULTI_OPTS[sid]
+    if not opt then return end
+
+    local curVal = self:getValue(sid)
+    local curIdx = 1
+    for i, v in ipairs(opt.values) do
+        if v == curVal then curIdx = i; break end
+    end
+    local rawLabel = opt.labels[curIdx] or "?"
+    local label    = (opt.i18n and tr(rawLabel, rawLabel)) or rawLabel
+
+    local arrowW = 0.022
+    local labelW = MULTI_W - arrowW * 2
+    local totalX = rightX - MULTI_W
+    local leftX  = totalX
+    local midX   = totalX + arrowW
+    local rightBX = totalX + arrowW + labelW
+
+    local lHov = not locked and self:hitTest(leftX, y, arrowW, TOGGLE_H, self.mouseX, self.mouseY)
+    self:drawRect(leftX, y, arrowW, TOGGLE_H, lHov and C.back_hover or C.off_bg)
+    self:drawText(leftX + arrowW * 0.5, y + TOGGLE_H * 0.18, TS_TINY, "<", lHov and C.accent or C.dim, RenderText.ALIGN_CENTER, true)
+
+    self:drawRect(midX, y, labelW, TOGGLE_H, {0.10, 0.11, 0.15, 0.90})
+    self:drawText(midX + labelW * 0.5, y + TOGGLE_H * 0.18, TS_TINY, label, C.white, RenderText.ALIGN_CENTER, false)
+
+    local rHov = not locked and self:hitTest(rightBX, y, arrowW, TOGGLE_H, self.mouseX, self.mouseY)
+    self:drawRect(rightBX, y, arrowW, TOGGLE_H, rHov and C.back_hover or C.off_bg)
+    self:drawText(rightBX + arrowW * 0.5, y + TOGGLE_H * 0.18, TS_TINY, ">", rHov and C.accent or C.dim, RenderText.ALIGN_CENTER, true)
+
+    if not locked then
+        self:registerClick("multi_prev_" .. sid, leftX,   y, arrowW, TOGGLE_H, {id = sid, dir = -1})
+        self:registerClick("multi_next_" .. sid, rightBX, y, arrowW, TOGGLE_H, {id = sid, dir =  1})
+    end
+end
+
+-- ── Mouse event ───────────────────────────────────────────
+function MDMSettingsPanel:onMouseEvent(posX, posY, isDown, isUp, button, eventUsed)
+    if not self.isVisible then return false end
+
+    self.mouseX = posX
+    self.mouseY = posY
+
+    if not isDown then return true end
+    if button ~= Input.MOUSE_BUTTON_LEFT then return true end
+
+    for _, r in ipairs(self._clickRects) do
+        if self:hitTest(r.x, r.y, r.w, r.h, posX, posY) then
+            self:handleClick(r.id, r.data)
+            return true
+        end
+    end
+
+    if not self:hitTest(PX, PY, PW, PH, posX, posY) then
+        self:close()
+    end
+
     return true
 end
 
--- ---------------------------------------------------------------------------
--- Build settings elements into the ScrollingLayout
--- Called once from _insertTab(). Add new settings here (see HOW TO above).
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI._addSettingsElements()
-    local layout = MDMSettingsUI.settingsLayout
-    if not layout then return end
-
-    -- ── Prices ────────────────────────────────────────────────────────────
-
-    MDMSettingsUI._addSection(layout, g_i18n:getText("mdm_header_prices") or "Prices")
-
-    _elem.pricesEnabled = MDMSettingsUI._addBinary(
-        layout, "onMDMPricesEnabledChanged",
-        g_i18n:getText("mdm_prices_enabled") or "Dynamic Prices",
-        g_i18n:getText("mdm_prices_enabled_tooltip") or "Enable MDM price fluctuations. Off reverts to vanilla sell prices."
-    )
-
-    _elem.volatility = MDMSettingsUI._addMulti(
-        layout, "onMDMVolatilityChanged",
-        { 
-            g_i18n:getText("mdm_label_low") or "Low",
-            g_i18n:getText("mdm_label_normal") or "Normal",
-            g_i18n:getText("mdm_label_high") or "High",
-            g_i18n:getText("mdm_label_extreme") or "Extreme"
-        },
-        g_i18n:getText("mdm_price_volatility") or "Price Volatility",
-        g_i18n:getText("mdm_price_volatility_tooltip") or "How wildly prices swing intraday and day-to-day. Low=0.5x, Normal=1x, High=1.5x, Extreme=2x."
-    )
-
-    -- ── World Events ──────────────────────────────────────────────────────
-
-    MDMSettingsUI._addSection(layout, g_i18n:getText("mdm_header_world_events") or "World Events")
-
-    _elem.eventsEnabled = MDMSettingsUI._addBinary(
-        layout, "onMDMEventsEnabledChanged",
-        g_i18n:getText("mdm_events_enabled") or "World Events",
-        g_i18n:getText("mdm_events_enabled_tooltip") or "Enable or disable world events. Prices still fluctuate when events are off."
-    )
-
-    _elem.eventFrequency = MDMSettingsUI._addMulti(
-        layout, "onMDMEventFrequencyChanged",
-        { 
-            g_i18n:getText("mdm_label_rare") or "Rare",
-            g_i18n:getText("mdm_label_normal") or "Normal",
-            g_i18n:getText("mdm_label_frequent") or "Frequent"
-        },
-        g_i18n:getText("mdm_event_frequency") or "Event Frequency",
-        g_i18n:getText("mdm_event_frequency_tooltip") or "How often events occur. Rare=0.4x, Normal=1x, Frequent=2x the base probability per check."
-    )
-
-    -- ── Futures Contracts ─────────────────────────────────────────────────
-
-    MDMSettingsUI._addSection(layout, g_i18n:getText("mdm_header_futures") or "Futures Contracts")
-
-    _elem.futuresPenalty = MDMSettingsUI._addMulti(
-        layout, "onMDMFuturesPenaltyChanged",
-        {
-            g_i18n:getText("mdm_penalty_low") or "Low (8%)",
-            g_i18n:getText("mdm_penalty_normal") or "Normal (15%)",
-            g_i18n:getText("mdm_penalty_high") or "High (25%)"
-        },
-        g_i18n:getText("mdm_default_penalty") or "Default Penalty",
-        g_i18n:getText("mdm_default_penalty_tooltip") or "Penalty on the undelivered contract value when a deadline is missed."
-    )
-
-    _elem.useRealDays = MDMSettingsUI._addBinary(
-        layout, "onMDMUseRealDaysChanged",
-        g_i18n:getText("mdm_use_real_days") or "Delivery Time Unit",
-        g_i18n:getText("mdm_use_real_days_tooltip") or "Off = In-Game Days. On = Real Days (best-effort, tied to time scale at contract creation)."
-    )
-
-    -- ── Interface ─────────────────────────────────────────────────────────
-
-    MDMSettingsUI._addSection(layout, g_i18n:getText("mdm_header_interface") or "Interface")
-
-    _elem.showEventNotifications = MDMSettingsUI._addBinary(
-        layout, "onMDMShowEventNotificationsChanged",
-        g_i18n:getText("mdm_show_event_notifications") or "Event Notifications",
-        g_i18n:getText("mdm_show_event_notifications_tooltip") or "Show a confirmation dialog when a new world event begins."
-    )
-
-    _elem.showContractHUD = MDMSettingsUI._addBinary(
-        layout, "onMDMShowContractHUDChanged",
-        g_i18n:getText("mdm_show_contract_hud") or "Contract HUD",
-        g_i18n:getText("mdm_show_contract_hud_tooltip") or "Show an on-screen progress tracker for your active futures contract."
-    )
-
-    -- ── Status ────────────────────────────────────────────────────────────
-
-    MDMSettingsUI._addSection(layout, g_i18n:getText("mdm_header_status") or "Status")
-
-    _elem.statusVersion   = MDMSettingsUI._addStatusRow(layout, g_i18n:getText("mdm_status_version") or "Version:             —")
-    _elem.statusEvents    = MDMSettingsUI._addStatusRow(layout, g_i18n:getText("mdm_status_events") or "Active Events:       —")
-    _elem.statusBC        = MDMSettingsUI._addStatusRow(layout, g_i18n:getText("mdm_status_bc") or "FuturesMission:      —")
-    _elem.statusUP        = MDMSettingsUI._addStatusRow(layout, g_i18n:getText("mdm_status_up") or "UsedPlus:            —")
-
-    -- ── Debug ─────────────────────────────────────────────────────────────
-
-    MDMSettingsUI._addSection(layout, g_i18n:getText("mdm_header_debug") or "Debug")
-
-    _elem.debugMode = MDMSettingsUI._addBinary(
-        layout, "onMDMDebugModeChanged",
-        g_i18n:getText("mdm_debug_logging") or "Debug Logging",
-        g_i18n:getText("mdm_debug_logging_tooltip") or "Write verbose [MDM] DEBUG entries to log.txt. For developers only."
-    )
-end
-
--- ---------------------------------------------------------------------------
--- Refresh element states from current settings values.
--- Called every time the settings frame opens (values may change via console).
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI._updateSettingsUI()
-    local mdm = g_MarketDynamics
-    if not mdm or not mdm.settings then return end
-
-    -- Apply alternating row backgrounds (same as BC's onSettingsFrameOpen).
-    -- Without this, row text colors render incorrectly against the page background.
-    local ps = g_inGameMenu and g_inGameMenu.pageSettings
-    if ps and MDMSettingsUI.settingsLayout then
-        ps:updateAlternatingElements(MDMSettingsUI.settingsLayout)
-    end
-
-    -- Fix header title if the MDM tab is already active when the frame opens.
-    if ps and ps.categoryHeaderText and ps.subCategoryPaging then
-        if ps.subCategoryPaging:getState() == MDMSettingsUI.modPageNr then
-            ps.categoryHeaderText:setText(g_i18n:getText("mdm_screen_title") or "Market Dynamics")
+function MDMSettingsPanel:handleClick(id, data)
+    if id == "close" then
+        self:close()
+    elseif id == "back" then
+        self.page = PAGE_LANDING
+        self.activeCatIdx = nil
+    elseif id:sub(1, 4) == "cat_" then
+        local idx = tonumber(id:sub(5))
+        if idx and CATEGORIES[idx] then
+            self.activeCatIdx = idx
+            self.page = PAGE_CATEGORY
+        end
+    elseif id == "open_admin" then
+        self.page = PAGE_ADMIN
+    elseif id:sub(1, 11) == "toggle_off_" then
+        if data then self:requestChange(data.id, false) end
+    elseif id:sub(1, 10) == "toggle_on_" then
+        if data then self:requestChange(data.id, true) end
+    elseif id:sub(1, 10) == "multi_prev" or id:sub(1, 10) == "multi_next" then
+        if data then
+            local opt = MULTI_OPTS[data.id]
+            if opt then
+                local curVal = self:getValue(data.id)
+                local curIdx = 1
+                for i, v in ipairs(opt.values) do
+                    if v == curVal then curIdx = i; break end
+                end
+                local nxtIdx = curIdx + (data.dir or 0)
+                if nxtIdx < 1 then nxtIdx = #opt.values end
+                if nxtIdx > #opt.values then nxtIdx = 1 end
+                self:requestChange(data.id, opt.values[nxtIdx])
+            end
         end
     end
-
-    local isAdmin = g_currentMission:getIsServer() or g_currentMission.isAdmin or g_currentMission.isMasterUser
-
-    if _elem.pricesEnabled then
-        _elem.pricesEnabled:setIsChecked(mdm.settings.pricesEnabled ~= false, false, false)
-        _elem.pricesEnabled:setDisabled(not isAdmin)
-    end
-
-    if _elem.volatility then
-        local scale = (mdm.marketEngine and mdm.marketEngine.volatilityScale) or 1.0
-        _elem.volatility:setState(MDMSettingsUI._findValueIndex(VOLATILITY_VALUES, scale))
-        _elem.volatility:setDisabled(not isAdmin)
-    end
-
-    if _elem.eventsEnabled then
-        _elem.eventsEnabled:setIsChecked(mdm.settings.eventsEnabled ~= false, false, false)
-        _elem.eventsEnabled:setDisabled(not isAdmin)
-    end
-
-    if _elem.eventFrequency then
-        _elem.eventFrequency:setState(MDMSettingsUI._findValueIndex(
-            EVENT_FREQUENCY_VALUES, mdm.settings.eventFrequency or 1.0))
-        _elem.eventFrequency:setDisabled(not isAdmin)
-    end
-
-    if _elem.futuresPenalty then
-        _elem.futuresPenalty:setState(MDMSettingsUI._findValueIndex(
-            FUTURES_PENALTY_VALUES, mdm.settings.futuresPenalty or 0.15))
-        _elem.futuresPenalty:setDisabled(not isAdmin)
-    end
-
-    if _elem.showEventNotifications then
-        _elem.showEventNotifications:setIsChecked(mdm.settings.showEventNotifications ~= false, false, false)
-        -- Interface settings are personal, no admin check needed
-    end
-
-    if _elem.showContractHUD then
-        _elem.showContractHUD:setIsChecked(mdm.settings.showContractHUD ~= false, false, false)
-        -- Interface settings are personal, no admin check needed
-    end
-
-    if _elem.useRealDays then
-        _elem.useRealDays:setIsChecked(mdm.settings.useRealDays == true, false, false)
-        _elem.useRealDays:setDisabled(not isAdmin)
-    end
-
-    if _elem.debugMode then
-        _elem.debugMode:setIsChecked(MDMLog.debugEnabled == true, false, false)
-        _elem.debugMode:setDisabled(not isAdmin)
-    end
-
-    -- Status rows (live, updated on every open)
-    if _elem.statusVersion then
-        local modInfo = g_modManager and g_modManager:getModByName(mdm.modName)
-        local fmt = g_i18n:getText("mdm_status_version_fmt") or "Version:             %s"
-        _elem.statusVersion:setText(string.format(fmt, ((modInfo and modInfo.version) or "?")))
-    end
-
-    if _elem.statusEvents then
-        local count = 0
-        if mdm.worldEvents then
-            for _ in pairs(mdm.worldEvents.active) do count = count + 1 end
-        end
-        local val = count == 0 and (g_i18n:getText("mdm_status_none") or "None") or string.format(g_i18n:getText("mdm_status_active_fmt") or "%d active", count)
-        local fmt = g_i18n:getText("mdm_status_events_fmt") or "Active Events:       %s"
-        _elem.statusEvents:setText(string.format(fmt, val))
-    end
-
-    if _elem.statusBC then
-        local val = BCIntegration.isAvailable() and (g_i18n:getText("mdm_status_detected") or "Detected") or (g_i18n:getText("mdm_status_not_installed") or "Not installed")
-        local fmt = g_i18n:getText("mdm_status_bc_fmt") or "FuturesMission:      %s"
-        _elem.statusBC:setText(string.format(fmt, val))
-    end
-
-    if _elem.statusUP then
-        local val = UPIntegration.isAvailable() and (g_i18n:getText("mdm_status_detected") or "Detected") or (g_i18n:getText("mdm_status_not_installed") or "Not installed")
-        local fmt = g_i18n:getText("mdm_status_up_fmt") or "UsedPlus:            %s"
-        _elem.statusUP:setText(string.format(fmt, val))
-    end
 end
-
--- ---------------------------------------------------------------------------
--- Callback Handlers
--- state = BinaryOptionElement.STATE_RIGHT (1) / STATE_LEFT (0) for toggles
--- state = 1-based index for multi-option dropdowns
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI:onMDMPricesEnabledChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    local enabled = (state == BinaryOptionElement.STATE_RIGHT)
-    g_MarketDynamics.settings.pricesEnabled = enabled
-    MDMLog.info("SettingsUI: pricesEnabled = " .. tostring(enabled))
-
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMVolatilityChanged(state)
-    local scale = VOLATILITY_VALUES[state] or 1.0
-    if g_MarketDynamics and g_MarketDynamics.marketEngine then
-        g_MarketDynamics.marketEngine.volatilityScale = scale
-    end
-    MDMLog.info("SettingsUI: volatilityScale = " .. tostring(scale))
-
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMEventsEnabledChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    g_MarketDynamics.settings.eventsEnabled = (state == BinaryOptionElement.STATE_RIGHT)
-    MDMLog.info("SettingsUI: eventsEnabled = " .. tostring(g_MarketDynamics.settings.eventsEnabled))
-
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMEventFrequencyChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    g_MarketDynamics.settings.eventFrequency = EVENT_FREQUENCY_VALUES[state] or 1.0
-    MDMLog.info("SettingsUI: eventFrequency = " .. tostring(g_MarketDynamics.settings.eventFrequency))
-
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMFuturesPenaltyChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    g_MarketDynamics.settings.futuresPenalty = FUTURES_PENALTY_VALUES[state] or 0.15
-    MDMLog.info("SettingsUI: futuresPenalty = " .. tostring(g_MarketDynamics.settings.futuresPenalty))
-
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMShowEventNotificationsChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    g_MarketDynamics.settings.showEventNotifications = (state == BinaryOptionElement.STATE_RIGHT)
-    MDMLog.info("SettingsUI: showEventNotifications = " .. tostring(g_MarketDynamics.settings.showEventNotifications))
-    -- Personal setting, no network sync needed (except to persist to server save if hosted)
-    -- Actually, we sync all settings for simplicity in MDMSettingsSyncEvent.
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMShowContractHUDChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    g_MarketDynamics.settings.showContractHUD = (state == BinaryOptionElement.STATE_RIGHT)
-    MDMLog.info("SettingsUI: showContractHUD = " .. tostring(g_MarketDynamics.settings.showContractHUD))
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMUseRealDaysChanged(state)
-    if not g_MarketDynamics or not g_MarketDynamics.settings then return end
-    g_MarketDynamics.settings.useRealDays = (state == BinaryOptionElement.STATE_RIGHT)
-    MDMLog.info("SettingsUI: useRealDays = " .. tostring(g_MarketDynamics.settings.useRealDays))
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
-function MDMSettingsUI:onMDMDebugModeChanged(state)
-    MDMLog.debugEnabled = (state == BinaryOptionElement.STATE_RIGHT)
-    if g_MarketDynamics and g_MarketDynamics.settings then
-        g_MarketDynamics.settings.debugMode = MDMLog.debugEnabled
-    end
-    MDMLog.info("SettingsUI: debugMode = " .. tostring(MDMLog.debugEnabled))
-
-    if g_server ~= nil then
-        MDMSettingsSyncEvent.sendToClients()
-    else
-        MDMSettingsSyncEvent.sendToServer()
-    end
-end
-
--- ---------------------------------------------------------------------------
--- GUI Element Builders
--- (FS25 profile-based — always loadProfile, never clone)
--- ---------------------------------------------------------------------------
-
-function MDMSettingsUI._addSection(layout, text)
-    local el = TextElement.new()
-    el.name = "sectionHeader"
-    el:loadProfile(g_gui:getProfile("fs25_settingsSectionHeader"), true)
-    el:setText(text)
-    layout:addElement(el)
-    el:onGuiSetupFinished()
-end
-
-function MDMSettingsUI._addBinary(layout, callbackName, title, tooltip)
-    local bitMap = BitmapElement.new()
-    bitMap:loadProfile(g_gui:getProfile("fs25_multiTextOptionContainer"), true)
-
-    local option = BinaryOptionElement.new()
-    option.useYesNoTexts = true
-    option:loadProfile(g_gui:getProfile("fs25_settingsBinaryOption"), true)
-    option.target = MDMSettingsUI
-    option:setCallback("onClickCallback", callbackName)
-
-    local titleEl = TextElement.new()
-    titleEl:loadProfile(g_gui:getProfile("fs25_settingsMultiTextOptionTitle"), true)
-    titleEl:setText(title)
-
-    local tooltipEl = TextElement.new()
-    tooltipEl.name = "ignore"
-    tooltipEl:loadProfile(g_gui:getProfile("fs25_multiTextOptionTooltip"), true)
-    tooltipEl:setText(tooltip)
-
-    option:addElement(tooltipEl)
-    bitMap:addElement(option)
-    bitMap:addElement(titleEl)
-
-    option:onGuiSetupFinished()
-    titleEl:onGuiSetupFinished()
-    tooltipEl:onGuiSetupFinished()
-    layout:addElement(bitMap)
-    bitMap:onGuiSetupFinished()
-
-    return option
-end
-
-function MDMSettingsUI._addMulti(layout, callbackName, texts, title, tooltip)
-    local bitMap = BitmapElement.new()
-    bitMap:loadProfile(g_gui:getProfile("fs25_multiTextOptionContainer"), true)
-
-    local option = MultiTextOptionElement.new()
-    option:loadProfile(g_gui:getProfile("fs25_settingsMultiTextOption"), true)
-    option.target = MDMSettingsUI
-    option:setCallback("onClickCallback", callbackName)
-    option:setTexts(texts)
-
-    local titleEl = TextElement.new()
-    titleEl:loadProfile(g_gui:getProfile("fs25_settingsMultiTextOptionTitle"), true)
-    titleEl:setText(title)
-
-    local tooltipEl = TextElement.new()
-    tooltipEl.name = "ignore"
-    tooltipEl:loadProfile(g_gui:getProfile("fs25_multiTextOptionTooltip"), true)
-    tooltipEl:setText(tooltip)
-
-    option:addElement(tooltipEl)
-    bitMap:addElement(option)
-    bitMap:addElement(titleEl)
-
-    option:onGuiSetupFinished()
-    titleEl:onGuiSetupFinished()
-    tooltipEl:onGuiSetupFinished()
-    layout:addElement(bitMap)
-    bitMap:onGuiSetupFinished()
-
-    return option
-end
-
--- Read-only status row — label and value in one string.
--- Uses the same container profile as regular settings rows so text is visible
--- and alternating row backgrounds apply correctly.
--- Returns the inner TextElement so _updateSettingsUI can call setText() on it.
-function MDMSettingsUI._addStatusRow(layout, initialText)
-    local bitMap = BitmapElement.new()
-    bitMap:loadProfile(g_gui:getProfile("fs25_multiTextOptionContainer"), true)
-
-    local titleEl = TextElement.new()
-    titleEl:loadProfile(g_gui:getProfile("fs25_settingsMultiTextOptionTitle"), true)
-    titleEl.textUpperCase = false
-    titleEl:setText(initialText or "—")
-
-    bitMap:addElement(titleEl)
-    titleEl:onGuiSetupFinished()
-    layout:addElement(bitMap)
-    bitMap:onGuiSetupFinished()
-
-    return titleEl
-end
-
--- Returns the index in `values` whose entry is closest to `target`.
-function MDMSettingsUI._findValueIndex(values, target)
-    local bestIdx, bestDiff = 1, math.huge
-    for i, v in ipairs(values) do
-        local d = math.abs(v - target)
-        if d < bestDiff then bestDiff = d; bestIdx = i end
-    end
-    return bestIdx
-end
-
--- ---------------------------------------------------------------------------
--- Hook installation — runs once at file-load time
--- ---------------------------------------------------------------------------
-
-local function initHooks()
-    if not InGameMenuSettingsFrame then return end
-
-    InGameMenuSettingsFrame.onFrameOpen = Utils.appendedFunction(
-        InGameMenuSettingsFrame.onFrameOpen,
-        MDMSettingsUI.onFrameOpen
-    )
-
-    MDMLog.info("SettingsUI: onFrameOpen hook installed")
-end
-
-initHooks()

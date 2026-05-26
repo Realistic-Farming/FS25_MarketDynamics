@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="106">
     <author>TisonK &amp; LeGrizzly</author>
-    <version>1.2.0.1</version>
+    <version>1.2.0.6</version>
     <title>
         <en>Market Dynamics</en>
     </title>
@@ -62,6 +62,9 @@
         <action name="MDM_CREATE_CONTRACT" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false">
             <binding device="KB_MOUSE_DEFAULT" input="KEY_N" />
         </action>
+        <action name="MDM_OPEN_SETTINGS" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_F5" />
+        </action>
     </actions>
 
     <!-- l10n definitions for input bindings (required for help display) -->
@@ -71,6 +74,9 @@
         </text>
         <text name="input_MDM_CREATE_CONTRACT">
             <en>MDM: Create Contract</en>
+        </text>
+        <text name="input_MDM_OPEN_SETTINGS">
+            <en>MDM: Open Settings</en>
         </text>
     </l10n>
 </modDesc>

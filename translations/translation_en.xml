@@ -49,6 +49,7 @@
 
         <!-- Market Screen -->
         <text name="mdm_screen_title"            text="Market Dynamics" />
+        <text name="global_mdm_screen_title"            text="Market Dynamics" />
         <text name="mdm_screen_no_data"          text="No price data available" />
         <text name="mdm_screen_no_history"       text="No history recorded yet" />
         <text name="mdm_screen_close_hint"       text="Press ESC to close" />
@@ -263,7 +264,51 @@
         <text name="mdm_evt_ft_added"          text="Added — changes apply on the next firing: " />
         <text name="mdm_evt_ft_title_suffix"   text=" — Custom Fill Types" />
 
+        <!-- Settings Panel -->
+        <text name="mdm_cat_market"              text="Market Engines" />
+        <text name="mdm_cat_market_desc"         text="Configure the core price calculation and futures contract systems." />
+        <text name="mdm_cat_sim"                 text="Simulation" />
+        <text name="mdm_cat_sim_desc"            text="Adjust world event frequency, notifications, and visual interfaces." />
+        <text name="mdm_hdr_engine"              text="PRICE ENGINE" />
+        <text name="mdm_hdr_futures"             text="FUTURES CONTRACTS" />
+        <text name="mdm_hdr_events"              text="WORLD EVENTS" />
+        <text name="mdm_hdr_display"             text="DISPLAY &amp; DEBUG" />
+        <text name="mdm_btn_configure"           text="Configure" />
+        <text name="mdm_btn_open"                text="Open" />
+        <text name="mdm_btn_back"                text="Back" />
+        <text name="mdm_panel_select_cat"        text="Select a category to configure" />
+        <text name="mdm_panel_admin_yes"         text="Admin: Yes" />
+        <text name="mdm_panel_admin_no"          text="Admin: No" />
+        <text name="mdm_panel_multiplayer"       text="Multiplayer" />
+        <text name="mdm_panel_singleplayer"      text="Singleplayer" />
+
+        <!-- Settings Labels & Descriptions -->
+        <text name="mdm_set_prices_enabled"      text="Dynamic Prices" />
+        <text name="mdm_desc_prices_enabled"     text="Enable or disable all Market Dynamics price fluctuations." />
+        <text name="mdm_set_use_real_days"       text="Real Days Delivery" />
+        <text name="mdm_desc_use_real_days"      text="Contract deadlines track real-world time instead of in-game days." />
+        <text name="mdm_set_futures_penalty"     text="Default Penalty" />
+        <text name="mdm_desc_futures_penalty"    text="Penalty applied to undelivered goods when a contract expires." />
+        <text name="mdm_set_events_enabled"      text="World Events" />
+        <text name="mdm_desc_events_enabled"     text="Allow global events like droughts or booms to impact the market." />
+        <text name="mdm_set_event_freq"          text="Event Frequency" />
+        <text name="mdm_desc_event_freq"         text="Scale the probability of new world events occurring." />
+        <text name="mdm_set_event_notify"        text="Event Notifications" />
+        <text name="mdm_desc_event_notify"       text="Show an on-screen dialog when a new world event begins." />
+        <text name="mdm_set_contract_hud"        text="Contract HUD" />
+        <text name="mdm_desc_contract_hud"       text="Show a persistent progress tracker for active futures contracts." />
+        <text name="mdm_set_debug_mode"          text="Debug Mode" />
+        <text name="mdm_desc_debug_mode"         text="Enable developer logging and additional debug information." />
+
+        <!-- Multi-option Labels -->
+        <text name="mdm_freq_rare"               text="Rare" />
+        <text name="mdm_freq_normal"             text="Normal" />
+        <text name="mdm_freq_frequent"           text="Frequent" />
+
         <!-- Input action display names -->
+        <text name="input_MDM_MARKET_SCREEN" text="MDM: Open Market Screen" />
+        <text name="input_MDM_CREATE_CONTRACT" text="MDM: Create Contract" />
+        <text name="input_MDM_OPEN_SETTINGS" text="MDM: Open Settings" />
         <text name="input_MDM_SETTINGS_PANEL" text="Market Dynamics Settings" />
         <text name="mdm_bc_dialog_suppressed" text="FS25_FuturesMission is active and handles contract creation. Use the Contracts page (ESC menu) to create futures contracts. Get it on GitHub: search FS25_FuturesMission by Mmtrx." />
     </texts>

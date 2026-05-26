@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Enyhe"/>
         <text name="mdm_hud_event_moderate" text="Mérsékelt"/>
         <text name="mdm_hud_event_severe" text="Szigorú"/>
-        <text name="mdm_screen_title" text="Piaci dinamika"/>
+        <text name="mdm_screen_title" text="Piaci dinamika" />
+        <text name="global_mdm_screen_title" text="Piaci dinamika"/>
         <text name="mdm_screen_no_data" text="Áradat nem áll rendelkezésre"/>
         <text name="mdm_screen_no_history" text="Még nem rögzítették az előzményeket"/>
         <text name="mdm_screen_close_hint" text="Nyomja meg az ESC gombot a bezáráshoz"/>

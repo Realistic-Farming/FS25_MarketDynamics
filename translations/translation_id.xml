@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Lembut"/>
         <text name="mdm_hud_event_moderate" text="Sedang"/>
         <text name="mdm_hud_event_severe" text="Berat"/>
-        <text name="mdm_screen_title" text="Dinamika Pasar"/>
+        <text name="mdm_screen_title" text="Dinamika Pasar" />
+        <text name="global_mdm_screen_title" text="Dinamika Pasar"/>
         <text name="mdm_screen_no_data" text="Tidak ada data harga yang tersedia"/>
         <text name="mdm_screen_no_history" text="Belum ada sejarah yang tercatat"/>
         <text name="mdm_screen_close_hint" text="Tekan ESC untuk menutup"/>

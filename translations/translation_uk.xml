@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Помірний"/>
         <text name="mdm_hud_event_moderate" text="Помірний"/>
         <text name="mdm_hud_event_severe" text="Сильний"/>
-        <text name="mdm_screen_title" text="Динаміка ринку"/>
+        <text name="mdm_screen_title" text="Динаміка ринку" />
+        <text name="global_mdm_screen_title" text="Динаміка ринку"/>
         <text name="mdm_screen_no_data" text="Немає даних про ціни"/>
         <text name="mdm_screen_no_history" text="Історія ще не записана"/>
         <text name="mdm_screen_close_hint" text="Натисніть ESC, щоб закрити"/>

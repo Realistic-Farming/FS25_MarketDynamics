@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Mírný"/>
         <text name="mdm_hud_event_moderate" text="Mírný"/>
         <text name="mdm_hud_event_severe" text="Těžké"/>
-        <text name="mdm_screen_title" text="Dynamika trhu"/>
+        <text name="mdm_screen_title" text="Dynamika trhu" />
+        <text name="global_mdm_screen_title" text="Dynamika trhu"/>
         <text name="mdm_screen_no_data" text="Nejsou k dispozici žádné údaje o ceně"/>
         <text name="mdm_screen_no_history" text="Dosud nebyla zaznamenána žádná historie"/>
         <text name="mdm_screen_close_hint" text="Stisknutím ESC zavřete"/>

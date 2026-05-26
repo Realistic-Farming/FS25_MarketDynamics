@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="軽度"/>
         <text name="mdm_hud_event_moderate" text="適度"/>
         <text name="mdm_hud_event_severe" text="厳しい"/>
-        <text name="mdm_screen_title" text="市場動向"/>
+        <text name="mdm_screen_title" text="市場動向" />
+        <text name="global_mdm_screen_title" text="市場動向"/>
         <text name="mdm_screen_no_data" text="入手可能な価格データはありません"/>
         <text name="mdm_screen_no_history" text="まだ履歴が記録されていません"/>
         <text name="mdm_screen_close_hint" text="ESC を押して閉じます"/>

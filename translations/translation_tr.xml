@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Hafif"/>
         <text name="mdm_hud_event_moderate" text="Ilıman"/>
         <text name="mdm_hud_event_severe" text="Haşin"/>
-        <text name="mdm_screen_title" text="Pazar Dinamikleri"/>
+        <text name="mdm_screen_title" text="Pazar Dinamikleri" />
+        <text name="global_mdm_screen_title" text="Pazar Dinamikleri"/>
         <text name="mdm_screen_no_data" text="Fiyat verisi mevcut değil"/>
         <text name="mdm_screen_no_history" text="Henüz kayıtlı bir geçmiş yok"/>
         <text name="mdm_screen_close_hint" text="Kapatmak için ESC'ye basın"/>

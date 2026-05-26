@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="경증"/>
         <text name="mdm_hud_event_moderate" text="보통의"/>
         <text name="mdm_hud_event_severe" text="극심한"/>
-        <text name="mdm_screen_title" text="시장 역학"/>
+        <text name="mdm_screen_title" text="시장 역학" />
+        <text name="global_mdm_screen_title" text="시장 역학"/>
         <text name="mdm_screen_no_data" text="가격 데이터가 없습니다."/>
         <text name="mdm_screen_no_history" text="아직 기록된 기록이 없습니다."/>
         <text name="mdm_screen_close_hint" text="닫으려면 ESC를 누르세요."/>

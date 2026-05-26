@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Ușoară"/>
         <text name="mdm_hud_event_moderate" text="Moderat"/>
         <text name="mdm_hud_event_severe" text="Severă"/>
-        <text name="mdm_screen_title" text="Dinamica pieței"/>
+        <text name="mdm_screen_title" text="Dinamica pieței" />
+        <text name="global_mdm_screen_title" text="Dinamica pieței"/>
         <text name="mdm_screen_no_data" text="Nu sunt disponibile date despre preț"/>
         <text name="mdm_screen_no_history" text="Nu s-a înregistrat încă un istoric"/>
         <text name="mdm_screen_close_hint" text="Apăsați ESC pentru a închide"/>
