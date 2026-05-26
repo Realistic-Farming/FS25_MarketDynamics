@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Nhẹ"/>
         <text name="mdm_hud_event_moderate" text="Vừa phải"/>
         <text name="mdm_hud_event_severe" text="Nghiêm trọng"/>
-        <text name="mdm_screen_title" text="Động lực thị trường"/>
+        <text name="mdm_screen_title" text="Động lực thị trường" />
+        <text name="global_mdm_screen_title" text="Động lực thị trường"/>
         <text name="mdm_screen_no_data" text="Không có dữ liệu về giá"/>
         <text name="mdm_screen_no_history" text="Chưa có lịch sử nào được ghi lại"/>
         <text name="mdm_screen_close_hint" text="Nhấn ESC để đóng"/>

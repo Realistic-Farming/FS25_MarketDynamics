@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="輕微"/>
         <text name="mdm_hud_event_moderate" text="緩和"/>
         <text name="mdm_hud_event_severe" text="劇烈"/>
-        <text name="mdm_screen_title" text="市場動態"/>
+        <text name="mdm_screen_title" text="市場動態" />
+        <text name="global_mdm_screen_title" text="市場動態"/>
         <text name="mdm_screen_no_data" text="無可用價格數據"/>
         <text name="mdm_screen_no_history" text="還沒有歷史記錄"/>
         <text name="mdm_screen_close_hint" text="按 ESC 關閉"/>

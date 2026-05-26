@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Mild"/>
         <text name="mdm_hud_event_moderate" text="Gematigd"/>
         <text name="mdm_hud_event_severe" text="Streng"/>
-        <text name="mdm_screen_title" text="Marktdynamiek"/>
+        <text name="mdm_screen_title" text="Marktdynamiek" />
+        <text name="global_mdm_screen_title" text="Marktdynamiek"/>
         <text name="mdm_screen_no_data" text="Geen prijsgegevens beschikbaar"/>
         <text name="mdm_screen_no_history" text="Er is nog geen geschiedenis vastgelegd"/>
         <text name="mdm_screen_close_hint" text="Druk op ESC om te sluiten"/>

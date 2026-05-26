@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Leicht"/>
         <text name="mdm_hud_event_moderate" text="Mäßig"/>
         <text name="mdm_hud_event_severe" text="Schwer"/>
-        <text name="mdm_screen_title" text="Marktdynamik"/>
+        <text name="mdm_screen_title" text="Marktdynamik" />
+        <text name="global_mdm_screen_title" text="Marktdynamik"/>
         <text name="mdm_screen_col_intensity" text="Intensität"/>
         <text name="mdm_screen_col_time_left" text="Verbleibende Zeit"/>
 		<text name="mdm_screen_col_qty" text="Menge"/>

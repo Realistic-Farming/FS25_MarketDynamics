@@ -18,7 +18,8 @@
         <text name="mdm_hud_event_mild" text="Blando"/>
         <text name="mdm_hud_event_moderate" text="Moderare"/>
         <text name="mdm_hud_event_severe" text="Acuto"/>
-        <text name="mdm_screen_title" text="Dinamiche di mercato"/>
+        <text name="mdm_screen_title" text="Dinamiche di mercato" />
+        <text name="global_mdm_screen_title" text="Dinamiche di mercato"/>
         <text name="mdm_screen_no_data" text="Nessun dato sui prezzi disponibile"/>
         <text name="mdm_screen_no_history" text="Nessuna cronologia ancora registrata"/>
         <text name="mdm_screen_close_hint" text="Premere ESC per chiudere"/>
