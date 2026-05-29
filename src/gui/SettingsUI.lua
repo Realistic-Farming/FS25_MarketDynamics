@@ -89,7 +89,7 @@ local C = {
 -- ── Multi-option definitions ───────────────────────────────
 local MULTI_OPTS = {
     eventFrequency = {
-        values = { 0.4, 1.0, 2.0 },
+        values = { 0.15, 1.0, 2.0 },
         labels = { "mdm_freq_rare", "mdm_freq_normal", "mdm_freq_frequent" },
         i18n   = true,
     },
