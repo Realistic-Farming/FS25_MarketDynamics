@@ -38,7 +38,7 @@ function MDMContractRequestEvent:writeStream(streamId, connection)
         streamWriteString(streamId, self.params.fillTypeName)
         streamWriteFloat32(streamId, self.params.quantity)
         streamWriteFloat32(streamId, self.params.lockedPrice)
-        streamWriteFloat64(streamId, self.params.deliveryTimeMs)
+        streamWriteInt32(streamId, math.floor((self.params.deliveryTimeMs or 0) / 1000))
         streamWriteBool(streamId, self.params.isRealDays or false)
         streamWriteFloat32(streamId, self.params.createdTimeScale or 1)
     else
@@ -55,7 +55,7 @@ function MDMContractRequestEvent:readStream(streamId, connection)
         self.params.fillTypeName     = streamReadString(streamId)
         self.params.quantity         = streamReadFloat32(streamId)
         self.params.lockedPrice      = streamReadFloat32(streamId)
-        self.params.deliveryTimeMs   = streamReadFloat64(streamId)
+        self.params.deliveryTimeMs   = streamReadInt32(streamId) * 1000
         self.params.isRealDays       = streamReadBool(streamId)
         self.params.createdTimeScale = streamReadFloat32(streamId)
     else
