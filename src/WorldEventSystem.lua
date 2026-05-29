@@ -208,14 +208,25 @@ function WorldEventSystem:_rollForEvents()
     local freqScale = (settings and settings.eventFrequency) or 1.0
     local disabled  = settings and settings.disabledEvents
 
+    -- Cap at one new event per check to prevent event storms.
+    -- Shuffle registry order so no single event is systematically favored.
+    local eligible = {}
     for id, event in pairs(self.registry) do
         if not (disabled and disabled[id]) and not self.active[id] then
             local cooldown = event.cooldownMs or MIN_COOLDOWN_MS
             if (now - event.lastFiredAt) >= cooldown then
-                if math.random() < (event.probability * freqScale) then
-                    self:_fireEvent(event, now)
-                end
+                table.insert(eligible, event)
             end
+        end
+    end
+    for i = #eligible, 2, -1 do
+        local j = math.random(i)
+        eligible[i], eligible[j] = eligible[j], eligible[i]
+    end
+    for _, event in ipairs(eligible) do
+        if math.random() < (event.probability * freqScale) then
+            self:_fireEvent(event, now)
+            break
         end
     end
 end

@@ -34,8 +34,6 @@ if _G.MDM_PriceHook_installed then
 end
 _G.MDM_PriceHook_installed = true
 
--- Re-entrancy guard to prevent double-counting if sellFillType calls addFillLevelFromTool
-local MDM_isInsideSellHook = false
 
 -- ---------------------------------------------------------------------------
 -- EconomyManager reference — used only for MDMGetVanillaPrice, never patched.
@@ -97,14 +95,9 @@ if SellingStation and SellingStation.sellFillType then
     SellingStation.sellFillType = Utils.overwrittenFunction(
         SellingStation.sellFillType,
         function(self, superFunc, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
-            local wasInside = MDM_isInsideSellHook
-            MDM_isInsideSellHook = true
-
             local result = superFunc(self, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
 
-            -- Only track on server; only when MDM is active with a futures market.
-            -- Use the re-entrancy guard to avoid double-counting if sellFillType calls addFillLevelFromTool.
-            if not wasInside and g_server ~= nil
+            if g_server ~= nil
                 and g_MarketDynamics and g_MarketDynamics.isActive
                 and g_MarketDynamics.futuresMarket then
 
@@ -119,7 +112,6 @@ if SellingStation and SellingStation.sellFillType then
                 end
             end
 
-            MDM_isInsideSellHook = wasInside
             return result
         end
     )
@@ -129,37 +121,9 @@ else
     MDMLog.warn("PriceHook: SellingStation.sellFillType not found — futures delivery tracking disabled")
 end
 
--- Fallback hook for addFillLevelFromTool which some selling stations use directly (e.g. trains)
-if SellingStation and SellingStation.addFillLevelFromTool then
-    SellingStation.addFillLevelFromTool = Utils.overwrittenFunction(
-        SellingStation.addFillLevelFromTool,
-        function(self, superFunc, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
-            local wasInside = MDM_isInsideSellHook
-            MDM_isInsideSellHook = true
-
-            local result = superFunc(self, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
-            
-            -- Some selling stations (trains, certain placeables) call addFillLevelFromTool
-            -- directly without going through sellFillType, so we must track here too.
-            -- We use the re-entrancy guard to avoid double-counting.
-            if not wasInside and g_server ~= nil
-                and g_MarketDynamics and g_MarketDynamics.isActive
-                and g_MarketDynamics.futuresMarket then
-
-                if result and result > 0 then
-                    MDMLog.debug(string.format("PriceHook: SellingStation.addFillLevelFromTool(farmId=%s, accepted=%.1f, ft=%s)",
-                        tostring(farmId), tostring(result), tostring(fillTypeIndex)))
-                    local pricePerLiter = self:getEffectiveFillTypePrice(fillTypeIndex)
-                    g_MarketDynamics.futuresMarket:onCropDelivered(farmId, fillTypeIndex, result, pricePerLiter)
-                end
-            end
-            
-            MDM_isInsideSellHook = wasInside
-            return result
-        end
-    )
-    MDMLog.info("PriceHook: SellingStation.addFillLevelFromTool hooked as fallback")
-end
+-- addFillLevelFromTool hook intentionally removed: standard selling stations call both
+-- sellFillType and addFillLevelFromTool at the same call-stack level, so the re-entrancy
+-- guard never engages and every delivery was double-counted. sellFillType is authoritative.
 
 -- ---------------------------------------------------------------------------
 -- Public helper: vanilla price snapshot for MarketEngine:init()

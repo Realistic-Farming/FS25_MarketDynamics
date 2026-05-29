@@ -89,7 +89,7 @@ local C = {
 -- ── Multi-option definitions ───────────────────────────────
 local MULTI_OPTS = {
     eventFrequency = {
-        values = { 0.4, 1.0, 2.0 },
+        values = { 0.15, 1.0, 2.0 },
         labels = { "mdm_freq_rare", "mdm_freq_normal", "mdm_freq_frequent" },
         i18n   = true,
     },
@@ -235,8 +235,14 @@ function MDMSettingsPanel:requestChange(id, value)
     if id == "debugMode" then
         if MDMLog then MDMLog.debugEnabled = value end
     end
-    
-    -- Optional: broadcast event if needed
+
+    -- Reset world event timer so frequency/enabled changes take effect at the next check
+    -- rather than waiting out the remainder of the current 5-minute interval.
+    if id == "eventFrequency" or id == "eventsEnabled" then
+        if g_MarketDynamics and g_MarketDynamics.worldEvents then
+            g_MarketDynamics.worldEvents.timer = 0
+        end
+    end
 end
 
 -- ── Drawing helpers ───────────────────────────────────────
