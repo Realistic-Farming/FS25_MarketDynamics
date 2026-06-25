@@ -107,6 +107,9 @@ local SETTING_DEFS = {
     eventsEnabled          = { label = "mdm_set_events_enabled",   desc = "mdm_desc_events_enabled",   type = "bool" },
     eventFrequency         = { label = "mdm_set_event_freq",       desc = "mdm_desc_event_freq",       type = "multi" },
     showEventNotifications = { label = "mdm_set_event_notify",     desc = "mdm_desc_event_notify",     type = "bool" },
+    eventNotificationBanner = { label = "mdm_set_event_banner",    desc = "mdm_desc_event_banner",     type = "bool",
+                                labelText = "Compact Event Banner",
+                                descText  = "Show world events as a small corner banner instead of a pop-up dialog." },
     showContractHUD        = { label = "mdm_set_contract_hud",     desc = "mdm_desc_contract_hud",     type = "bool" },
     debugMode              = { label = "mdm_set_debug_mode",       desc = "mdm_desc_debug_mode",       type = "bool" },
 }
@@ -129,7 +132,7 @@ local CATEGORIES = {
         descKey  = "mdm_cat_sim_desc",
         accent   = {0.32, 0.88, 0.44, 1.0}, -- Green for sim
         sections = {
-            { headerKey = "mdm_hdr_events",   items = { "eventsEnabled", "eventFrequency", "showEventNotifications" } },
+            { headerKey = "mdm_hdr_events",   items = { "eventsEnabled", "eventFrequency", "showEventNotifications", "eventNotificationBanner" } },
             { headerKey = "mdm_hdr_display",  items = { "showContractHUD", "debugMode" } },
         },
     },
@@ -473,8 +476,8 @@ function MDMSettingsPanel:drawSettingRow(x, y, w, sid, rowIdx, isAdmin, accent)
 
     local locked = false -- MDM might not need per-setting locking yet
     local lx = x + 0.008
-    self:drawText(lx, y + ROW_H * 0.54, TS_BODY, tr(def.label, sid), C.white, RenderText.ALIGN_LEFT, true)
-    self:drawText(lx, y + ROW_H * 0.15, TS_TINY, tr(def.desc, ""), C.dim, RenderText.ALIGN_LEFT, false)
+    self:drawText(lx, y + ROW_H * 0.54, TS_BODY, tr(def.label, def.labelText or sid), C.white, RenderText.ALIGN_LEFT, true)
+    self:drawText(lx, y + ROW_H * 0.15, TS_TINY, tr(def.desc, def.descText or ""), C.dim, RenderText.ALIGN_LEFT, false)
 
     local ctrlX = x + w - 0.012
     local ctrlY = y + (ROW_H - TOGGLE_H) / 2
