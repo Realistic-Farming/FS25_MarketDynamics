@@ -1,8 +1,13 @@
 -- FuturesMarket.lua
 -- Handles futures contract creation, tracking, and fulfillment.
 -- Players lock in a price + quantity + delivery date.
--- On delivery date: if fulfilled → full locked-price payout;
---                   if defaulted → partial payout minus penalty on unfulfilled portion.
+-- True-futures settlement: every committed (delivered) liter nets EXACTLY the
+-- locked price. The player is paid the live market rate at the selling station;
+-- the contract then settles the difference — topping up when the market was below
+-- the locked price, or clawing back the excess when the market was above it.
+-- On delivery date: if fulfilled → committed quantity nets exactly the locked value;
+--                   if defaulted → delivered portion settles at the locked price,
+--                                  minus a penalty on the unfulfilled portion.
 --
 -- UPIntegration hooks:
 --   onContractCreated   — notified when a new contract is written
@@ -221,28 +226,38 @@ function FuturesMarket:_fulfillContract(id)
         return
     end
 
-    -- The player has already received some money during unloading (at market rates).
-    -- We only pay the remaining balance to reach exactly (quantity * lockedPrice).
+    -- True-futures settlement: the committed quantity always nets exactly the
+    -- locked value. The player already received market-rate money at the selling
+    -- station (tracked in valueReceived); the contract settles the difference.
+    -- A positive settlement tops up a below-locked market; a negative settlement
+    -- claws back the excess from an above-locked market. Either way the final
+    -- total received for the committed crop is (quantity * lockedPrice). (issue #92)
     local totalTarget = contract.quantity * contract.lockedPrice
-    local bonus = math.max(0, totalTarget - (contract.valueReceived or 0))
+    local settlement  = totalTarget - (contract.valueReceived or 0)
 
-    if bonus > 0 then
-        g_currentMission:addMoney(bonus, contract.farmId, MoneyType.OTHER, true)
+    if settlement ~= 0 then
+        g_currentMission:addMoney(settlement, contract.farmId, MoneyType.OTHER, true, true)
     end
-    
-    MDMLog.info(string.format("FuturesMarket: contract #%d FULFILLED — target $%.2f, already received $%.2f, bonus $%.2f",
-        id, totalTarget, (contract.valueReceived or 0), bonus))
+
+    MDMLog.info(string.format("FuturesMarket: contract #%d FULFILLED — locked value $%.2f, received at market $%.2f, settlement $%.2f",
+        id, totalTarget, (contract.valueReceived or 0), settlement))
 
     -- HUD notification (only show to the owning farm's local player)
     if g_localPlayer and g_localPlayer.farmId == contract.farmId then
-        local msg = string.format("Contract fulfilled: %s — $%s bonus paid",
-            contract.fillTypeName,
-            g_i18n:formatMoney(math.floor(bonus), 0, true, false))
+        local amtStr = g_i18n:formatMoney(math.floor(math.abs(settlement) + 0.5), 0, true, false)
+        local msg
+        if settlement >= 0 then
+            msg = string.format("Contract fulfilled: %s — settled at locked price (+$%s)",
+                contract.fillTypeName, amtStr)
+        else
+            msg = string.format("Contract fulfilled: %s — settled at locked price (-$%s, market was higher)",
+                contract.fillTypeName, amtStr)
+        end
         g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_OK, msg)
     end
 
-    -- Notify UPIntegration for credit score reporting.
-    UPIntegration.onContractFulfilled(id, contract.farmId, bonus)
+    -- Notify UPIntegration for credit score reporting (report the full contract value).
+    UPIntegration.onContractFulfilled(id, contract.farmId, totalTarget)
 
     -- Broadcast fulfilled status to all connected clients.
     if g_server ~= nil then
@@ -250,16 +265,21 @@ function FuturesMarket:_fulfillContract(id)
     end
 end
 
--- Settle a defaulted contract: partial payout for delivered portion, minus
--- a penalty on the unfulfilled portion.
+-- Settle a defaulted contract: the delivered portion settles at the locked price
+-- (true futures — same as a fulfilled contract, just for fewer liters), minus a
+-- penalty on the unfulfilled portion.
 --
 -- Effective penalty rate = DEFAULT_PENALTY * UPIntegration.getPenaltyModifier()
 --   Excellent credit (750+) → ~10% effective penalty
 --   Normal credit           → ~15% effective penalty  (no UP or unknown score)
 --   Poor credit    (<600)   → ~20% effective penalty
 --
--- Net payout is floored at 0: the penalty never exceeds the partial payout,
--- so a default never results in a charge against the player's account.
+-- The net settlement is NOT floored at 0 and may be negative. This is required for
+-- consistency with the fulfilled path: if completing a contract claws back market
+-- excess but defaulting did not, players could deliberately default whenever the
+-- market rose above the locked price and keep the windfall — making a default more
+-- profitable than completing. Allowing the clawback (and a real penalty on a pure
+-- default) closes that exploit and gives the futuresPenalty setting teeth. (issue #92)
 function FuturesMarket:_defaultContract(id)
     local contract = self.contracts[id]
     if not contract then return end
@@ -278,8 +298,10 @@ function FuturesMarket:_defaultContract(id)
     local delivered   = contract.delivered
     local unfulfilled = contract.quantity - delivered
 
-    -- Partial target is (delivered amount * locked price)
-    local partialTarget = delivered * contract.lockedPrice
+    -- Delivered liters settle at the locked price (true futures), same as a
+    -- fulfilled contract: locked value for what was delivered, minus the market
+    -- money the player already received at the station.
+    local deliveredSettlement = (delivered * contract.lockedPrice) - (contract.valueReceived or 0)
 
     -- Base penalty comes from player settings; UP credit score may scale it further.
     local settings    = g_MarketDynamics and g_MarketDynamics.settings
@@ -287,29 +309,28 @@ function FuturesMarket:_defaultContract(id)
     local penaltyRate = basePenalty * UPIntegration.getPenaltyModifier(contract.farmId)
     local penalty     = unfulfilled * contract.lockedPrice * penaltyRate
 
-    -- Net bonus is what we owe them (partialTarget - penalty) minus what they already got.
-    local net = math.max(0, (partialTarget - penalty) - (contract.valueReceived or 0))
+    -- Net settlement = delivered-portion adjustment minus the shortfall penalty.
+    -- May be negative (a charge) — see the note above _defaultContract.
+    local net = deliveredSettlement - penalty
 
-    if net > 0 then
-        g_currentMission:addMoney(net, contract.farmId, MoneyType.OTHER, true)
+    if net ~= 0 then
+        g_currentMission:addMoney(net, contract.farmId, MoneyType.OTHER, true, true)
     end
 
     MDMLog.warn(string.format(
-        "FuturesMarket: contract #%d DEFAULTED — target $%.2f, penalty -$%.2f, already received $%.2f, net bonus $%.2f",
-        id, partialTarget, penalty, (contract.valueReceived or 0), net))
+        "FuturesMarket: contract #%d DEFAULTED — delivered settlement $%.2f, penalty -$%.2f, received at market $%.2f, net $%.2f",
+        id, deliveredSettlement, penalty, (contract.valueReceived or 0), net))
 
     -- HUD notification (only show to the owning farm's local player)
     if g_localPlayer and g_localPlayer.farmId == contract.farmId then
+        local amtStr = g_i18n:formatMoney(math.floor(math.abs(net) + 0.5), 0, true, false)
         local msg
-        if net > 0 then
-            msg = string.format("Contract defaulted: %s — %dL/%dL delivered, $%s bonus after penalty",
-                contract.fillTypeName,
-                delivered, contract.quantity,
-                g_i18n:formatMoney(math.floor(net), 0, true, false))
+        if net >= 0 then
+            msg = string.format("Contract defaulted: %s — %dL/%dL delivered, settled +$%s after penalty",
+                contract.fillTypeName, delivered, contract.quantity, amtStr)
         else
-            msg = string.format("Contract defaulted: %s — %dL/%dL delivered, no bonus payout",
-                contract.fillTypeName,
-                delivered, contract.quantity)
+            msg = string.format("Contract defaulted: %s — %dL/%dL delivered, charged $%s after penalty",
+                contract.fillTypeName, delivered, contract.quantity, amtStr)
         end
         g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_CRITICAL, msg)
     end
