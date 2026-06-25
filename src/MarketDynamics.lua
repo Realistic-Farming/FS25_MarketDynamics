@@ -236,15 +236,19 @@ function MarketDynamics:showEventNotification(eventListString)
         return 
     end
 
-    local text = string.format(g_i18n:getText("mdm_msg_event_started") or "A new world event has started: %s\n\nWould you like to open the Market Screen to see the impact?", eventListString)
+    -- Show a discreet, non-modal banner rather than a full-screen modal dialog.
+    -- The old YesNoDialog dimmed the entire screen with a black overlay, which is
+    -- disruptive while driving or working a field (issue #94). The active event is
+    -- also listed in the Market Screen's Events tab, so a quiet banner is enough.
     local title = g_i18n:getText("mdm_screen_title") or "Market Dynamics"
+    local msg   = string.format("%s: %s", title, eventListString)
 
-    MDMLog.info("MarketDynamics: calling YesNoDialog.show")
-    YesNoDialog.show(function(yes)
-        if yes then
-            MDMMarketScreen.show()
-        end
-    end, nil, text, title)
+    if g_currentMission and g_currentMission.addIngameNotification then
+        g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_INFO, msg)
+        MDMLog.info("MarketDynamics: event notification banner shown")
+    else
+        MDMLog.warn("MarketDynamics: addIngameNotification unavailable — notification skipped")
+    end
 end
 
 -- ---------------------------------------------------------------------------
