@@ -56,8 +56,13 @@ function MDMContractSyncEvent:writeContract(streamId, c)
     streamWriteString(streamId, c.fillTypeName)
     streamWriteFloat32(streamId, c.quantity)
     streamWriteFloat32(streamId, c.lockedPrice)
-    streamWriteFloat64(streamId, c.deliveryTime)
-    streamWriteFloat64(streamId, c.deliveryStartTime or 0)
+    -- Time values are sent as Int32 seconds, not Float64. streamWriteFloat64 is
+    -- unreliable on dedicated servers and silently corrupts the rest of the stream,
+    -- so the client never receives valid contracts and nothing shows in the menu
+    -- (issue #93). This mirrors the same fix already applied to MDMContractRequestEvent
+    -- in #82. Game time in seconds fits comfortably in an Int32.
+    streamWriteInt32(streamId, math.floor((c.deliveryTime or 0) / 1000))
+    streamWriteInt32(streamId, math.floor((c.deliveryStartTime or 0) / 1000))
     streamWriteBool(streamId, c.bcManaged == true)
     streamWriteFloat32(streamId, c.delivered)
     streamWriteFloat32(streamId, c.valueReceived or 0)
@@ -90,8 +95,9 @@ function MDMContractSyncEvent:readContract(streamId)
         fillTypeName = streamReadString(streamId),
         quantity = streamReadFloat32(streamId),
         lockedPrice = streamReadFloat32(streamId),
-        deliveryTime = streamReadFloat64(streamId),
-        deliveryStartTime = streamReadFloat64(streamId),
+        -- Int32 seconds → ms, matching writeContract (see #93 / #82).
+        deliveryTime = streamReadInt32(streamId) * 1000,
+        deliveryStartTime = streamReadInt32(streamId) * 1000,
         bcManaged    = streamReadBool(streamId),
         delivered = streamReadFloat32(streamId),
         valueReceived = streamReadFloat32(streamId),
