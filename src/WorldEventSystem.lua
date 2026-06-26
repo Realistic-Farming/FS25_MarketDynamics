@@ -105,8 +105,10 @@ function WorldEventSystem:update(dt)
         end
     end
 
-    -- Probabilistic event roll on a fixed interval
-    if self.timer >= CHECK_INTERVAL_MS then
+    -- Probabilistic event roll on a day-length-scaled interval, so per-month
+    -- event density stays stable regardless of the days/month setting.
+    local checkInterval = CHECK_INTERVAL_MS * MDMUtil.getMonthLengthScale()
+    if self.timer >= checkInterval then
         self.timer = 0
         local settings = g_MarketDynamics and g_MarketDynamics.settings
         if not settings or settings.eventsEnabled ~= false then
@@ -159,8 +161,9 @@ function WorldEventSystem:forceFireEvent(id, intensity)
 
     intensity = math.max(0, math.min(1, intensity or 1.0))
     local now    = MDMUtil.getGameTime()
-    local minDur = event.minDurationMs or (5  * 60 * 1000)
-    local maxDur = event.maxDurationMs or (15 * 60 * 1000)
+    local scale  = MDMUtil.getMonthLengthScale()
+    local minDur = (event.minDurationMs or (5  * 60 * 1000)) * scale
+    local maxDur = (event.maxDurationMs or (15 * 60 * 1000)) * scale
     local duration = minDur + math.random() * (maxDur - minDur)
 
     event.lastFiredAt = now
@@ -207,13 +210,14 @@ function WorldEventSystem:_rollForEvents()
     local settings  = g_MarketDynamics and g_MarketDynamics.settings
     local freqScale = (settings and settings.eventFrequency) or 1.0
     local disabled  = settings and settings.disabledEvents
+    local scale     = MDMUtil.getMonthLengthScale()
 
     -- Cap at one new event per check to prevent event storms.
     -- Shuffle registry order so no single event is systematically favored.
     local eligible = {}
     for id, event in pairs(self.registry) do
         if not (disabled and disabled[id]) and not self.active[id] then
-            local cooldown = event.cooldownMs or MIN_COOLDOWN_MS
+            local cooldown = (event.cooldownMs or MIN_COOLDOWN_MS) * scale
             if (now - event.lastFiredAt) >= cooldown then
                 table.insert(eligible, event)
             end
@@ -234,8 +238,9 @@ end
 -- Fire an event: roll intensity and duration, record in active table, call onFire.
 function WorldEventSystem:_fireEvent(event, now)
     local intensity = event.minIntensity + math.random() * (event.maxIntensity - event.minIntensity)
-    local minDur    = event.minDurationMs or (5  * 60 * 1000)
-    local maxDur    = event.maxDurationMs or (15 * 60 * 1000)
+    local scale     = MDMUtil.getMonthLengthScale()
+    local minDur    = (event.minDurationMs or (5  * 60 * 1000)) * scale
+    local maxDur    = (event.maxDurationMs or (15 * 60 * 1000)) * scale
     local duration  = minDur + math.random() * (maxDur - minDur)
 
     event.lastFiredAt         = now
