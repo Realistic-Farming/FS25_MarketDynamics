@@ -131,6 +131,7 @@ function MarketSerializer:save(coordinator)
         xmlFile:setFloat("marketDynamics.settings#eventFrequency", s.eventFrequency or 1.0)
         xmlFile:setFloat("marketDynamics.settings#futuresPenalty", s.futuresPenalty or 0.15)
         xmlFile:setBool ("marketDynamics.settings#showEventNotifications", s.showEventNotifications ~= false)
+        xmlFile:setBool ("marketDynamics.settings#eventNotificationBanner", s.eventNotificationBanner == true)
         xmlFile:setBool ("marketDynamics.settings#showContractHUD",       s.showContractHUD       ~= false)
         xmlFile:setBool ("marketDynamics.settings#useRealDays",           s.useRealDays           == true)
 
@@ -370,6 +371,9 @@ function MarketSerializer:load(coordinator)
 
         local showEventNotifications = xmlFile:getBool("marketDynamics.settings#showEventNotifications")
         if showEventNotifications ~= nil then s.showEventNotifications = showEventNotifications end
+
+        local eventNotificationBanner = xmlFile:getBool("marketDynamics.settings#eventNotificationBanner")
+        if eventNotificationBanner ~= nil then s.eventNotificationBanner = eventNotificationBanner end
 
         local showContractHUD = xmlFile:getBool("marketDynamics.settings#showContractHUD")
         if showContractHUD ~= nil then s.showContractHUD = showContractHUD end

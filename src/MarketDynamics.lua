@@ -37,7 +37,8 @@ function MarketDynamics.new(modDir, modName)
         eventsEnabled        = true,   -- When false, WorldEventSystem skips probability rolls
         eventFrequency       = 1.0,   -- Probability scale: 0.4=Rare, 1.0=Normal, 2.0=Frequent
         futuresPenalty       = 0.15,  -- Default penalty fraction on unfulfilled contracts
-        showEventNotifications = true, -- Show YesNo dialog when a new event fires
+        showEventNotifications = true, -- Master on/off for world-event alerts
+        eventNotificationBanner = false, -- false = pop-up dialog (default), true = discreet banner (#94)
         showContractHUD       = true,  -- Show custom HUD for active contracts
         useRealDays          = false, -- When true, contract delivery windows track real-world time
         disabledEvents       = {},    -- { [eventId] = true } — events that won't roll
@@ -236,15 +237,33 @@ function MarketDynamics:showEventNotification(eventListString)
         return 
     end
 
-    local text = string.format(g_i18n:getText("mdm_msg_event_started") or "A new world event has started: %s\n\nWould you like to open the Market Screen to see the impact?", eventListString)
     local title = g_i18n:getText("mdm_screen_title") or "Market Dynamics"
 
-    MDMLog.info("MarketDynamics: calling YesNoDialog.show")
-    YesNoDialog.show(function(yes)
-        if yes then
-            MDMMarketScreen.show()
+    if self.settings.eventNotificationBanner then
+        -- Discreet, non-modal banner: a quiet in-game notification in the corner
+        -- instead of a full-screen modal that dims everything black. Preferred while
+        -- driving or working a field (issue #94). The active event is also listed in
+        -- the Market Screen's Events tab.
+        local msg = string.format("%s: %s", title, eventListString)
+        if g_currentMission and g_currentMission.addIngameNotification then
+            g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_INFO, msg)
+            MDMLog.info("MarketDynamics: event notification banner shown")
+        else
+            MDMLog.warn("MarketDynamics: addIngameNotification unavailable — notification skipped")
         end
-    end, nil, text, title)
+    else
+        -- Full pop-up dialog (default): asks whether to open the Market Screen.
+        local text = string.format(g_i18n:getText("mdm_msg_event_started")
+            or "A new world event has started: %s\n\nWould you like to open the Market Screen to see the impact?",
+            eventListString)
+
+        MDMLog.info("MarketDynamics: calling YesNoDialog.show")
+        YesNoDialog.show(function(yes)
+            if yes then
+                MDMMarketScreen.show()
+            end
+        end, nil, text, title)
+    end
 end
 
 -- ---------------------------------------------------------------------------
