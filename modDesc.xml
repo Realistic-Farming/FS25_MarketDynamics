@@ -52,6 +52,7 @@
         <sourceFile filename="src/events/FinancialPanicEvent.lua" />
         <sourceFile filename="src/events/ProteinPremiumEvent.lua" />
         <sourceFile filename="src/MarketDynamics.lua" />
+        <sourceFile filename="src/MDMSettingsHubBridge.lua" />
         <sourceFile filename="main.lua" />
     </extraSourceFiles>
 

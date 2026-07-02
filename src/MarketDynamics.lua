@@ -118,6 +118,10 @@ function MarketDynamics:onStartMission(mission)
         MDMContractSyncRequestEvent.sendToServer()
         MDMLog.info("MarketDynamics: requested contract sync from server")
     end
+
+    -- Register with SettingsHub (if installed) so FarmTablet's System Settings
+    -- app can list Market Dynamics' settings. No-ops safely if SettingsHub is absent.
+    MDMSettingsHubBridge.register(self)
 end
 
 -- Per-frame tick. dt = in-game milliseconds from FSBaseMission.update.
