@@ -9,7 +9,7 @@
         <text name="mdm_event_biofuel_initiative" text="Initiative sur les biocarburants"/>
         <text name="mdm_event_livestock_boom" text="Boom de l'alimentation du bétail"/>
         <text name="mdm_event_pest_outbreak" text="Brûlure des racines"/>
-		<text name="mdm_event_cold_snap" text="Vague de froid"/>
+        <text name="mdm_event_cold_snap" text="Vague de froid"/>
         <text name="mdm_event_financial_panic" text="Panique financière"/>
         <text name="mdm_event_protein_premium" text="Hausse des prix des protéines"/>
         <text name="mdm_hud_title" text="Contrat Actif"/>
@@ -29,28 +29,28 @@
         <text name="mdm_screen_tab_events" text="Événements"/>
         <text name="mdm_screen_tab_contracts" text="Contrats"/>
         <text name="mdm_screen_commodities" text="PRODUITS"/>
-		<text name="mdm_screen_events_hdr" text="ÉVÉNEMENTS ACTIFS"/>
-		<text name="mdm_screen_contracts_hdr" text="CONTRATS À TERME"/>
-		<text name="mdm_screen_col_crop" text="Culture"/>
-		<text name="mdm_screen_col_price" text="Prix"/>
-		<text name="mdm_screen_col_change" text="Changement"/>
-		<text name="mdm_screen_col_event" text="Événement"/>
+        <text name="mdm_screen_events_hdr" text="ÉVÉNEMENTS ACTIFS"/>
+        <text name="mdm_screen_contracts_hdr" text="CONTRATS À TERME"/>
+        <text name="mdm_screen_col_crop" text="Culture"/>
+        <text name="mdm_screen_col_price" text="Prix"/>
+        <text name="mdm_screen_col_change" text="Changement"/>
+        <text name="mdm_screen_col_event" text="Événement"/>
         <text name="mdm_screen_current_price" text="Prix ​​actuel"/>
         <text name="mdm_screen_base_price" text="Prix ​​de base"/>
-		<text name="mdm_screen_change" text="Variation"/>
+        <text name="mdm_screen_change" text="Variation"/>
         <text name="mdm_screen_volatility" text="Volatilité"/>
         <text name="mdm_screen_modifiers" text="Modificateurs actifs"/>
         <text name="mdm_screen_session_trend" text="Tendance des prix des sessions"/>
         <text name="mdm_screen_collecting" text="Collecte de données..."/>
         <text name="mdm_screen_select_crop" text="Sélectionnez une marchandise"/>
         <text name="mdm_screen_no_events" text="Les marchés sont calmes. Aucun événement actif."/>
-		<text name="mdm_screen_col_intensity" text="Intensité"/>
-		<text name="mdm_screen_col_time_left" text="Temps restant"/>
-		<text name="mdm_screen_col_qty" text="Qté"/>
-		<text name="mdm_screen_col_locked" text="Verrouillé"/>
-		<text name="mdm_screen_col_delivered" text="Livré"/>
-		<text name="mdm_screen_col_deadline" text="Échéance"/>
-		<text name="mdm_screen_col_status" text="État"/>
+        <text name="mdm_screen_col_intensity" text="Intensité"/>
+        <text name="mdm_screen_col_time_left" text="Temps restant"/>
+        <text name="mdm_screen_col_qty" text="Qté"/>
+        <text name="mdm_screen_col_locked" text="Verrouillé"/>
+        <text name="mdm_screen_col_delivered" text="Livré"/>
+        <text name="mdm_screen_col_deadline" text="Échéance"/>
+        <text name="mdm_screen_col_status" text="État"/>
         <text name="mdm_screen_new_contract" text="Alt+F : Nouveau contrat"/>
         <text name="mdm_screen_no_contracts" text="Pas encore de contrats. Appuyez sur Alt+F pour en créer un."/>
         <text name="mdm_screen_at_risk" text="À RISQUE"/>
@@ -62,175 +62,196 @@
         <text name="mdm_futures_fulfill" text="Réalisé"/>
         <text name="mdm_futures_defaulted" text="Échoué"/>
         <text name="mdm_futures_active" text="Actif"/>
-		<text name="mdm_settled" text="Stabilisé"/>
+        <text name="mdm_settled" text="Stabilisé"/>
         <text name="mdm_futures_delivery_label" text="Livraison"/>
         <text name="mdm_futures_locked_label" text="Prix ​​verrouillé"/>
         <text name="mdm_futures_quantity_label" text="Quantité (L)"/>
         <text name="mdm_futures_bc_disabled" text="Futures désactivés — Mode BetterContracts actif"/>
         <text name="mdm_futures_created" text="Contrat créé !"/>
         <text name="mdm_futures_no_contracts" text="Pas encore de contrats"/>
-		<text name="mdm_futures_create" text="Nouveau contrat"/>
+        <text name="mdm_futures_create" text="Nouveau contrat"/>
         <text name="mdm_dialog_summary" text="Résumé du contrat"/>
-		<text name="mdm_futures_crop_label" text="Marchandise"/>
+        <text name="mdm_futures_crop_label" text="Marchandise"/>
         <text name="mdm_dialog_qty_label" text="Quantité du contrat"/>
-        <text name="mdm_dialog_unit_label"    text="Time Unit" />
-        <text name="mdm_unit_game_days"       text="In-Game Days" />
-        <text name="mdm_unit_real_days"       text="Real Days" />
+        <text name="mdm_dialog_unit_label"    text="Unité de temps" />
+        <text name="mdm_unit_game_days"       text="Jours de jeu" />
+        <text name="mdm_unit_real_days"       text="Jours réels" />
         <text name="mdm_dialog_delivery_label" text="Fenêtre de livraison"/>
-		<text name="mdm_timescale_drift_warning" text="[EN] Time scale changed — real-day contract deadlines may be affected."/>
+        <text name="mdm_timescale_drift_warning" text="L'échelle de temps a changé — les délais des contrats en jours réels peuvent être affectés."/>
         <text name="mdm_dialog_no_crops" text="Aucune donnée de marché disponible pour l'instant."/>
         <text name="mdm_screen_new_contract_btn" text="Nouveau contrat [N]"/>
-		<text name="mdm_custom_amount" text="Quantité personnalisée"/>
-		<text name="mdm_custom_days" text="Jours personnalisés"/>
-		<text name="mdm_enter_amount" text="Entrer la quantité :"/>
-		<text name="mdm_enter_days" text="Entrer le nombre de jours :"/>
-		<text name="mdm_enter_value" text="Entrer la valeur :"/>
-		<text name="mdm_custom_amount_hint" text="Entrez la quantité souhaitée du contrat en litres."/>
-		<text name="mdm_custom_days_hint" text="Sélectionnez la durée de la fenêtre de livraison. Les jours réels seront convertis en temps de jeu selon votre réglage actuel d'échelle temporelle."/>
-		<text name="mdm_evt_force_fire" text="Forcer l'événement"/>
-		<text name="mdm_evt_stop" text="Arrêter l'événement"/>
-		<text name="mdm_browse_title" text="Types de remplissage disponibles"/>
-		<text name="mdm_browse_hint" text="Ci-dessous se trouvent tous les types de remplissage actuellement suivis par le marché. Utilisez ces noms dans la configuration des événements."/>
-        <text name="mdm_browse_search"          text="Filter:" />
-		<text name="mdm_browse_types" text="Parcourir les types"/>
-		<text name="mdm_qty_500" text="500 L"/>
-		<text name="mdm_qty_1000" text="1 000 L"/>
-		<text name="mdm_qty_5000" text="5 000 L"/>
-		<text name="mdm_qty_10000" text="10 000 L"/>
-		<text name="mdm_qty_25000" text="25 000 L"/>
-		<text name="mdm_qty_50000" text="50 000 L"/>
-		<text name="mdm_del_30" text="30 jours"/>
-		<text name="mdm_del_60" text="60 jours"/>
-		<text name="mdm_del_90" text="90 jours"/>
-		<text name="mdm_del_120" text="120 jours"/>
-		<text name="mdm_custom_input_title" text="Entrée personnalisée"/>
-		<text name="mdm_evt_ft_title" text="Types de remplissage des événements"/>
-		<text name="mdm_evt_ft_names_hint" text="Entrez les noms des types de remplissage utilisés dans le jeu (ex. WHEAT, MUNGBEAN). Les changements prendront effet lors du prochain déclenchement d'événement."/>
-		<text name="mdm_evt_ft_custom_header" text="TYPES DE REMPLISSAGE PERSONNALISÉS"/>
-		<text name="mdm_evt_ft_empty" text="Aucun type de remplissage personnalisé configuré."/>
-		<text name="mdm_evt_ft_add_header" text="AJOUTER UN NOUVEAU TYPE DE REMPLISSAGE"/>
-		<text name="mdm_evt_settings_title" text="Paramètres des événements"/>
-		<text name="mdm_header_global" text="GLOBAL"/>
-		<text name="mdm_header_individual_events" text="ÉVÉNEMENTS INDIVIDUELS"/>
-		<text name="mdm_col_event" text="Événement"/>
-		<text name="mdm_col_status" text="Statut"/>
-		<text name="mdm_col_custom_fills" text="Remplissages personnalisés"/>
-		<text name="mdm_col_test" text="Test"/>
-		<text name="mdm_edit_fills" text="Modifier les remplissages"/>
-		<text name="mdm_header_tracked_fills" text="TYPES DE REMPLISSAGE SUIVIS"/>
-		<text name="mdm_days_remaining" text="%d jour(s) restant(s)"/>
-		<text name="mdm_total_value" text="Valeur totale : $"/>
-		<text name="mdm_delivered_value" text="Valeur livrée : $%s (%d%%)"/>
-		<text name="mdm_adm_hint_complete" text="Terminer : forcer immédiatement le paiement complet au prix verrouillé."/>
-		<text name="mdm_adm_hint_cancel" text="Annuler : supprimer le contrat — aucun paiement, aucune pénalité."/>
-		<text name="mdm_adm_btn_cancel" text="[EN] Cancel (No Penalty)"/>
-		<text name="mdm_adm_btn_forfeit" text="[EN] Forfeit (Penalty)"/>
-		<text name="mdm_adm_hint_forfeit" text="[EN] Forfeit: terminate contract immediately. A penalty will be applied to the undelivered portion."/>
-		<text name="mdm_current_price_fmt" text="Prix actuel : $%.0f / 1 000L"/>
-		<text name="mdm_change_from_base_fmt" text="Variation par rapport à la base : %s%.1f%%"/>
-		<text name="mdm_summary_crop" text="Culture : "/>
-		<text name="mdm_summary_qty" text="Quantité : "/>
-		<text name="mdm_locked_price_fmt" text="Prix verrouillé : $%.0f / 1 000L"/>
-		<text name="mdm_summary_total" text="Total : $"/>
-		<text name="mdm_deliver_in" text="Livrer dans : "/>
-		<text name="mdm_default_penalty_hint" text="Pénalité par défaut : 15% sur la quantité non livrée"/>
-		<text name="mdm_signal_above" text="[+] %.1f%% au-dessus du prix de base - bon moment pour verrouiller"/>
-		<text name="mdm_signal_below" text="[-] %.1f%% en dessous du prix de base - envisagez d'attendre"/>
-		<text name="mdm_signal_neutral" text="[~] Proche de la référence (%.1f%%) - neutre"/>
-		<text name="mdm_screen_no_contracts_bc" text="Les contrats à terme sont gérés par FS25_FuturesMission (par Mmtrx). Veuillez utiliser l'onglet Contrats dans le menu ESC."/>
-		<text name="mdm_time_fmt_hm" text="%dh %dm"/>
-		<text name="mdm_time_fmt_m" text="%d min"/>
-		<text name="mdm_qty_fmt" text="%.0fL"/>
-		<text name="mdm_deadline_fmt_d" text="%d jours"/>
-		<text name="mdm_deadline_fmt_h" text="%d h"/>
-		<text name="mdm_header_prices" text="Prix"/>
-		<text name="mdm_prices_enabled" text="Prix dynamiques"/>
-		<text name="mdm_prices_enabled_tooltip" text="Activer les fluctuations de prix MDM. Désactivé = retour aux prix de vente vanilla."/>
-		<text name="mdm_price_volatility" text="Volatilité des prix"/>
-		<text name="mdm_price_volatility_tooltip" text="Détermine l'intensité des variations de prix intrajournalières et quotidiennes. Faible=0.5x, Normal=1x, Élevé=1.5x, Extrême=2x."/>
-		<text name="mdm_events_enabled" text="Événements mondiaux"/>
-		<text name="mdm_events_enabled_tooltip" text="Activer ou désactiver les événements mondiaux. Les prix continuent de fluctuer même si les événements sont désactivés."/>
-		<text name="mdm_header_world_events" text="ÉVÉNEMENTS MONDIAUX"/>
-		<text name="mdm_event_frequency" text="Fréquence des événements"/>
-		<text name="mdm_event_frequency_tooltip" text="Détermine la fréquence des événements. Rare=0.4x, Normal=1x, Fréquent=2x la probabilité de base à chaque vérification."/>
-		<text name="mdm_header_futures" text="Contrats à terme"/>
-		<text name="mdm_default_penalty" text="Pénalité par défaut"/>
-		<text name="mdm_default_penalty_tooltip" text="Pénalité appliquée à la valeur non livrée du contrat lorsqu'une échéance est dépassée."/>
-		<text name="mdm_use_real_days" text="Unité de temps de livraison (jours réels)"/>
-		<text name="mdm_use_real_days_tooltip" text="Désactivé = jours en jeu. Activé = jours réels (approximation basée sur l'échelle de temps au moment de la création du contrat)."/>
-		<text name="mdm_penalty_low" text="Faible (8%)"/>
-		<text name="mdm_penalty_normal" text="Normal (15%)"/>
-		<text name="mdm_penalty_high" text="Élevé (25%)"/>
-		<text name="mdm_header_interface" text="Interface"/>
-		<text name="mdm_show_event_notifications" text="Notifications d'événements"/>
-		<text name="mdm_show_event_notifications_tooltip" text="Afficher une fenêtre de confirmation lorsqu'un nouvel événement mondial commence."/>
-		<text name="mdm_show_contract_hud" text="HUD des contrats"/>
-		<text name="mdm_show_contract_hud_tooltip" text="Afficher un suivi de progression à l'écran pour votre contrat à terme actif."/>
-		<text name="mdm_msg_event_started" text="Un nouvel événement mondial a commencé : %s&amp;#10;&amp;#10;Voulez-vous ouvrir l'écran du marché pour voir son impact ?"/>
-		<text name="mdm_header_status" text="Statut"/>
-		<text name="mdm_status_version" text="Version : —"/>
-		<text name="mdm_status_events" text="Événements actifs : —"/>
-		<text name="mdm_status_bc" text="FuturesMission : —"/>
-		<text name="mdm_status_up" text="UsedPlus : —"/>
-		<text name="mdm_header_debug" text="Débogage"/>
-		<text name="mdm_debug_logging" text="Journalisation debug"/>
-		<text name="mdm_debug_logging_tooltip" text="Écrire des entrées détaillées [MDM] DEBUG dans log.txt. Réservé aux développeurs."/>
-		<text name="mdm_status_version_fmt" text="Version : %s"/>
-		<text name="mdm_status_none" text="Aucun"/>
-		<text name="mdm_status_active_fmt" text="%d actif(s)"/>
-		<text name="mdm_status_events_fmt" text="Événements actifs : %s"/>
-		<text name="mdm_status_detected" text="Détecté"/>
-		<text name="mdm_status_not_installed" text="Non installé"/>
-		<text name="mdm_status_bc_fmt" text="FuturesMission : %s"/>
-		<text name="mdm_status_up_fmt" text="UsedPlus : %s"/>
-		<text name="mdm_evt_ft_hint" text="Entrez un nom de type de remplissage (ex. WHEAT, MUNGBEAN). Les changements prendront effet lors du prochain déclenchement d'événement."/>
-		<text name="mdm_evt_ft_browse" text="Tous les types suivis : "/>
-		<text name="mdm_evt_ft_not_found" text="Type de remplissage introuvable. Vérifiez l'orthographe : "/>
-		<text name="mdm_evt_ft_duplicate" text="Déjà présent dans la liste : "/>
-		<text name="mdm_evt_ft_added" text="Ajouté — les changements seront appliqués lors du prochain déclenchement : "/>
-		<text name="mdm_evt_ft_title_suffix" text=" — Types de remplissage personnalisés"/>
-
+        <text name="mdm_custom_amount" text="Quantité personnalisée"/>
+        <text name="mdm_custom_days" text="Jours personnalisés"/>
+        <text name="mdm_enter_amount" text="Entrer la quantité :"/>
+        <text name="mdm_enter_days" text="Entrer le nombre de jours :"/>
+        <text name="mdm_enter_value" text="Entrer la valeur :"/>
+        <text name="mdm_custom_amount_hint" text="Entrez la quantité souhaitée du contrat en litres."/>
+        <text name="mdm_custom_days_hint" text="Sélectionnez la durée de la fenêtre de livraison. Les jours réels seront convertis en temps de jeu selon votre réglage actuel d'échelle temporelle."/>
+        <text name="mdm_evt_force_fire" text="Forcer l'événement"/>
+        <text name="mdm_evt_stop" text="Arrêter l'événement"/>
+        <text name="mdm_browse_title" text="Types de remplissage disponibles"/>
+        <text name="mdm_browse_hint" text="Ci-dessous se trouvent tous les types de remplissage actuellement suivis par le marché. Utilisez ces noms dans la configuration des événements."/>
+        <text name="mdm_browse_search"          text="Filtre :" />
+        <text name="mdm_browse_types" text="Parcourir les types"/>
+        <text name="mdm_qty_500" text="500 L"/>
+        <text name="mdm_qty_1000" text="1 000 L"/>
+        <text name="mdm_qty_5000" text="5 000 L"/>
+        <text name="mdm_qty_10000" text="10 000 L"/>
+        <text name="mdm_qty_25000" text="25 000 L"/>
+        <text name="mdm_qty_50000" text="50 000 L"/>
+        <text name="mdm_del_30" text="30 jours"/>
+        <text name="mdm_del_60" text="60 jours"/>
+        <text name="mdm_del_90" text="90 jours"/>
+        <text name="mdm_del_120" text="120 jours"/>
+        <text name="mdm_custom_input_title" text="Entrée personnalisée"/>
+        <text name="mdm_evt_ft_title" text="Types de remplissage des événements"/>
+        <text name="mdm_evt_ft_names_hint" text="Entrez les noms des types de remplissage utilisés dans le jeu (ex. WHEAT, MUNGBEAN). Les changements prendront effet lors du prochain déclenchement d'événement."/>
+        <text name="mdm_evt_ft_custom_header" text="TYPES DE REMPLISSAGE PERSONNALISÉS"/>
+        <text name="mdm_evt_ft_empty" text="Aucun type de remplissage personnalisé configuré."/>
+        <text name="mdm_evt_ft_add_header" text="AJOUTER UN NOUVEAU TYPE DE REMPLISSAGE"/>
+        <text name="mdm_evt_settings_title" text="Paramètres des événements"/>
+        <text name="mdm_header_global" text="GLOBAL"/>
+        <text name="mdm_header_individual_events" text="ÉVÉNEMENTS INDIVIDUELS"/>
+        <text name="mdm_col_event" text="Événement"/>
+        <text name="mdm_col_status" text="Statut"/>
+        <text name="mdm_col_custom_fills" text="Remplissages personnalisés"/>
+        <text name="mdm_col_test" text="Test"/>
+        <text name="mdm_edit_fills" text="Modifier les remplissages"/>
+        <text name="mdm_header_tracked_fills" text="TYPES DE REMPLISSAGE SUIVIS"/>
+        <text name="mdm_days_remaining" text="%d jour(s) restant(s)"/>
+        <text name="mdm_total_value" text="Valeur totale : $"/>
+        <text name="mdm_delivered_value" text="Valeur livrée : $%s (%d%%)"/>
+        <text name="mdm_adm_hint_complete" text="Terminer : forcer immédiatement le paiement complet au prix verrouillé."/>
+        <text name="mdm_adm_hint_cancel" text="Annuler : supprimer le contrat — aucun paiement, aucune pénalité."/>
+        <text name="mdm_adm_btn_cancel" text="Annuler (sans pénalité)"/>
+        <text name="mdm_adm_btn_forfeit" text="Confisquer (avec pénalité)"/>
+        <text name="mdm_adm_hint_forfeit" text="Confisquer : résilier le contrat immédiatement. Une pénalité sera appliquée à la partie non livrée."/>
+        <text name="mdm_current_price_fmt" text="Prix actuel : $%.0f / 1 000L"/>
+        <text name="mdm_change_from_base_fmt" text="Variation par rapport à la base : %s%.1f%%"/>
+        <text name="mdm_summary_crop" text="Culture : "/>
+        <text name="mdm_summary_qty" text="Quantité : "/>
+        <text name="mdm_locked_price_fmt" text="Prix verrouillé : $%.0f / 1 000L"/>
+        <text name="mdm_summary_total" text="Total : $"/>
+        <text name="mdm_deliver_in" text="Livrer dans : "/>
+        <text name="mdm_default_penalty_hint" text="Pénalité par défaut : 15% sur la quantité non livrée"/>
+        <text name="mdm_signal_above" text="[+] %.1f%% au-dessus du prix de base - bon moment pour verrouiller"/>
+        <text name="mdm_signal_below" text="[-] %.1f%% en dessous du prix de base - envisagez d'attendre"/>
+        <text name="mdm_signal_neutral" text="[~] Proche de la référence (%.1f%%) - neutre"/>
+        <text name="mdm_screen_no_contracts_bc" text="Les contrats à terme sont gérés par FS25_FuturesMission (par Mmtrx). Veuillez utiliser l'onglet Contrats dans le menu ESC."/>
+        <text name="mdm_time_fmt_hm" text="%dh %dm"/>
+        <text name="mdm_time_fmt_m" text="%d min"/>
+        <text name="mdm_qty_fmt" text="%.0fL"/>
+        <text name="mdm_deadline_fmt_d" text="%d jours"/>
+        <text name="mdm_deadline_fmt_h" text="%d h"/>
+        <text name="mdm_header_prices" text="Prix"/>
+        <text name="mdm_prices_enabled" text="Prix dynamiques"/>
+        <text name="mdm_prices_enabled_tooltip" text="Activer les fluctuations de prix MDM. Désactivé = retour aux prix de vente vanilla."/>
+        <text name="mdm_price_volatility" text="Volatilité des prix"/>
+        <text name="mdm_price_volatility_tooltip" text="Détermine l'intensité des variations de prix intrajournalières et quotidiennes. Faible=0.5x, Normal=1x, Élevé=1.5x, Extrême=2x."/>
+        <text name="mdm_events_enabled" text="Événements mondiaux"/>
+        <text name="mdm_events_enabled_tooltip" text="Activer ou désactiver les événements mondiaux. Les prix continuent de fluctuer même si les événements sont désactivés."/>
+        <text name="mdm_header_world_events" text="ÉVÉNEMENTS MONDIAUX"/>
+        <text name="mdm_event_frequency" text="Fréquence des événements"/>
+        <text name="mdm_event_frequency_tooltip" text="Détermine la fréquence des événements. Rare=0.4x, Normal=1x, Fréquent=2x la probabilité de base à chaque vérification."/>
+        <text name="mdm_header_futures" text="Contrats à terme"/>
+        <text name="mdm_default_penalty" text="Pénalité par défaut"/>
+        <text name="mdm_default_penalty_tooltip" text="Pénalité appliquée à la valeur non livrée du contrat lorsqu'une échéance est dépassée."/>
+        <text name="mdm_use_real_days" text="Unité de temps de livraison (jours réels)"/>
+        <text name="mdm_use_real_days_tooltip" text="Désactivé = jours en jeu. Activé = jours réels (approximation basée sur l'échelle de temps au moment de la création du contrat)."/>
+        <text name="mdm_penalty_low" text="Faible (8%)"/>
+        <text name="mdm_penalty_normal" text="Normal (15%)"/>
+        <text name="mdm_penalty_high" text="Élevé (25%)"/>
+        <text name="mdm_header_interface" text="Interface"/>
+        <text name="mdm_show_event_notifications" text="Notifications d'événements"/>
+        <text name="mdm_show_event_notifications_tooltip" text="Afficher une fenêtre de confirmation lorsqu'un nouvel événement mondial commence."/>
+        <text name="mdm_show_contract_hud" text="HUD des contrats"/>
+        <text name="mdm_show_contract_hud_tooltip" text="Afficher un suivi de progression à l'écran pour votre contrat à terme actif."/>
+        <text name="mdm_msg_event_started" text="Un nouvel événement mondial a commencé : %s&amp;#10;&amp;#10;Voulez-vous ouvrir l'écran du marché pour voir son impact ?"/>
+        <text name="mdm_header_status" text="Statut"/>
+        <text name="mdm_status_version" text="Version : —"/>
+        <text name="mdm_status_events" text="Événements actifs : —"/>
+        <text name="mdm_status_bc" text="FuturesMission : —"/>
+        <text name="mdm_status_up" text="UsedPlus : —"/>
+        <text name="mdm_header_debug" text="Débogage"/>
+        <text name="mdm_debug_logging" text="Journalisation debug"/>
+        <text name="mdm_debug_logging_tooltip" text="Écrire des entrées détaillées [MDM] DEBUG dans log.txt. Réservé aux développeurs."/>
+        <text name="mdm_status_version_fmt" text="Version : %s"/>
+        <text name="mdm_status_none" text="Aucun"/>
+        <text name="mdm_status_active_fmt" text="%d actif(s)"/>
+        <text name="mdm_status_events_fmt" text="Événements actifs : %s"/>
+        <text name="mdm_status_detected" text="Détecté"/>
+        <text name="mdm_status_not_installed" text="Non installé"/>
+        <text name="mdm_status_bc_fmt" text="FuturesMission : %s"/>
+        <text name="mdm_status_up_fmt" text="UsedPlus : %s"/>
+        <text name="mdm_evt_ft_hint" text="Entrez un nom de type de remplissage (ex. WHEAT, MUNGBEAN). Les changements prendront effet lors du prochain déclenchement d'événement."/>
+        <text name="mdm_evt_ft_browse" text="Tous les types suivis : "/>
+        <text name="mdm_evt_ft_not_found" text="Type de remplissage introuvable. Vérifiez l'orthographe : "/>
+        <text name="mdm_evt_ft_duplicate" text="Déjà présent dans la liste : "/>
+        <text name="mdm_evt_ft_added" text="Ajouté — les changements seront appliqués lors du prochain déclenchement : "/>
+        <text name="mdm_evt_ft_title_suffix" text=" — Types de remplissage personnalisés"/>
 
         <!-- Input action display names -->
-        <text name="input_MDM_MARKET_SCREEN" text="Ouvrir la bourse" />
-        <text name="input_MDM_CREATE_CONTRACT" text="Créer un contrat à terme" />
-		<text name="input_MDM_SETTINGS_PANEL" text="[EN] Market Dynamics Settings"/>
+        <text name="input_MDM_MARKET_SCREEN" text="MDM : Ouvrir la bourse" />
+        <text name="input_MDM_CREATE_CONTRACT" text="MDM : Créer un contrat" />
+        <text name="input_MDM_OPEN_SETTINGS" text="MDM : Ouvrir les paramètres" />
+        <text name="input_MDM_SETTINGS_PANEL" text="Paramètres de Market Dynamics"/>
 
         <!-- Contract admin dialog -->
-        <text name="mdm_admin_title"            text="Contract Details" />
-        <text name="mdm_admin_details_label"    text="Contract Info" />
-        <text name="mdm_admin_summary_label"    text="Value Summary" />
-        <text name="mdm_admin_crop"             text="Crop:" />
-        <text name="mdm_admin_qty"              text="Quantity:" />
-        <text name="mdm_admin_price"            text="Locked price:" />
-        <text name="mdm_admin_delivered"        text="Delivered:" />
-        <text name="mdm_admin_deadline"         text="Deadline:" />
-        <text name="mdm_admin_status"           text="Status:" />
-        <text name="mdm_admin_complete"         text="Force Complete" />
-        <text name="mdm_admin_cancel_contract"  text="Cancel Contract" />
+        <text name="mdm_admin_title"            text="Détails du contrat" />
+        <text name="mdm_admin_details_label"    text="Infos du contrat" />
+        <text name="mdm_admin_summary_label"    text="Récapitulatif des valeurs" />
+        <text name="mdm_admin_crop"             text="Culture :" />
+        <text name="mdm_admin_qty"              text="Quantité :" />
+        <text name="mdm_admin_price"            text="Prix verrouillé :" />
+        <text name="mdm_admin_delivered"        text="Livré :" />
+        <text name="mdm_admin_deadline"         text="Échéance :" />
+        <text name="mdm_admin_status"           text="Statut :" />
+        <text name="mdm_admin_complete"         text="Forcer la complétion" />
+        <text name="mdm_admin_cancel_contract"  text="Annuler le contrat" />
         <text name="mdm_admin_settled"          text="Ce contrat est réglé. Utilisez Supprimer pour le retirer de la liste." />
-            <text name="mdm_bc_dialog_suppressed" text="FS25_FuturesMission is active and handles contract creation. Use the Contracts page (ESC menu) to create futures contracts. Get it on GitHub: search FS25_FuturesMission by Mmtrx." />
+        <text name="mdm_bc_dialog_suppressed"   text="FS25_FuturesMission est actif et gère la création des contrats. Utilisez la page Contrats (menu ESC) pour créer des contrats à terme. Disponible sur GitHub : recherchez FS25_FuturesMission par Mmtrx." />
 
-		<text name="mdm_label_enabled" text="Activé"/>
-		<text name="mdm_label_disabled" text="Désactivé"/>
-		<text name="mdm_label_normal" text="Normal"/>
-		<text name="mdm_label_low" text="Faible"/>
-		<text name="mdm_label_high" text="Élevé"/>
-		<text name="mdm_label_extreme" text="Extrême"/>
-		<text name="mdm_label_rare" text="Rare"/>
-		<text name="mdm_label_frequent" text="Fréquent"/>
-		<text name="mdm_label_crop" text="Culture"/>
-		<text name="mdm_label_qty" text="Qté"/>
-		<text name="mdm_label_quantity" text="Quantité"/>
-		<text name="mdm_label_price" text="Prix"/>
-		<text name="mdm_label_change" text="Variation"/>
-		<text name="mdm_label_status" text="Statut"/>
-		<text name="mdm_label_total_value" text="Valeur totale"/>
-		<text name="mdm_label_confirm" text="Confirmer"/>
-		<text name="mdm_label_cancel" text="Annuler"/>
-		<text name="mdm_label_close" text="Fermer"/>
-		<text name="mdm_label_delete" text="Supprimer"/>
-		<text name="mdm_label_remove" text="Retirer"/>
-		<text name="mdm_label_add" text="Ajouter"/>
-     </texts>
+        <!-- Settings Panel -->
+        <text name="mdm_cat_market"                text="Moteurs de marché" />
+        <text name="mdm_cat_market_desc"           text="Configurez le calcul des prix de base et les systèmes de contrats à terme." />
+        <text name="mdm_cat_sim"                   text="Simulation" />
+        <text name="mdm_cat_sim_desc"              text="Ajustez la fréquence des événements mondiaux, les notifications et les interfaces visuelles." />
+        <text name="mdm_hdr_engine"               text="MOTEUR DE PRIX" />
+        <text name="mdm_hdr_futures"              text="CONTRATS À TERME" />
+        <text name="mdm_hdr_events"               text="ÉVÉNEMENTS MONDIAUX" />
+        <text name="mdm_hdr_display"              text="AFFICHAGE &amp; DÉBOGAGE" />
+        <text name="mdm_btn_configure"            text="Configurer" />
+        <text name="mdm_btn_open"                 text="Ouvrir" />
+        <text name="mdm_btn_back"                 text="Retour" />
+        <text name="mdm_panel_select_cat"         text="Sélectionnez une catégorie à configurer" />
+        <text name="mdm_panel_admin_yes"          text="Admin : Oui" />
+        <text name="mdm_panel_admin_no"           text="Admin : Non" />
+        <text name="mdm_panel_multiplayer"        text="Multijoueur" />
+        <text name="mdm_panel_singleplayer"       text="Solo" />
+
+        <!-- Settings Labels & Descriptions -->
+        <text name="mdm_set_prices_enabled"      text="Prix dynamiques" />
+        <text name="mdm_desc_prices_enabled"     text="Activer ou désactiver toutes les fluctuations de prix de Market Dynamics." />
+        <text name="mdm_set_use_real_days"       text="Livraison en jours réels" />
+        <text name="mdm_desc_use_real_days"      text="Les échéances des contrats suivent le temps réel au lieu des jours de jeu." />
+        <text name="mdm_set_futures_penalty"     text="Pénalité par défaut" />
+        <text name="mdm_desc_futures_penalty"    text="Pénalité appliquée aux marchandises non livrées à l'expiration du contrat." />
+        <text name="mdm_set_events_enabled"      text="Événements mondiaux" />
+        <text name="mdm_desc_events_enabled"     text="Permettre aux événements globaux (sécheresses, boom) d'impacter le marché." />
+        <text name="mdm_set_event_freq"          text="Fréquence des événements" />
+        <text name="mdm_desc_event_freq"         text="Échelonner la probabilité d'apparition de nouveaux événements mondiaux." />
+        <text name="mdm_set_event_notify"        text="Notifications d'événements" />
+        <text name="mdm_desc_event_notify"       text="Afficher une boîte de dialogue à l'écran lorsqu'un nouvel événement mondial commence." />
+        <text name="mdm_set_event_banner"        text="Bannière d'événement compacte" />
+        <text name="mdm_desc_event_banner"       text="Afficher les événements mondiaux sous forme de petite bannière plutôt que d'une boîte de dialogue contextuelle." />
+        <text name="mdm_set_contract_hud"        text="HUD des contrats" />
+        <text name="mdm_desc_contract_hud"       text="Afficher un suivi de progression permanent pour les contrats à terme actifs." />
+        <text name="mdm_set_debug_mode"          text="Mode débogage" />
+        <text name="mdm_desc_debug_mode"         text="Activer la journalisation développeur et des informations de débogage supplémentaires." />
+
+        <!-- Multi-option Labels -->
+        <text name="mdm_freq_rare"               text="Rare" />
+        <text name="mdm_freq_normal"             text="Normal" />
+        <text name="mdm_freq_frequent"           text="Fréquent" />
+    </texts>
 </l10n>
