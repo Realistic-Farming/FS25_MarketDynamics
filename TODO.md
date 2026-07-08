@@ -1,25 +1,31 @@
 # TODO: FS25_MarketDynamics
 
 > Ecosystem role: **Markets and Economy** · Part of the Realistic Farming connected suite
-> Status: TEMPLATE (working checklist). Fill from the ecosystem audit/baseline, then keep it current.
+> Status: FILLED from the ecosystem audit/baseline, kept current.
 > Convention: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked. Newest at the top of each section.
 
 ## From the ecosystem audit (Arissani)
-_Action items that come out of the audit/baseline go here first so nothing is missed._
-- [ ] _audit item_
+- [ ] Expose a stable companion read API so peers stop reading internal tables (`marketEngine.prices`, `worldEvents.active`, `futuresMarket`).
+- [ ] Handle capitalization is `g_currentMission.MarketDynamics` (capital M); ensure CropDisease and ProStaff briefs use it, and poll `getActiveEvents()` matching by id string.
 
 ## Bugs
-- [ ] _bug_
+- [ ] None flagged by the audit.
 
 ## Features / enhancements
-- [ ] _feature_
+- [ ] `getEligibleEvents()` to unblock ProStaff L20 early-warning (off-cooldown, not-active events).
 
 ## Cross-mod integration
-_Wiring to StateLedger / NetworkSync / MasterHUD / SettingsHub / FarmTablet / peer mods._
-- [ ] _integration task_
+- [ ] StateLedger: migrate off `FS25_MarketDynamics.xml` (schema v2).
+- [ ] NetworkSync: replace the 5 custom event classes.
+- [ ] MasterHUD: MDMHUD ticker + MDMMarketScreen; the admin tab stays gated by `isMasterUser`.
+- [ ] SettingsHub: remove the ESC-menu injection.
+- [ ] Reads: RandomWorldEvents `getPriceModifier`, SeasonalCropStress `cropStressManager`. Read by: CropDisease, ProStaff.
 
 ## Docs / localization
-- [ ] _doc or translation task (remember all 26 languages)_
+- [ ] Keep all 26 languages in step for any new setting.
+- [ ] Update README/version on each release.
 
 ## Blocked / waiting on
-- [!] _blocked item + what it waits on_
+- [!] MasterHUD admin-tab guard decision (waits on: audit answer, internal `isMasterUser` check vs a panel `adminOnly` flag).
+- [!] ProStaff early-warning threshold (waits on: Arissani, whether getEligibleEvents applies a minimum probability filter).
+- [!] Bedrock migrations (waits on: adopting the four engines).
