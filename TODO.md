@@ -9,7 +9,7 @@
 - [ ] Handle capitalization is `g_currentMission.MarketDynamics` (capital M); ensure CropDisease and ProStaff briefs use it, and poll `getActiveEvents()` matching by id string.
 
 ## Bugs
-- [ ] None flagged by the audit.
+- [x] Money-authority (F15-class futures settlement): VERIFIED server-gated in live source. Both settlement paths bail on pure clients before `addMoney` (FuturesMarket.lua:217 `_fulfillContract`, :287 `_defaultContract`, via `if g_currentMission.isClient and not g_currentMission.isServer then return`), plus a double-pay guard (:210). The 2026-07-09 money-authority sweep flagged this as ungated, but it grepped `getIsServer` and missed the valid `.isServer`/`.isClient` field guard. Not a bug.
 
 ## Features / enhancements
 - [ ] `getEligibleEvents()` to unblock ProStaff L20 early-warning (off-cooldown, not-active events).
