@@ -23,6 +23,11 @@ function MDMContractRequestEvent.new(action, params)
 end
 
 function MDMContractRequestEvent.sendToServer(action, params)
+    -- Route through NetworkSync's server-authoritative action channel when the bridge is
+    -- active; otherwise fall back to the own client-to-server event exactly as before.
+    if MDMNetworkSyncBridge ~= nil and MDMNetworkSyncBridge.trySendAction(action, params) then
+        return
+    end
     if g_server ~= nil then
         MDMContractRequestEvent.execute(action, params)
     else

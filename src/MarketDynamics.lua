@@ -96,6 +96,11 @@ function MarketDynamics:onMissionLoaded(mission)
     -- FSBaseMission.draw path (MarketDynamics:draw) stands down when this is active.
     MDMMasterHUDBridge.register(self)
 
+    -- Route the client-initiated contract action through NetworkSync's server-authoritative
+    -- action channel when present; the own MDMContractRequestEvent is the fallback. No-op if
+    -- NetworkSync is absent. Server->client state broadcasts stay on their own events.
+    MDMNetworkSyncBridge.register(self)
+
     MDMLog.info("MarketDynamics: mission loaded, system active")
 end
 

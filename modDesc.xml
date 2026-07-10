@@ -55,6 +55,7 @@
         <sourceFile filename="src/MDMSettingsHubBridge.lua" />
         <sourceFile filename="src/MDMStateLedgerBridge.lua" />
         <sourceFile filename="src/MDMMasterHUDBridge.lua" />
+        <sourceFile filename="src/MDMNetworkSyncBridge.lua" />
         <sourceFile filename="main.lua" />
     </extraSourceFiles>
 
