@@ -53,6 +53,8 @@
         <sourceFile filename="src/events/ProteinPremiumEvent.lua" />
         <sourceFile filename="src/MarketDynamics.lua" />
         <sourceFile filename="src/MDMSettingsHubBridge.lua" />
+        <sourceFile filename="src/MDMStateLedgerBridge.lua" />
+        <sourceFile filename="src/MDMMasterHUDBridge.lua" />
         <sourceFile filename="main.lua" />
     </extraSourceFiles>
 

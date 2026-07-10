@@ -91,6 +91,11 @@ function MarketDynamics:onMissionLoaded(mission)
     -- Detect optional companion mods
     self.rweIntegration:detect()
 
+    -- Register the HUD with MasterHUD (if installed) so it owns the single
+    -- suspend-aware draw loop. No-ops safely if MasterHUD is absent; the own
+    -- FSBaseMission.draw path (MarketDynamics:draw) stands down when this is active.
+    MDMMasterHUDBridge.register(self)
+
     MDMLog.info("MarketDynamics: mission loaded, system active")
 end
 
@@ -109,6 +114,19 @@ function MarketDynamics:onStartMission(mission)
 
     if g_server ~= nil then
         self.serializer:load(self)
+
+        -- StateLedger (bedrock) override: when the shared master file carries a
+        -- MarketDynamics_State block, it is the load source of truth for the durable
+        -- market state (contracts, prices, cooldowns, lastGameTime). It overrides the
+        -- state just imported from FS25_MarketDynamics.xml (kept as the safety copy).
+        -- Runs before cleanupStaleEntries + reregisterActiveContracts so the ledger
+        -- state flows through the same post-load pipeline. No-ops when StateLedger is
+        -- absent or the block is empty (own XML stays primary).
+        MDMStateLedgerBridge.register(self)
+        if MDMStateLedgerBridge.hasState() then
+            MDMStateLedgerBridge.applyState(self)
+        end
+
         -- Remove stale entries from removed mods before anything uses the data.
         self.marketEngine:cleanupStaleEntries()
         MDMEventConfig.validateAndClean()
@@ -153,8 +171,11 @@ function MarketDynamics:update(dt)
 end
 
 -- Per-frame draw. Delegates to g_MDMHud if the market screen registers one.
+-- When MasterHUD is present it owns the draw loop (MDMMasterHUDBridge.drawStack
+-- runs the identical body), so this hook stands down to avoid drawing twice.
 function MarketDynamics:draw()
     if not self.isActive then return end
+    if MDMMasterHUDBridge and MDMMasterHUDBridge.active then return end
     if g_MDMHud then
         g_MDMHud:draw()
     end

@@ -51,6 +51,12 @@ function MDMSettingsHubBridge.register(mdm)
         hub:registerModule("MarketDynamics", {
             adminSettings = defs,
             onChange      = function(key, value, playerId) applyChange(key, value) end,
+            -- We own our persistence (MarketSerializer -> FS25_MarketDynamics.xml) and load
+            -- it in onStartMission before this registration runs, so the hub must mirror
+            -- for display only: never restore its own stale copy and replay it back through
+            -- onChange on load. Without this the hub could push a stale value over our real
+            -- one every load (the same trap SoilFertilizer hit that silently disabled the mod).
+            selfPersisted = true,
         })
     end)
 
