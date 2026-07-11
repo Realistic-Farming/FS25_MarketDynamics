@@ -39,6 +39,11 @@ function MDMMarketSyncEvent.new(marketEngine, worldEvents)
 end
 
 function MDMMarketSyncEvent.sendToClients()
+    -- When NetworkSync is active it carries the full state; mark it dirty instead of
+    -- broadcasting the own event.
+    if MDMNetworkSyncBridge ~= nil and MDMNetworkSyncBridge.markStateDirty() then
+        return
+    end
     if g_server ~= nil and g_MarketDynamics then
         g_server:broadcastEvent(MDMMarketSyncEvent.new(g_MarketDynamics.marketEngine, g_MarketDynamics.worldEvents))
     end
@@ -91,12 +96,15 @@ function MDMMarketSyncEvent:readStream(streamId, connection)
     self:run(connection)
 end
 
-function MDMMarketSyncEvent:run(connection)
-    if not connection:getIsServer() then return end -- only clients process this
+-- Apply market prices + active world events to the local client. Extracted from :run so
+-- the NetworkSync bridge can reuse the EXACT same apply path (prices, event lifecycle,
+-- notifications, UI refresh) instead of re-implementing it. `prices` = array of
+-- {index, volatilityFactor}; `activeEvents` = array of {id, endsAt, intensity, extraData}.
+function MDMMarketSyncEvent.applyState(prices, activeEvents)
     if not g_MarketDynamics then return end
 
     if g_MarketDynamics.marketEngine then
-        for _, p in ipairs(self.prices) do
+        for _, p in ipairs(prices) do
             local entry = g_MarketDynamics.marketEngine.prices[p.index]
             if entry then
                 entry.volatilityFactor = p.volatilityFactor
@@ -116,10 +124,10 @@ function MDMMarketSyncEvent:run(connection)
         for id, _ in pairs(g_MarketDynamics.worldEvents.active) do
             g_MarketDynamics.worldEvents:_expireEvent(id, true)
         end
-        
+
         -- Load new events
         local newEventNames = {}
-        for _, e in ipairs(self.activeEvents) do
+        for _, e in ipairs(activeEvents) do
             g_MarketDynamics.worldEvents:loadActiveEvent(e.id, e.endsAt, e.intensity, e.extraData)
             if g_MarketDynamics.worldEvents.isInitialized and not oldActive[e.id] then
                 local desc = g_MarketDynamics.worldEvents.registry[e.id]
@@ -127,7 +135,7 @@ function MDMMarketSyncEvent:run(connection)
                 table.insert(newEventNames, name)
             end
         end
-        
+
         g_MarketDynamics.worldEvents.isInitialized = true
 
         -- Show notification if we have new events (clients only)
@@ -138,7 +146,7 @@ function MDMMarketSyncEvent:run(connection)
             addTimer(1000, "showEventNotification", g_MarketDynamics)
         end
     end
-    
+
     -- Refresh UI
     if g_gui and g_gui.currentGuiName == "InGameMenu" then
         local inGameMenu = g_gui.screenControllers[InGameMenu] or g_inGameMenu
@@ -151,4 +159,9 @@ function MDMMarketSyncEvent:run(connection)
             end
         end
     end
+end
+
+function MDMMarketSyncEvent:run(connection)
+    if not connection:getIsServer() then return end -- only clients process this
+    MDMMarketSyncEvent.applyState(self.prices, self.activeEvents)
 end

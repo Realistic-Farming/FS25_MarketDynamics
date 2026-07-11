@@ -36,8 +36,18 @@ MDMNetworkSyncBridge = {}
 
 MDMNetworkSyncBridge.ACTION_ID = "MarketDynamics_Contract"
 
-MDMNetworkSyncBridge.active = false
-MDMNetworkSyncBridge._ns    = nil
+-- State-sync module (the deferred half, now built): a single FULL-snapshot module that
+-- carries the whole syncable state - all futures contracts + market price volatility +
+-- active world events - server->client. On any change the server marks it dirty and
+-- NetworkSync sends the full snapshot at its next batch (NS chunks a large payload). The
+-- registerModule id + channel are pre-reserved (Point-2: id FS25_MarketDynamics, channel
+-- MarketDynamics_Sync). NetworkSync is transport, not a save key.
+MDMNetworkSyncBridge.STATE_MODULE_ID = "FS25_MarketDynamics"
+MDMNetworkSyncBridge.STATE_CHANNEL   = "MarketDynamics_Sync"
+
+MDMNetworkSyncBridge.active      = false   -- action channel registered
+MDMNetworkSyncBridge.stateActive = false   -- state-sync module registered
+MDMNetworkSyncBridge._ns         = nil
 
 -- Flatten contract params into a typed arg array (NetworkSync type-tags each value).
 -- Mirrors MDMContractRequestEvent:writeStream field-for-field; index 1 is the action.
@@ -139,15 +149,123 @@ function MDMNetworkSyncBridge.trySendAction(action, params)
     return true
 end
 
--- Register the action handler with NetworkSync if present. adminOnly = false because
--- the fine-grained farm-manager / owner rules live in onAction, not a blanket admin gate.
+-- ── State-sync serialization (server->client full snapshot) ───────────────────
+-- Flatten the whole syncable state into one typed array. Length-prefixed sub-lists so
+-- NetworkSync's flat, type-tagged array round-trips: contractCount, then 12 fields per
+-- contract (mirroring MDMContractSyncEvent:writeContract); priceCount, then 2 per price;
+-- eventCount, then 4 per active event.
+local function buildStateArray()
+    local arr = {}
+    local mdm = g_MarketDynamics
+    local fm  = mdm ~= nil and mdm.futuresMarket or nil
+
+    local contracts = (fm ~= nil and fm.contracts) or {}
+    local cCount = 0
+    for _ in pairs(contracts) do cCount = cCount + 1 end
+    arr[#arr + 1] = cCount
+    for _, c in pairs(contracts) do
+        arr[#arr + 1] = c.id or 0
+        arr[#arr + 1] = c.farmId or 0
+        arr[#arr + 1] = c.fillTypeIndex or 0
+        arr[#arr + 1] = tostring(c.fillTypeName or "")
+        arr[#arr + 1] = c.quantity or 0
+        arr[#arr + 1] = c.lockedPrice or 0
+        arr[#arr + 1] = math.floor((c.deliveryTime or 0) / 1000)
+        arr[#arr + 1] = math.floor((c.deliveryStartTime or 0) / 1000)
+        arr[#arr + 1] = c.bcManaged == true
+        arr[#arr + 1] = c.delivered or 0
+        arr[#arr + 1] = c.valueReceived or 0
+        arr[#arr + 1] = tostring(c.status or "")
+    end
+
+    -- Market prices + active events: reuse MDMMarketSyncEvent.new's capture exactly.
+    local prices, events = {}, {}
+    if mdm ~= nil then
+        local snap = MDMMarketSyncEvent.new(mdm.marketEngine, mdm.worldEvents)
+        prices = snap.prices or {}
+        events = snap.activeEvents or {}
+    end
+    arr[#arr + 1] = #prices
+    for _, p in ipairs(prices) do
+        arr[#arr + 1] = p.index or 0
+        arr[#arr + 1] = p.volatilityFactor or 1
+    end
+    arr[#arr + 1] = #events
+    for _, e in ipairs(events) do
+        arr[#arr + 1] = tostring(e.id or "")
+        arr[#arr + 1] = e.endsAt or 0
+        arr[#arr + 1] = e.intensity or 0
+        arr[#arr + 1] = tostring(e.extraData or "")
+    end
+    return arr
+end
+
+-- Client: rebuild the state from the array and apply it through the SAME hardened paths
+-- the own events use - MDMContractSyncEvent.execute (full contract rebuild + UI reload) and
+-- MDMMarketSyncEvent.applyState (prices / event lifecycle / notifications / UI).
+local function applyStateArray(arr)
+    if type(arr) ~= "table" then return end
+    local i = 1
+
+    local cCount = tonumber(arr[i]) or 0; i = i + 1
+    local contracts = {}
+    for _ = 1, cCount do
+        contracts[#contracts + 1] = {
+            id                = arr[i],
+            farmId            = arr[i + 1],
+            fillTypeIndex     = arr[i + 2],
+            fillTypeName      = arr[i + 3],
+            quantity          = arr[i + 4],
+            lockedPrice       = arr[i + 5],
+            deliveryTime      = (tonumber(arr[i + 6]) or 0) * 1000,
+            deliveryStartTime = (tonumber(arr[i + 7]) or 0) * 1000,
+            bcManaged         = arr[i + 8],
+            delivered         = arr[i + 9],
+            valueReceived     = arr[i + 10],
+            status            = arr[i + 11],
+        }
+        i = i + 12
+    end
+
+    local pCount = tonumber(arr[i]) or 0; i = i + 1
+    local prices = {}
+    for _ = 1, pCount do
+        prices[#prices + 1] = { index = arr[i], volatilityFactor = arr[i + 1] }
+        i = i + 2
+    end
+
+    local eCount = tonumber(arr[i]) or 0; i = i + 1
+    local events = {}
+    for _ = 1, eCount do
+        events[#events + 1] = { id = arr[i], endsAt = arr[i + 1], intensity = arr[i + 2], extraData = arr[i + 3] }
+        i = i + 4
+    end
+
+    MDMContractSyncEvent.execute(MDMContractSyncEvent.SYNC_FULL, contracts)
+    MDMMarketSyncEvent.applyState(prices, events)
+end
+
+-- Server: mark the state module dirty so NetworkSync resyncs the full snapshot at its next
+-- batch. Returns true when it handled it (so the caller skips the own broadcast event).
+function MDMNetworkSyncBridge.markStateDirty()
+    if not MDMNetworkSyncBridge.stateActive or MDMNetworkSyncBridge._ns == nil then
+        return false
+    end
+    MDMNetworkSyncBridge._ns:markDirty(MDMNetworkSyncBridge.STATE_MODULE_ID)
+    return true
+end
+
+-- Register the action handler + the state-sync module with NetworkSync if present.
+-- adminOnly = false on the action because the fine-grained farm-manager / owner rules live
+-- in onAction, not a blanket admin gate.
 function MDMNetworkSyncBridge.register(mdm)
-    MDMNetworkSyncBridge.active = false
-    MDMNetworkSyncBridge._ns    = nil
+    MDMNetworkSyncBridge.active      = false
+    MDMNetworkSyncBridge.stateActive = false
+    MDMNetworkSyncBridge._ns         = nil
 
     local ns = (g_currentMission ~= nil and g_currentMission.networkSync) or g_networkSync
     if ns == nil then
-        MDMLog.info("Market Dynamics: NetworkSync not detected; contract actions use their own event")
+        MDMLog.info("Market Dynamics: NetworkSync not detected; contract actions + state use their own events")
         return
     end
 
@@ -156,12 +274,18 @@ function MDMNetworkSyncBridge.register(mdm)
             adminOnly = false,
             onAction  = onAction,
         })
+        ns:registerModule(MDMNetworkSyncBridge.STATE_MODULE_ID, {
+            channel      = MDMNetworkSyncBridge.STATE_CHANNEL,
+            onWriteState = buildStateArray,
+            onReadState  = applyStateArray,
+        })
     end)
 
     if ok then
-        MDMNetworkSyncBridge.active = true
-        MDMNetworkSyncBridge._ns    = ns
-        MDMLog.info("Market Dynamics: contract action channel registered with NetworkSync")
+        MDMNetworkSyncBridge.active      = true
+        MDMNetworkSyncBridge.stateActive = true
+        MDMNetworkSyncBridge._ns         = ns
+        MDMLog.info("Market Dynamics: contract action channel + state-sync registered with NetworkSync")
     else
         MDMLog.error("Market Dynamics: NetworkSync registration failed: " .. tostring(err))
     end

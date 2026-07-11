@@ -21,6 +21,11 @@ function MDMContractSyncEvent.new(syncType, data)
 end
 
 function MDMContractSyncEvent.sendToClients(syncType, data)
+    -- When NetworkSync is active it carries the full state; mark it dirty (full resync at
+    -- the next batch) instead of broadcasting the own incremental event.
+    if MDMNetworkSyncBridge ~= nil and MDMNetworkSyncBridge.markStateDirty() then
+        return
+    end
     if g_server ~= nil then
         g_server:broadcastEvent(MDMContractSyncEvent.new(syncType, data))
     end

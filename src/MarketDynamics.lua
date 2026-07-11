@@ -138,8 +138,12 @@ function MarketDynamics:onStartMission(mission)
         UPIntegration.reregisterActiveContracts(self.futuresMarket.contracts)
         MDMLog.info("MarketDynamics: savegame data loaded")
     else
-        MDMContractSyncRequestEvent.sendToServer()
-        MDMLog.info("MarketDynamics: requested contract sync from server")
+        -- When NetworkSync is active it delivers the full state to joining clients, so the
+        -- own contract-sync request is only the fallback path.
+        if not (MDMNetworkSyncBridge ~= nil and MDMNetworkSyncBridge.stateActive) then
+            MDMContractSyncRequestEvent.sendToServer()
+            MDMLog.info("MarketDynamics: requested contract sync from server")
+        end
     end
 
     -- Register with SettingsHub (if installed) so FarmTablet's System Settings
