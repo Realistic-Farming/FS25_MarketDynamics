@@ -16,7 +16,7 @@
 
 ## Cross-mod integration
 - [x] StateLedger: `MarketDynamics_State` bridge live (Phase 1, delegate-when-present; own XML kept as the safety copy). Commit b740771.
-- [~] NetworkSync: contract ACTION channel bridged via NS Path 3 (`MarketDynamics_Contract`, anti-spoof + ownership preserved; commit 3bd0255). **DEFERRED:** the server->client STATE broadcasts (MDMContractSyncEvent FULL/UPDATE/REMOVE + MDMMarketSyncEvent) stay on their own hardened events - migrating their side-effect-rich run() (world-event lifecycle, notifications, UI rebuilds, #93/#82/#51 stream fixes) is a separate careful pass. Channel `MarketDynamics_Sync` reserved.
+- [x] NetworkSync FULLY bridged. (1) Contract ACTION channel via NS Path 3 (`MarketDynamics_Contract`, anti-spoof + ownership preserved; commit 3bd0255). (2) STATE-sync module (id `FS25_MarketDynamics`, channel `MarketDynamics_Sync`; commit ad70e30): one FULL-snapshot carrying all contracts + market prices + active events, onWriteState/onReadState reuse the hardened MDMContractSyncEvent.execute + MDMMarketSyncEvent.applyState paths (no apply rewrite); sendToClients delegate to markStateDirty, join request skipped when NS active. Serialization round-trip verified. Owed: two-machine MP test.
 - [x] MasterHUD: MDMHUD + settings panel bridged (Phase 1); own draw stands down when active.
 - [x] SettingsHub: `MarketDynamics` module bridged (Phase 1, selfPersisted). ESC-menu injection retained as the standalone fallback (delegate-when-present).
 - [ ] Reads: RandomWorldEvents `getPriceModifier`, SeasonalCropStress `cropStressManager`. Read by: CropDisease, ProStaff.
@@ -28,4 +28,4 @@
 ## Blocked / waiting on
 - [!] MasterHUD admin-tab guard decision (waits on: audit answer, internal `isMasterUser` check vs a panel `adminOnly` flag).
 - [!] ProStaff early-warning threshold (waits on: Arissani, whether getEligibleEvents applies a minimum probability filter).
-- [~] Bedrock migrations: StateLedger + MasterHUD + SettingsHub + the NetworkSync contract action channel are DONE. Only the NetworkSync STATE-sync broadcasts remain (deferred by choice, not blocked - see Cross-mod integration). Owed: two-machine MP test of what is built.
+- [x] Bedrock migrations: ALL FOUR bridges DONE (StateLedger + MasterHUD + SettingsHub + NetworkSync action channel AND state-sync). Only the whole-wave two-machine MP test remains.
