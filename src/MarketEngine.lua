@@ -30,7 +30,7 @@ MarketEngine.__index = MarketEngine
 
 -- Update intervals (ms of in-game time)
 local INTRADAY_INTERVAL_MS = 60 * 1000       -- every in-game minute
-local DAILY_INTERVAL_MS    = 24 * 60 * 1000  -- every in-game day
+local DAILY_INTERVAL_MS    = 24 * 60 * 60 * 1000  -- every in-game day (86,400,000 ms)
 
 -- Volatility parameters
 local INTRADAY_MAGNITUDE   = 0.020  -- ±2.0% per intraday tick
