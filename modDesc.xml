@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="106">
     <author>TisonK &amp; LeGrizzly</author>
-    <version>1.2.0.8</version>
+    <version>1.2.0.9</version>
     <title>
         <en>Market Dynamics</en>
     </title>
@@ -52,6 +52,10 @@
         <sourceFile filename="src/events/FinancialPanicEvent.lua" />
         <sourceFile filename="src/events/ProteinPremiumEvent.lua" />
         <sourceFile filename="src/MarketDynamics.lua" />
+        <sourceFile filename="src/MDMSettingsHubBridge.lua" />
+        <sourceFile filename="src/MDMStateLedgerBridge.lua" />
+        <sourceFile filename="src/MDMMasterHUDBridge.lua" />
+        <sourceFile filename="src/MDMNetworkSyncBridge.lua" />
         <sourceFile filename="main.lua" />
     </extraSourceFiles>
 

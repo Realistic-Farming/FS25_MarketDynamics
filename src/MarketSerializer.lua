@@ -428,3 +428,184 @@ function MarketSerializer:load(coordinator)
     xmlFile:delete()
     MDMLog.info("MarketSerializer: restored version " .. version)
 end
+
+-- =========================================================
+-- StateLedger twins (in-memory table form of the STATE portion)
+-- =========================================================
+-- toTable / applyTable are the plain-Lua-table twins of the state that save()
+-- writes and load() reads, for the optional FS25_StateLedger bedrock module
+-- MarketDynamics_State. They carry the DURABLE market state only:
+--   * futures contracts        (the #51-critical, money-adjacent state)
+--   * prices + history          (per fillTypeIndex)
+--   * world-event cooldowns      (lastFiredAt per event)
+--   * lastGameTime, volatilityScale
+--
+-- They deliberately do NOT carry:
+--   * settings                  (SettingsHub's domain; own XML is the fallback)
+--   * active world events        (transient + they apply price modifiers when
+--                                 loaded, so re-applying them here on top of the
+--                                 own-XML load would double the modifier. load()
+--                                 owns active events; the own XML stays in sync
+--                                 because both files are written in the same save)
+--   * UPIntegration state        (restored by load() from the own XML; contracts
+--                                 keep their upDealId so reregisterActiveContracts
+--                                 rebuilds the linkage after applyTable)
+--
+-- IMPORTANT: keep this in sync with save()/load() above. A new persisted contract
+-- or price field must be added in all four places or the ledger silently drops it.
+--
+-- Numbers round-trip exactly through StateLedgerXML (stored as %.17g), so unlike
+-- the own-XML path there is no C++ 32-bit-float truncation to dodge with strings.
+-- The one exception is lastFiredAt, whose "never fired" default is -math.huge:
+-- StateLedgerXML coerces non-finite numbers to 0, which would flip the semantics,
+-- so it is carried as a string and parsed back.
+
+function MarketSerializer:toTable(coordinator)
+    local out = {
+        version      = 2,
+        lastGameTime = MDMUtil.getGameTime(),
+    }
+
+    -- Futures contracts (array; each carries its own id)
+    local contracts = {}
+    if coordinator.futuresMarket and coordinator.futuresMarket.contracts then
+        for _, c in pairs(coordinator.futuresMarket.contracts) do
+            contracts[#contracts + 1] = {
+                id                = c.id,
+                farmId            = c.farmId,
+                fillTypeIndex     = c.fillTypeIndex,
+                fillTypeName      = c.fillTypeName,
+                quantity          = c.quantity,
+                lockedPrice       = c.lockedPrice,
+                deliveryTime      = c.deliveryTime or 0,
+                deliveryStartTime = c.deliveryStartTime or 0,
+                delivered         = c.delivered or 0,
+                valueReceived     = c.valueReceived or 0,
+                status            = c.status or "active",
+                isRealDays        = c.isRealDays or false,
+                createdTimeScale  = c.createdTimeScale or 1,
+                upDealId          = c.upDealId and tostring(c.upDealId) or nil,
+            }
+        end
+    end
+    out.contracts = contracts
+
+    -- Prices + history (array; each carries its fillTypeIndex)
+    local prices = {}
+    if coordinator.marketEngine then
+        for index, entry in pairs(coordinator.marketEngine.prices) do
+            local history = {}
+            if entry.history then
+                for m, h in ipairs(entry.history) do
+                    history[m] = { price = h.price, time = h.time }
+                end
+            end
+            prices[#prices + 1] = {
+                index      = index,
+                current    = entry.current,
+                trend      = entry.trend or 0,
+                volatility = entry.volatility or 0,
+                history    = history,
+            }
+        end
+        out.volatilityScale = coordinator.marketEngine.volatilityScale or 1.0
+    end
+    out.prices = prices
+
+    -- World-event cooldowns (array of { id, lastFiredAt-as-string })
+    local cooldowns = {}
+    if coordinator.worldEvents and coordinator.worldEvents.registry then
+        for id, event in pairs(coordinator.worldEvents.registry) do
+            cooldowns[#cooldowns + 1] = {
+                id          = id,
+                lastFiredAt = tostring(event.lastFiredAt),
+            }
+        end
+    end
+    out.eventCooldowns = cooldowns
+
+    return out
+end
+
+function MarketSerializer:applyTable(coordinator, data)
+    if type(data) ~= "table" or coordinator == nil then return false end
+
+    -- Contracts: the ledger is the source of truth, so clear the set imported from
+    -- the own XML and rebuild it from the ledger block. nextId is a monotonic
+    -- high-water mark (never reset) so an id is never reused.
+    if coordinator.futuresMarket and type(data.contracts) == "table" then
+        local fm = coordinator.futuresMarket
+        for k in pairs(fm.contracts) do fm.contracts[k] = nil end
+        for _, c in ipairs(data.contracts) do
+            local id = c.id
+            local deliveryTime = tonumber(c.deliveryTime)
+            if id and deliveryTime and deliveryTime > 0 then
+                fm.contracts[id] = {
+                    id                = id,
+                    farmId            = c.farmId,
+                    fillTypeIndex     = c.fillTypeIndex,
+                    fillTypeName      = c.fillTypeName,
+                    quantity          = c.quantity,
+                    lockedPrice       = c.lockedPrice,
+                    deliveryTime      = deliveryTime,
+                    deliveryStartTime = c.deliveryStartTime or 0,
+                    bcManaged         = false,  -- runtime flag; re-established by BCIntegration (matches load())
+                    delivered         = c.delivered or 0,
+                    valueReceived     = c.valueReceived or 0,
+                    status            = c.status or "active",
+                    upDealId          = c.upDealId,
+                    isRealDays        = c.isRealDays or false,
+                    createdTimeScale  = c.createdTimeScale or 1,
+                }
+                if id >= fm.nextId then fm.nextId = id + 1 end
+            else
+                MDMLog.warn("MarketSerializer.applyTable: contract with invalid id/deliveryTime — skipping")
+            end
+        end
+    end
+
+    -- Prices: overwrite by fillTypeIndex and recalculate (the full keyed set is
+    -- always present, so overwrite is a complete replacement).
+    if coordinator.marketEngine and type(data.prices) == "table" then
+        for _, p in ipairs(data.prices) do
+            local index = p.index
+            if index then
+                local entry = coordinator.marketEngine.prices[index]
+                if entry then
+                    entry.current    = p.current or entry.current
+                    entry.trend      = p.trend or 0
+                    entry.volatility = p.volatility or 0
+                    entry.history    = {}
+                    if type(p.history) == "table" then
+                        for _, h in ipairs(p.history) do
+                            if h.price and h.time then
+                                table.insert(entry.history, { price = h.price, time = h.time })
+                            end
+                        end
+                    end
+                    coordinator.marketEngine:_recalculate(index)
+                end
+            end
+        end
+        if data.volatilityScale and data.volatilityScale > 0 then
+            coordinator.marketEngine.volatilityScale = data.volatilityScale
+        end
+    end
+
+    -- lastGameTime: prevents contracts from expiring immediately on reload.
+    if data.lastGameTime then
+        coordinator.lastSavedGameTime = tonumber(data.lastGameTime) or coordinator.lastSavedGameTime
+    end
+
+    -- Event cooldowns: overwrite by id (only for events still in the registry).
+    if coordinator.worldEvents and coordinator.worldEvents.registry
+        and type(data.eventCooldowns) == "table" then
+        for _, e in ipairs(data.eventCooldowns) do
+            if e.id and coordinator.worldEvents.registry[e.id] then
+                coordinator.worldEvents.registry[e.id].lastFiredAt = tonumber(e.lastFiredAt) or -math.huge
+            end
+        end
+    end
+
+    return true
+end

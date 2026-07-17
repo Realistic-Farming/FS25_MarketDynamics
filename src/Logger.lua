@@ -66,3 +66,43 @@ function MDMUtil.getGameTime()
     local dayTime    = env.dayTime    or 0
     return (currentDay - 1) * 86400000 + dayTime
 end
+
+-- Days/month (period length) scaling.
+--
+-- World event timing (roll interval, cooldowns, durations) is balanced around
+-- a reference of 1 day per month. The player can stretch a month across several
+-- days, which spreads one in-game month over more in-game time and would
+-- otherwise pack proportionally more event rolls into a single month. Scaling
+-- the timing values by the selected days/month keeps per-month event density
+-- stable across day-length settings.
+MDMUtil.BASE_DAYS_PER_MONTH = 1
+
+-- Active days per month (Giants calls a month a "period"), clamped to 1-30.
+-- Prefers the live environment value and falls back to the planned (menu)
+-- value, then to the 1-day reference.
+function MDMUtil.getDaysPerMonth()
+    local mission = g_currentMission
+    if mission == nil then
+        return MDMUtil.BASE_DAYS_PER_MONTH
+    end
+
+    local env         = mission.environment
+    local missionInfo = mission.missionInfo
+
+    local days = (env and env.daysPerPeriod)
+        or (missionInfo and missionInfo.plannedDaysPerPeriod)
+
+    days = tonumber(days)
+    if days == nil then
+        return MDMUtil.BASE_DAYS_PER_MONTH
+    end
+
+    days = math.floor(days + 0.5)
+    return math.max(1, math.min(30, days))
+end
+
+-- Multiplier applied to event timing so monthly density stays stable across
+-- day-length settings. 1 day/month gives 1.0, 4 days/month gives 4.0.
+function MDMUtil.getMonthLengthScale()
+    return MDMUtil.getDaysPerMonth() / MDMUtil.BASE_DAYS_PER_MONTH
+end

@@ -19,3 +19,6 @@ desktop.ini
 
 # Tool outputs
 GLOBAL_LEAK_AUDIT.md
+
+# Built mod zip - release asset only, never committed
+*.zip
