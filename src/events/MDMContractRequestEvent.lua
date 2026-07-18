@@ -106,16 +106,30 @@ function MDMContractRequestEvent:run(connection)
                 end
             end
         else
-            -- Security: Action on existing contract.
-            -- Allow if user is Admin OR Farm Manager OR the contract belongs to their farm.
+            -- Security: action on an existing contract.
             local fm = g_MarketDynamics and g_MarketDynamics.futuresMarket
             local contract = fm and fm.contracts and fm.contracts[self.params.contractId]
             local isOwner = contract ~= nil and farm ~= nil and contract.farmId == farm.farmId
 
-            if not isAdmin and not isFarmManager and not isOwner then
-                MDMLog.warn("MDMContractRequestEvent: unauthorized action " .. tostring(self.action)
-                    .. " from userId=" .. tostring(userId))
-                return
+            if self.action == MDMContractRequestEvent.ACTION_PLAYER_FORFEIT then
+                -- Forfeiting your own contract (with its penalty) is a legitimate owner
+                -- action, so allow the owner or a manager of that farm, or an admin.
+                if not isAdmin and not isFarmManager and not isOwner then
+                    MDMLog.warn("MDMContractRequestEvent: unauthorized forfeit from userId=" .. tostring(userId))
+                    return
+                end
+            else
+                -- ADMIN_COMPLETE / ADMIN_CANCEL / ADMIN_DELETE are admin interventions and
+                -- must NOT be reachable through farm ownership. A contract owner force-
+                -- completing their own contract would be paid the full locked price for
+                -- goods never delivered, and admin-cancel would escape the forfeit penalty.
+                -- Require a server admin, matching the dialog's own isAdmin gate
+                -- (MDMContractAdminDialog:onCompleteClick / onCancelContractClick).
+                if not isAdmin then
+                    MDMLog.warn("MDMContractRequestEvent: unauthorized admin action " .. tostring(self.action)
+                        .. " from userId=" .. tostring(userId))
+                    return
+                end
             end
         end
 
