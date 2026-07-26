@@ -115,14 +115,25 @@ local function onAction(userId, args)
                 end
             end
         else
-            -- Security: action on an existing contract. Admin OR farm manager OR owner.
+            -- Security: action on an existing contract. Match the own event's
+            -- authorization: PLAYER_FORFEIT allows owner, but ADMIN_COMPLETE /
+            -- ADMIN_CANCEL / ADMIN_DELETE require admin-only (prevents owners
+            -- from force-completing their own contracts or escaping forfeit).
             local fm       = g_MarketDynamics and g_MarketDynamics.futuresMarket
             local contract = fm and fm.contracts and fm.contracts[params.contractId]
             local isOwner  = contract ~= nil and farm ~= nil and contract.farmId == farm.farmId
-            if not isAdmin and not isFarmManager and not isOwner then
-                MDMLog.warn("MDMNetworkSyncBridge: unauthorized action " .. tostring(action)
-                    .. " from userId=" .. tostring(userId))
-                return
+            if action == MDMContractRequestEvent.ACTION_PLAYER_FORFEIT then
+                if not isAdmin and not isFarmManager and not isOwner then
+                    MDMLog.warn("MDMNetworkSyncBridge: unauthorized forfeit from userId=" .. tostring(userId))
+                    return
+                end
+            else
+                -- ADMIN_COMPLETE / ADMIN_CANCEL / ADMIN_DELETE — admin only
+                if not isAdmin then
+                    MDMLog.warn("MDMNetworkSyncBridge: unauthorized admin action " .. tostring(action)
+                        .. " from userId=" .. tostring(userId))
+                    return
+                end
             end
         end
 

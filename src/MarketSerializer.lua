@@ -77,8 +77,7 @@ function MarketSerializer:save(coordinator)
             local base = "marketDynamics.prices.price(" .. k .. ")"
             xmlFile:setInt  (base .. "#index",  index)
             xmlFile:setFloat(base .. "#current", entry.current)
-            xmlFile:setFloat(base .. "#trend",   entry.trend or 0)
-            xmlFile:setFloat(base .. "#volatility", entry.volatility or 0)
+            xmlFile:setFloat(base .. "#volatilityFactor", entry.volatilityFactor or 1)
             
             -- Save history
             if entry.history and #entry.history > 0 then
@@ -286,8 +285,7 @@ function MarketSerializer:load(coordinator)
                 local entry = coordinator.marketEngine.prices[index]
                 if entry then
                     entry.current    = xmlFile:getFloat(base .. "#current") or entry.current
-                    entry.trend      = xmlFile:getFloat(base .. "#trend")   or 0
-                    entry.volatility = xmlFile:getFloat(base .. "#volatility") or 0
+                    entry.volatilityFactor = xmlFile:getFloat(base .. "#volatilityFactor") or entry.volatilityFactor
                     
                     -- Restore history
                     entry.history = {}
@@ -479,6 +477,7 @@ function MarketSerializer:toTable(coordinator)
                 lockedPrice       = c.lockedPrice,
                 deliveryTime      = c.deliveryTime or 0,
                 deliveryStartTime = c.deliveryStartTime or 0,
+                bcManaged         = c.bcManaged == true,
                 delivered         = c.delivered or 0,
                 valueReceived     = c.valueReceived or 0,
                 status            = c.status or "active",
@@ -501,11 +500,10 @@ function MarketSerializer:toTable(coordinator)
                 end
             end
             prices[#prices + 1] = {
-                index      = index,
-                current    = entry.current,
-                trend      = entry.trend or 0,
-                volatility = entry.volatility or 0,
-                history    = history,
+                index             = index,
+                current           = entry.current,
+                volatilityFactor  = entry.volatilityFactor or 1,
+                history           = history,
             }
         end
         out.volatilityScale = coordinator.marketEngine.volatilityScale or 1.0
@@ -549,7 +547,7 @@ function MarketSerializer:applyTable(coordinator, data)
                     lockedPrice       = c.lockedPrice,
                     deliveryTime      = deliveryTime,
                     deliveryStartTime = c.deliveryStartTime or 0,
-                    bcManaged         = false,  -- runtime flag; re-established by BCIntegration (matches load())
+                    bcManaged         = c.bcManaged == true,  -- preserved from ledger/NetworkSync
                     delivered         = c.delivered or 0,
                     valueReceived     = c.valueReceived or 0,
                     status            = c.status or "active",
@@ -573,8 +571,7 @@ function MarketSerializer:applyTable(coordinator, data)
                 local entry = coordinator.marketEngine.prices[index]
                 if entry then
                     entry.current    = p.current or entry.current
-                    entry.trend      = p.trend or 0
-                    entry.volatility = p.volatility or 0
+                    entry.volatilityFactor = p.volatilityFactor or entry.volatilityFactor
                     entry.history    = {}
                     if type(p.history) == "table" then
                         for _, h in ipairs(p.history) do
