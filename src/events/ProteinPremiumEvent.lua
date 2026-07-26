@@ -25,6 +25,7 @@ local MILLING_CROPS = { "WHEAT", "BARLEY" }
 
 local function onFire(intensity)
     if not g_MarketDynamics then return end
+    if not g_fillTypeManager then MDMLog.warn("g_fillTypeManager nil") return end
 
     local proteinFactor = 1.18 + intensity * 0.32  -- 1.18x to 1.50x
     local millingFactor = 1.08 + intensity * 0.17  -- 1.08x to 1.25x

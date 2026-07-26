@@ -18,6 +18,7 @@ local ENERGY_CROPS = { "canola", "sunflower" }
 
 local function onFire(intensity)
     if not g_MarketDynamics then return end
+    if not g_fillTypeManager then MDMLog.warn("g_fillTypeManager nil") return end
 
     local stapleFactor = 1.15 + intensity * 0.30  -- 1.15x to 1.45x
     local energyFactor = 1.20 + intensity * 0.35  -- 1.20x to 1.55x

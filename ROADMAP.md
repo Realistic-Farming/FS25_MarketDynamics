@@ -10,9 +10,9 @@
 - Keep it honest: near-term is committed, mid-term is intended, long-term is aspirational.
 
 ## Current baseline
-- Version at baseline: v1.2.0.8
+- Version at baseline: v1.2.0.9 (development); bedrock bridges + FarmTablet app shipped, plus the MP contract-admin exploit fix and the daily-timer 60x gremlin fix.
 - Audit reference: ecosystem-dev-tracking Point 1-5 (FS25_MarketDynamics, 2026-06-29)
-- Baseline date: 2026-06-29
+- Baseline date: 2026-06-29 (updated 2026-07-25)
 
 ## Near-term (next release cycle)
 - [~] Companion read API on `g_currentMission.MarketDynamics`: getActiveEvents() is live; getEligibleEvents() is still pending (ProStaff L20 early-warning). Price/trend reads to follow.

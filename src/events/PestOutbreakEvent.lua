@@ -16,6 +16,7 @@ local AFFECTED_CROPS = { "POTATO", "SUGARBEET" }
 
 local function onFire(intensity)
     if not g_MarketDynamics then return end
+    if not g_fillTypeManager then MDMLog.warn("g_fillTypeManager nil") return end
 
     local factor = 1.20 + intensity * 0.40  -- 1.20x to 1.60x
 
