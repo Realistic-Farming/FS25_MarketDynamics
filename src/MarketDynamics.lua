@@ -51,6 +51,11 @@ function MarketDynamics.new(modDir, modName)
     self.futuresMarket = FuturesMarket.new()
     self.serializer    = MarketSerializer
 
+    -- Consumer price modifier registry: external mods register multiplier callbacks
+    -- via registerPriceModifier(name, fn). Each registered fn receives a context table
+    -- and returns a multiplier that is applied to the final price.
+    self.priceModifiers = {}
+
     -- Expose BCIntegration so external mods (e.g. BetterContracts) can reach it via
     -- g_MarketDynamics.bcIntegration without depending on the global table name.
     self.bcIntegration = BCIntegration
@@ -238,6 +243,26 @@ function MarketDynamics:delete()
         g_MDMHud:delete()
     end
     MDMLog.info("MarketDynamics: deleted")
+end
+
+-- ---------------------------------------------------------------------------
+-- Price Modifier Registry
+-- ---------------------------------------------------------------------------
+
+---Register a consumer price modifier. The callback receives a context table and must
+---return a positive number (multiplier) or nil to opt out of this fill type.
+---@param name string  Unique identifier (e.g. mod name or system name)
+---@param fn   function(ctx) -> number|nil
+function MarketDynamics:registerPriceModifier(name, fn)
+    self.priceModifiers[name] = fn
+    MDMLog.info("MarketDynamics: registered price modifier '" .. tostring(name) .. "'")
+end
+
+---Remove a previously registered consumer price modifier by name.
+---@param name string
+function MarketDynamics:unregisterPriceModifier(name)
+    self.priceModifiers[name] = nil
+    MDMLog.info("MarketDynamics: unregistered price modifier '" .. tostring(name) .. "'")
 end
 
 -- ---------------------------------------------------------------------------

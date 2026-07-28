@@ -60,15 +60,9 @@
     </extraSourceFiles>
 
     <actions>
-        <action name="MDM_MARKET_SCREEN" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false">
-            <binding device="KB_MOUSE_DEFAULT" input="KEY_F10" />
-        </action>
-        <action name="MDM_CREATE_CONTRACT" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false">
-            <binding device="KB_MOUSE_DEFAULT" input="KEY_N" />
-        </action>
-        <action name="MDM_OPEN_SETTINGS" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false">
-            <binding device="KB_MOUSE_DEFAULT" input="KEY_F5" />
-        </action>
+        <action name="MDM_MARKET_SCREEN" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false" />
+        <action name="MDM_CREATE_CONTRACT" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false" />
+        <action name="MDM_OPEN_SETTINGS" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false" />
     </actions>
 
     <!-- l10n definitions for input bindings (required for help display) -->

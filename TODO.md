@@ -12,6 +12,7 @@
 - [x] MP contract-admin exploit (f15715b): contract admin actions now require an actual admin, not just ownership. Closes a multiplayer path where a non-admin farm owner could trigger admin-only contract actions.
 - [x] Daily price shift ran 60x too often (6c54f8c): the daily market price shift fired every 24 in-game minutes instead of once per in-game day. Now fires once per in-game day. This is the ledger's MDM `DAILY_INTERVAL` 60x gremlin (MarketEngine.lua), closed.
 - [x] Money-authority (F15-class futures settlement): VERIFIED server-gated in live source. Both settlement paths bail on pure clients before `addMoney` (FuturesMarket.lua:217 `_fulfillContract`, :287 `_defaultContract`, via `if g_currentMission.isClient and not g_currentMission.isServer then return`), plus a double-pay guard (:210). The 2026-07-09 money-authority sweep flagged this as ungated, but it grepped `getIsServer` and missed the valid `.isServer`/`.isClient` field guard. Not a bug.
+- [x] 2026-07-26 bug sweep: MDM auth gate, MDM persistence, MDM bcManaged bugs fixed and merged to main. All closed.
 
 ## Features / enhancements
 - [ ] `getEligibleEvents()` to unblock ProStaff L20 early-warning (off-cooldown, not-active events).
