@@ -258,5 +258,25 @@ function MarketEngine:_recalculate(fillTypeIndex)
     for _, mod in ipairs(entry.modifiers) do
         factor = factor * mod.factor
     end
-    entry.current = entry.base * factor
+    local currentPrice = entry.base * factor
+
+    -- Consumer composition: product of all registered modifier multipliers
+    if g_MarketDynamics and g_MarketDynamics.priceModifiers then
+        local consumerMult = 1.0
+        for name, fn in pairs(g_MarketDynamics.priceModifiers) do
+            local ok, mult = pcall(fn, {
+                fillTypeIndex = fillTypeIndex,
+                basePrice = entry.base,
+                marketPrice = currentPrice,
+            })
+            if ok and type(mult) == "number" and mult > 0 then
+                consumerMult = consumerMult * mult
+            end
+        end
+        -- Clamp B: consumer composition band (provisional 0.5-3.0)
+        consumerMult = math.max(0.5, math.min(3.0, consumerMult))
+        currentPrice = currentPrice * consumerMult
+    end
+
+    entry.current = currentPrice
 end
