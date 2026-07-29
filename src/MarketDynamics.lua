@@ -28,6 +28,7 @@ function MarketDynamics.new(modDir, modName)
     self.modDir   = modDir
     self.modName  = modName
     self.isActive = false
+    self._loadPhase = true
 
     -- Player-configurable settings (persisted by MarketSerializer, edited via SettingsUI)
     -- Add new settings here and wire them in MarketSerializer + SettingsUI.
@@ -154,6 +155,8 @@ function MarketDynamics:onStartMission(mission)
     -- Register with SettingsHub (if installed) so FarmTablet's System Settings
     -- app can list Market Dynamics' settings. No-ops safely if SettingsHub is absent.
     MDMSettingsHubBridge.register(self)
+
+    self._loadPhase = false
 end
 
 -- Per-frame tick. dt = in-game milliseconds from FSBaseMission.update.
@@ -169,6 +172,18 @@ function MarketDynamics:update(dt)
     -- Safety: If we just loaded, wait until 'now' has caught up to 'lastSavedGameTime'
     -- This prevents immediate contract defaults if the day/time hasn't finished syncing.
     if self.lastSavedGameTime and now < self.lastSavedGameTime then
+        return
+    end
+
+    -- Load-phase guard: skip all expire/restore/price-shift logic during the
+    -- initial join/load window. The onStartMission() clears this flag once all
+    -- saved state is restored. Without this guard, events can expire and contracts
+    -- can default prematurely on MP join because the simulation catches up to saved
+    -- timestamps before the client has received its full initial state.
+    if self._loadPhase then
+        -- Zero timers so they don't accumulate during loading and fire on resume
+        self.marketEngine.intradayTimer = 0
+        self.marketEngine.dailyTimer = 0
         return
     end
 

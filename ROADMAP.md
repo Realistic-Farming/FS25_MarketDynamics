@@ -15,6 +15,7 @@
 - Baseline date: 2026-06-29 (updated 2026-07-25)
 
 ## Near-term (next release cycle)
+- [x] Witcombe join load-phase guard (ad958a0): load-phase flag prevents expire/restore/price-shift logic during MP join. Pushed 2026-07-28.
 - [~] Companion read API on `g_currentMission.MarketDynamics`: getActiveEvents() is live; getEligibleEvents() is still pending (ProStaff L20 early-warning). Price/trend reads to follow.
 - [x] StateLedger migration: `MarketDynamics_State` bridge live (b740771); own XML kept as the safety copy. Shipped v1.2.0.9.
 - [x] NetworkSync migration: fully bridged, contract action channel (3bd0255) + state-sync module (ad70e30), replacing the custom event classes. Shipped v1.2.0.9.
