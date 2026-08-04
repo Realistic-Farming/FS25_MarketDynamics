@@ -16,6 +16,7 @@
 - [x] 2026-07-26 bug sweep: MDM auth gate, MDM persistence, MDM bcManaged bugs fixed and merged to main. All closed.
 
 ## Features / enhancements
+- [x] Release gate mechanism (2026-08-04): `ReleaseGate.lua` with an EMPTY registry (Arissani 2026-08-03). `experimentalSystems` opt-in (default false, orthogonal to difficulty) through the coordinator settings, `MarketSerializer` save/load, the MP `MDMSettingsSyncEvent`, the SettingsHub mirror and a settings-panel row. `mdmRelease` status command. Nothing gated; a row drops in the moment a system needs locking.
 - [ ] `getEligibleEvents()` to unblock ProStaff L20 early-warning (off-cooldown, not-active events).
 
 ## Cross-mod integration
