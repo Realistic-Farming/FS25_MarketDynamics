@@ -45,6 +45,7 @@ function MDMSettingsHubBridge.register(mdm)
         { id = "eventNotificationBanner", type = "bool",  default = s.eventNotificationBanner, adminOnly = false, label = "Notifications As Banner" },
         { id = "showContractHUD",         type = "bool",  default = s.showContractHUD,         adminOnly = false, label = "Contract HUD" },
         { id = "debugMode",               type = "bool",  default = s.debugMode,               adminOnly = false, label = "Debug Mode" },
+        { id = "experimentalSystems",     type = "bool",  default = s.experimentalSystems,     adminOnly = true,  label = "Experimental Systems" },
     }
 
     local ok, err = pcall(function()
