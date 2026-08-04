@@ -15,6 +15,7 @@
 
     <extraSourceFiles>
         <sourceFile filename="src/Logger.lua" />
+        <sourceFile filename="src/ReleaseGate.lua" />
         <sourceFile filename="src/MarketEngine.lua" />
         <sourceFile filename="src/WorldEventSystem.lua" />
         <sourceFile filename="src/FuturesMarket.lua" />

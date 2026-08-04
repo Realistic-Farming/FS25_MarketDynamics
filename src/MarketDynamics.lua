@@ -44,6 +44,8 @@ function MarketDynamics.new(modDir, modName)
         useRealDays          = false, -- When true, contract delivery windows track real-world time
         disabledEvents       = {},    -- { [eventId] = true } — events that won't roll
         eventCustomFillTypes = {},    -- { [eventId] = { fillTypeName, ... } }
+        -- Release-gate opt-in (default false), orthogonal to difficulty. See ReleaseGate.lua.
+        experimentalSystems  = false,
     }
 
     -- Subsystems
@@ -66,6 +68,13 @@ function MarketDynamics.new(modDir, modName)
     local modInfo = g_modManager:getModByName(modName)
     MDMLog.info("MarketDynamics created — v" .. (modInfo and modInfo.version or "?"))
     return self
+end
+
+--- Release-gate opt-in. True when the player has explicitly enabled experimental
+--- (LOCKED) systems. Orthogonal to difficulty: the two locks stack, see ReleaseGate.lua.
+---@return boolean
+function MarketDynamics:allowsExperimentalSystems()
+    return self.settings.experimentalSystems == true
 end
 
 -- Called after mission is fully loaded. Safe to access all game APIs from here.

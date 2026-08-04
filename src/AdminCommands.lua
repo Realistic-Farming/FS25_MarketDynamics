@@ -52,6 +52,15 @@ local function cmdStatus(self)
     print("==================")
 end
 
+local function cmdRelease(self)
+    if not ReleaseGate then
+        print("[MDM] Release gate not loaded")
+        return
+    end
+    local optIn = g_MarketDynamics and g_MarketDynamics:allowsExperimentalSystems()
+    print(ReleaseGate.status(optIn))
+end
+
 local function cmdEvent(self, eventId)
     if not eventId or eventId == "" then
         print("[MDM] Usage: mdmEvent <eventId>")
@@ -219,6 +228,7 @@ function MDMAdminCommands_register()
     g_MarketDynamics.cmdMdmPrice     = cmdPrice
     g_MarketDynamics.cmdMdmEvents    = cmdEvents
     g_MarketDynamics.cmdMdmReloadGui = cmdReloadGui
+    g_MarketDynamics.cmdMdmRelease   = cmdRelease
 
     addConsoleCommand("mdmStatus",    "MDM: system health and active events",          "cmdMdmStatus",    g_MarketDynamics)
     addConsoleCommand("mdmEvent",     "MDM: force-fire event (arg: eventId)",          "cmdMdmEvent",     g_MarketDynamics)
@@ -226,8 +236,9 @@ function MDMAdminCommands_register()
     addConsoleCommand("mdmPrice",     "MDM: show price for a crop (arg: cropName)",    "cmdMdmPrice",     g_MarketDynamics)
     addConsoleCommand("mdmEvents",    "MDM: list all registered events and status",    "cmdMdmEvents",    g_MarketDynamics)
     addConsoleCommand("mdmReloadGui", "MDM: hot-reload modal dialog XML without restart", "cmdMdmReloadGui", g_MarketDynamics)
+    addConsoleCommand("mdmRelease",   "MDM: release gate status (STABLE vs LOCKED)",   "cmdMdmRelease",   g_MarketDynamics)
 
-    MDMLog.info("AdminCommands: registered 6 console commands")
+    MDMLog.info("AdminCommands: registered 7 console commands")
 end
 
 function MDMAdminCommands_remove()
@@ -237,4 +248,5 @@ function MDMAdminCommands_remove()
     removeConsoleCommand("mdmPrice")
     removeConsoleCommand("mdmEvents")
     removeConsoleCommand("mdmReloadGui")
+    removeConsoleCommand("mdmRelease")
 end

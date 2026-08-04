@@ -112,6 +112,9 @@ local SETTING_DEFS = {
                                 descText  = "Show world events as a small corner banner instead of a pop-up dialog." },
     showContractHUD        = { label = "mdm_set_contract_hud",     desc = "mdm_desc_contract_hud",     type = "bool" },
     debugMode              = { label = "mdm_set_debug_mode",       desc = "mdm_desc_debug_mode",       type = "bool" },
+    experimentalSystems    = { label = "mdm_set_experimental",     desc = "mdm_desc_experimental",     type = "bool",
+                               labelText = "Experimental Systems",
+                               descText  = "Enable experimental (not yet released) systems at your own risk" },
 }
 
 -- ── Category definitions ───────────────────────────────────
@@ -133,7 +136,7 @@ local CATEGORIES = {
         accent   = {0.32, 0.88, 0.44, 1.0}, -- Green for sim
         sections = {
             { headerKey = "mdm_hdr_events",   items = { "eventsEnabled", "eventFrequency", "showEventNotifications", "eventNotificationBanner" } },
-            { headerKey = "mdm_hdr_display",  items = { "showContractHUD", "debugMode" } },
+            { headerKey = "mdm_hdr_display",  items = { "showContractHUD", "debugMode", "experimentalSystems" } },
         },
     },
 }

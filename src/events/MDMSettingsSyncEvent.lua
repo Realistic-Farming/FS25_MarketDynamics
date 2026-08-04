@@ -48,6 +48,7 @@ function MDMSettingsSyncEvent:writeStream(streamId, connection)
     streamWriteBool(streamId, s.eventNotificationBanner == true)
     streamWriteBool(streamId, s.showContractHUD ~= false)
     streamWriteBool(streamId, s.useRealDays == true)
+    streamWriteBool(streamId, s.experimentalSystems == true)
 
     -- Disabled events
     local de = s.disabledEvents or {}
@@ -86,6 +87,7 @@ function MDMSettingsSyncEvent:readStream(streamId, connection)
         eventNotificationBanner = streamReadBool(streamId),
         showContractHUD = streamReadBool(streamId),
         useRealDays = streamReadBool(streamId),
+        experimentalSystems = streamReadBool(streamId),
         disabledEvents = {},
         eventCustomFillTypes = {},
     }
