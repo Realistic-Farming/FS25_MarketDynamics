@@ -15,6 +15,7 @@
 - Baseline date: 2026-06-29 (updated 2026-07-25)
 
 ## Near-term (next release cycle)
+- [x] Release gate mechanism (2026-08-04): wired per Arissani's 2026-08-03 lock set (EMPTY for MDM - the price-modifier contract is inert, OM-213 is unbuilt and owed). `ReleaseGate.lua` with an empty registry, `experimentalSystems` opt-in (default false, orthogonal to difficulty) through settings/persistence/MP sync/SettingsHub/panel, and the `mdmRelease` status command. Nothing gated today.
 - [x] Witcombe join load-phase guard (ad958a0): load-phase flag prevents expire/restore/price-shift logic during MP join. Pushed 2026-07-28.
 - [~] Companion read API on `g_currentMission.MarketDynamics`: getActiveEvents() is live; getEligibleEvents() is still pending (ProStaff L20 early-warning). Price/trend reads to follow.
 - [x] StateLedger migration: `MarketDynamics_State` bridge live (b740771); own XML kept as the safety copy. Shipped v1.2.0.9.
