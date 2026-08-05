@@ -189,11 +189,47 @@
 		<text name="mdm_evt_ft_duplicate" text="[EN] Already in the list: "/>
 		<text name="mdm_evt_ft_added" text="[EN] Added — changes apply on the next firing: "/>
 		<text name="mdm_evt_ft_title_suffix" text="[EN]  — Custom Fill Types"/>
+		<text name="mdm_cat_market" text="[EN] Market Engines"/>
+		<text name="mdm_cat_market_desc" text="[EN] Configure the core price calculation and futures contract systems."/>
+		<text name="mdm_cat_sim" text="[EN] Simulation"/>
+		<text name="mdm_cat_sim_desc" text="[EN] Adjust world event frequency, notifications, and visual interfaces."/>
+		<text name="mdm_hdr_engine" text="[EN] PRICE ENGINE"/>
+		<text name="mdm_hdr_futures" text="[EN] FUTURES CONTRACTS"/>
+		<text name="mdm_hdr_events" text="[EN] WORLD EVENTS"/>
+		<text name="mdm_hdr_display" text="[EN] DISPLAY &amp;amp; DEBUG"/>
+		<text name="mdm_btn_configure" text="[EN] Configure"/>
+		<text name="mdm_btn_open" text="[EN] Open"/>
+		<text name="mdm_btn_back" text="[EN] Back"/>
+		<text name="mdm_panel_select_cat" text="[EN] Select a category to configure"/>
+		<text name="mdm_panel_admin_yes" text="[EN] Admin: Yes"/>
+		<text name="mdm_panel_admin_no" text="[EN] Admin: No"/>
+		<text name="mdm_panel_multiplayer" text="[EN] Multiplayer"/>
+		<text name="mdm_panel_singleplayer" text="[EN] Singleplayer"/>
+		<text name="mdm_set_prices_enabled" text="[EN] Dynamic Prices"/>
+		<text name="mdm_desc_prices_enabled" text="[EN] Enable or disable all Market Dynamics price fluctuations."/>
+		<text name="mdm_set_use_real_days" text="[EN] Real Days Delivery"/>
+		<text name="mdm_desc_use_real_days" text="[EN] Contract deadlines track real-world time instead of in-game days."/>
+		<text name="mdm_set_futures_penalty" text="[EN] Default Penalty"/>
+		<text name="mdm_desc_futures_penalty" text="[EN] Penalty applied to undelivered goods when a contract expires."/>
+		<text name="mdm_set_events_enabled" text="[EN] World Events"/>
+		<text name="mdm_desc_events_enabled" text="[EN] Allow global events like droughts or booms to impact the market."/>
+		<text name="mdm_set_event_freq" text="[EN] Event Frequency"/>
+		<text name="mdm_desc_event_freq" text="[EN] Scale the probability of new world events occurring."/>
+		<text name="mdm_set_event_notify" text="[EN] Event Notifications"/>
+		<text name="mdm_desc_event_notify" text="[EN] Show an on-screen dialog when a new world event begins."/>
+		<text name="mdm_set_contract_hud" text="[EN] Contract HUD"/>
+		<text name="mdm_desc_contract_hud" text="[EN] Show a persistent progress tracker for active futures contracts."/>
+		<text name="mdm_set_debug_mode" text="[EN] Debug Mode"/>
+		<text name="mdm_desc_debug_mode" text="[EN] Enable developer logging and additional debug information."/>
+		<text name="mdm_freq_rare" text="[EN] Rare"/>
+		<text name="mdm_freq_normal" text="[EN] Normal"/>
+		<text name="mdm_freq_frequent" text="[EN] Frequent"/>
 
     
         <!-- Input action display names -->
         <text name="input_MDM_MARKET_SCREEN" text="Abrir mercado" />
         <text name="input_MDM_CREATE_CONTRACT" text="Crear contrato de futuros" />
+		<text name="input_MDM_OPEN_SETTINGS" text="[EN] MDM: Open Settings"/>
 		<text name="input_MDM_SETTINGS_PANEL" text="[EN] Market Dynamics Settings"/>
 
         <!-- Contract admin dialog -->
@@ -210,6 +246,45 @@
         <text name="mdm_admin_cancel_contract"  text="Cancel Contract" />
         <text name="mdm_admin_settled"          text="Este contrato está liquidado. Use Eliminar para quitarlo de la lista." />
             <text name="mdm_bc_dialog_suppressed" text="FS25_FuturesMission is active and handles contract creation. Use the Contracts page (ESC menu) to create futures contracts. Get it on GitHub: search FS25_FuturesMission by Mmtrx." />
+		<text name="md_rf_pda_module_title" text="[EN] Market Dynamics"/>
+		<text name="md_rf_pda_blurb" text="[EN] Pause Market glance: Prices, Events, Contracts. Top table stays; bottom swaps. Open full Market for the deep desk."/>
+		<text name="rf_pda_side_info_market_dynamics" text="[EN] Market Dynamics&#10;&#10;Pause Market glance with three pages: Prices, Events, Contracts.&#10;&#10;Top table = crops, prices, and swings. On Prices, pick a crop to drive the graph.&#10;&#10;Events page = what is hitting the market now, how strong, and how long left.&#10;&#10;Contracts page = your open deals (read-only). Manage them in full Market.&#10;&#10;Open full Market (SPACE) for the deep desk."/>
+		<text name="md_rf_pda_page_prices" text="[EN] Prices"/>
+		<text name="md_rf_pda_page_events" text="[EN] Events"/>
+		<text name="md_rf_pda_page_contracts" text="[EN] Contracts"/>
+		<text name="md_rf_pda_col_crop" text="[EN] Crop"/>
+		<text name="md_rf_pda_col_price" text="[EN] Price"/>
+		<text name="md_rf_pda_col_change" text="[EN] Change"/>
+		<text name="md_rf_pda_commodities_empty" text="[EN] no market prices yet"/>
+		<text name="md_rf_pda_graph_title" text="[EN] Price trend"/>
+		<text name="md_rf_pda_movers_title" text="[EN] Notable moves"/>
+		<text name="md_rf_pda_movers_empty" text="[EN] No commodities yet"/>
+		<text name="md_rf_pda_events_none" text="[EN] no active market events"/>
+		<text name="md_rf_pda_events_more" text="[EN] and %d more"/>
+		<text name="md_rf_pda_ev_col_name" text="[EN] Event"/>
+		<text name="md_rf_pda_ev_col_intensity" text="[EN] Intensity"/>
+		<text name="md_rf_pda_ev_col_time" text="[EN] Time left"/>
+		<text name="md_rf_pda_remaining_dh" text="[EN] %dd %dh left"/>
+		<text name="md_rf_pda_remaining_hm" text="[EN] %dh %dm left"/>
+		<text name="md_rf_pda_remaining_m" text="[EN] %dm left"/>
+		<text name="md_rf_pda_remaining_done" text="[EN] ending"/>
+		<text name="md_rf_pda_remaining_unknown" text="[EN] time unknown"/>
+		<text name="md_rf_pda_detail_title" text="[EN] Market Detail"/>
+		<text name="md_rf_pda_select_mover" text="[EN] Pick a mover to see price detail."/>
+		<text name="md_rf_pda_select_crop" text="[EN] Pick a crop in the table to see the graph."/>
+		<text name="md_rf_pda_building_history" text="[EN] Building price history..."/>
+		<text name="md_rf_pda_pressure_up_sharp" text="[EN] up sharply vs base"/>
+		<text name="md_rf_pda_pressure_up" text="[EN] softly up vs base"/>
+		<text name="md_rf_pda_pressure_near" text="[EN] near base"/>
+		<text name="md_rf_pda_pressure_soft" text="[EN] soft vs base"/>
+		<text name="md_rf_pda_pressure_down_sharp" text="[EN] down sharply vs base"/>
+		<text name="md_rf_pda_contracts_open" text="[EN] Open contracts: %d"/>
+		<text name="md_rf_pda_contracts_none" text="[EN] no open contracts"/>
+		<text name="md_rf_pda_contracts_more" text="[EN] and %d more in full Market"/>
+		<text name="md_rf_pda_ct_col_qty" text="[EN] Quantity"/>
+		<text name="md_rf_pda_ct_col_price" text="[EN] Locked price"/>
+		<text name="md_rf_pda_ct_col_status" text="[EN] Status"/>
+		<text name="md_rf_pda_open_market" text="[EN] Open full Market"/>
     
 		<text name="mdm_label_enabled" text="[EN] Enabled"/>
 		<text name="mdm_label_disabled" text="[EN] Disabled"/>

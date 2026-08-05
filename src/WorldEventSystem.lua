@@ -131,11 +131,12 @@ end
 function WorldEventSystem:getActiveEvents()
     local result = {}
     for id, active in pairs(self.active) do
-        local desc    = self.registry[id]
-        local rawName = desc and desc.name or id
-        local name    = rawName
-        if desc and desc.nameKey and g_i18n then
-            name = g_i18n:getText(desc.nameKey) or rawName
+        local desc = self.registry[id]
+        local name
+        if desc ~= nil then
+            name = MDMUtil.resolveEventName(desc)
+        else
+            name = MDMUtil.resolveEventName(nil, nil, id)
         end
         table.insert(result, {
             id        = id,
@@ -181,7 +182,7 @@ function WorldEventSystem:forceFireEvent(id, intensity)
 
     -- Show notification if this is a local player (Host/SP)
     if g_client ~= nil and g_MarketDynamics then
-        local name = (event.nameKey and g_i18n:getText(event.nameKey)) or event.name or id
+        local name = MDMUtil.resolveEventName(event)
         g_MarketDynamics.pendingEventNotificationName = name
         addTimer(1000, "showEventNotification", g_MarketDynamics)
     end
@@ -257,8 +258,8 @@ function WorldEventSystem:_fireEvent(event, now)
 
     -- Show notification if this is a local player (Host/SP)
     if g_client ~= nil and g_MarketDynamics then
-        local desc = self.registry[event.id]
-        local name = (desc and desc.nameKey and g_i18n:getText(desc.nameKey)) or (desc and desc.name) or event.id
+        local desc = self.registry[event.id] or event
+        local name = MDMUtil.resolveEventName(desc)
         g_MarketDynamics.pendingEventNotificationName = name
         addTimer(1000, "showEventNotification", g_MarketDynamics)
     end

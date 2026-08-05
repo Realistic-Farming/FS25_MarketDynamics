@@ -195,6 +195,45 @@
         <text name="input_MDM_CREATE_CONTRACT" text="MDM : Créer un contrat" />
         <text name="input_MDM_OPEN_SETTINGS" text="MDM : Ouvrir les paramètres" />
         <text name="input_MDM_SETTINGS_PANEL" text="Paramètres de Market Dynamics"/>
+		<text name="md_rf_pda_module_title" text="[EN] Market Dynamics"/>
+		<text name="md_rf_pda_blurb" text="[EN] Pause Market glance: Prices, Events, Contracts. Top table stays; bottom swaps. Open full Market for the deep desk."/>
+		<text name="rf_pda_side_info_market_dynamics" text="[EN] Market Dynamics&#10;&#10;Pause Market glance with three pages: Prices, Events, Contracts.&#10;&#10;Top table = crops, prices, and swings. On Prices, pick a crop to drive the graph.&#10;&#10;Events page = what is hitting the market now, how strong, and how long left.&#10;&#10;Contracts page = your open deals (read-only). Manage them in full Market.&#10;&#10;Open full Market (SPACE) for the deep desk."/>
+		<text name="md_rf_pda_page_prices" text="[EN] Prices"/>
+		<text name="md_rf_pda_page_events" text="[EN] Events"/>
+		<text name="md_rf_pda_page_contracts" text="[EN] Contracts"/>
+		<text name="md_rf_pda_col_crop" text="[EN] Crop"/>
+		<text name="md_rf_pda_col_price" text="[EN] Price"/>
+		<text name="md_rf_pda_col_change" text="[EN] Change"/>
+		<text name="md_rf_pda_commodities_empty" text="[EN] no market prices yet"/>
+		<text name="md_rf_pda_graph_title" text="[EN] Price trend"/>
+		<text name="md_rf_pda_movers_title" text="[EN] Notable moves"/>
+		<text name="md_rf_pda_movers_empty" text="[EN] No commodities yet"/>
+		<text name="md_rf_pda_events_none" text="[EN] no active market events"/>
+		<text name="md_rf_pda_events_more" text="[EN] and %d more"/>
+		<text name="md_rf_pda_ev_col_name" text="[EN] Event"/>
+		<text name="md_rf_pda_ev_col_intensity" text="[EN] Intensity"/>
+		<text name="md_rf_pda_ev_col_time" text="[EN] Time left"/>
+		<text name="md_rf_pda_remaining_dh" text="[EN] %dd %dh left"/>
+		<text name="md_rf_pda_remaining_hm" text="[EN] %dh %dm left"/>
+		<text name="md_rf_pda_remaining_m" text="[EN] %dm left"/>
+		<text name="md_rf_pda_remaining_done" text="[EN] ending"/>
+		<text name="md_rf_pda_remaining_unknown" text="[EN] time unknown"/>
+		<text name="md_rf_pda_detail_title" text="[EN] Market Detail"/>
+		<text name="md_rf_pda_select_mover" text="[EN] Pick a mover to see price detail."/>
+		<text name="md_rf_pda_select_crop" text="[EN] Pick a crop in the table to see the graph."/>
+		<text name="md_rf_pda_building_history" text="[EN] Building price history..."/>
+		<text name="md_rf_pda_pressure_up_sharp" text="[EN] up sharply vs base"/>
+		<text name="md_rf_pda_pressure_up" text="[EN] softly up vs base"/>
+		<text name="md_rf_pda_pressure_near" text="[EN] near base"/>
+		<text name="md_rf_pda_pressure_soft" text="[EN] soft vs base"/>
+		<text name="md_rf_pda_pressure_down_sharp" text="[EN] down sharply vs base"/>
+		<text name="md_rf_pda_contracts_open" text="[EN] Open contracts: %d"/>
+		<text name="md_rf_pda_contracts_none" text="[EN] no open contracts"/>
+		<text name="md_rf_pda_contracts_more" text="[EN] and %d more in full Market"/>
+		<text name="md_rf_pda_ct_col_qty" text="[EN] Quantity"/>
+		<text name="md_rf_pda_ct_col_price" text="[EN] Locked price"/>
+		<text name="md_rf_pda_ct_col_status" text="[EN] Status"/>
+		<text name="md_rf_pda_open_market" text="[EN] Open full Market"/>
 
         <!-- Contract admin dialog -->
         <text name="mdm_admin_title"            text="Détails du contrat" />
@@ -253,5 +292,26 @@
         <text name="mdm_freq_rare"               text="Rare" />
         <text name="mdm_freq_normal"             text="Normal" />
         <text name="mdm_freq_frequent"           text="Fréquent" />
-    </texts>
+    
+		<text name="mdm_label_enabled" text="[EN] Enabled"/>
+		<text name="mdm_label_disabled" text="[EN] Disabled"/>
+		<text name="mdm_label_normal" text="[EN] Normal"/>
+		<text name="mdm_label_low" text="[EN] Low"/>
+		<text name="mdm_label_high" text="[EN] High"/>
+		<text name="mdm_label_extreme" text="[EN] Extreme"/>
+		<text name="mdm_label_rare" text="[EN] Rare"/>
+		<text name="mdm_label_frequent" text="[EN] Frequent"/>
+		<text name="mdm_label_crop" text="[EN] Crop"/>
+		<text name="mdm_label_qty" text="[EN] Qty"/>
+		<text name="mdm_label_quantity" text="[EN] Quantity"/>
+		<text name="mdm_label_price" text="[EN] Price"/>
+		<text name="mdm_label_change" text="[EN] Change"/>
+		<text name="mdm_label_status" text="[EN] Status"/>
+		<text name="mdm_label_total_value" text="[EN] Total Value"/>
+		<text name="mdm_label_confirm" text="[EN] Confirm"/>
+		<text name="mdm_label_cancel" text="[EN] Cancel"/>
+		<text name="mdm_label_close" text="[EN] Close"/>
+		<text name="mdm_label_delete" text="[EN] Delete"/>
+		<text name="mdm_label_remove" text="[EN] Remove"/>
+		<text name="mdm_label_add" text="[EN] Add"/></texts>
 </l10n>

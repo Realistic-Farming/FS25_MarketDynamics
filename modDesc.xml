@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="106">
     <author>TisonK &amp; LeGrizzly</author>
-    <version>1.2.0.9</version>
+    <version>1.2.2.13</version>
     <title>
         <en>Market Dynamics</en>
     </title>
@@ -37,6 +37,11 @@
         <sourceFile filename="src/gui/MDMBrowseFillTypesDialog.lua" />
         <sourceFile filename="src/gui/MarketScreenGraph.lua" />
         <sourceFile filename="src/gui/MarketScreen.lua" />
+        <sourceFile filename="src/gui/RfEscModules.lua" />
+        <sourceFile filename="src/gui/RfPdaMenuPage.lua" />
+        <sourceFile filename="src/gui/RfEscBootstrap.lua" />
+        <sourceFile filename="src/gui/RfEscUiDebugger.lua" />
+        <sourceFile filename="src/gui/MdRfPdaGuest.lua" />
         <sourceFile filename="src/events/MDMContractRequestEvent.lua" />
         <sourceFile filename="src/events/MDMContractSyncEvent.lua" />
         <sourceFile filename="src/events/MDMContractSyncRequestEvent.lua" />
@@ -68,7 +73,7 @@
     </actions>
 
     <!-- l10n definitions for input bindings (required for help display) -->
-    <l10n filenamePrefix="translations/translation">
+    <l10n filenamePrefix="translations/translation_">
         <text name="input_MDM_MARKET_SCREEN">
             <en>MDM: Open Market Screen</en>
         </text>
