@@ -73,7 +73,7 @@
     </actions>
 
     <!-- l10n definitions for input bindings (required for help display) -->
-    <l10n filenamePrefix="translations/translation_">
+    <l10n filenamePrefix="translations/translation">
         <text name="input_MDM_MARKET_SCREEN">
             <en>MDM: Open Market Screen</en>
         </text>
