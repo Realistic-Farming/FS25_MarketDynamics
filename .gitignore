@@ -25,3 +25,4 @@ GLOBAL_LEAK_AUDIT.md
 
 # Pre-commit gate deps (tools/test/ - installed by npm, never shipped)
 node_modules/
+tools/test/package-lock.json
