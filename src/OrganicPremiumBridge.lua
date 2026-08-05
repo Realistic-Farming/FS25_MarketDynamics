@@ -4,15 +4,17 @@
 -- Registers the "OrganicPremium" consumer price modifier with MarketDynamics,
 -- mirroring the FertilizerDepot bridge's registration lifecycle. The premium
 -- reads SoilFertilizer's organic provenance (getFarmOrganicFraction) and applies
--- `1.0 + (P - 1.0) * frac` to the price, proportional to a farm's organic share
--- of the harvested supply of the sold fill type.
+-- `1.0 + (P - 1.0) * frac` to the market price, proportional to a farm's organic
+-- share of the harvested supply of the sold fill type.
 --
--- The modifier is a pure multiplier over the market price. Because the price is
--- market-wide but the premium is per-farm, the SELLING FARM is supplied to the
--- modifier through a dedi-safe context set by MDM's own price path (PriceHook's
--- sellFillType wrapper) around the sale: g_MarketDynamics._organicSellingFarmId.
--- MarketDynamics remains the sole price owner; no base-game sale path is patched
--- by this build.
+-- STRICT MARKET-WIDE READING (Tyson ruling 2026-08-05): the modifier never
+-- touches PriceHook or SellingStation, so it cannot resolve a per-sale selling
+-- farm. The premium is therefore market-wide: it reflects the LOCAL/server farm's
+-- organic share. On a dedicated server g_currentMission:getFarmId() is nil, so
+-- the modifier opts out and the market price stays vanilla - the per-farm premium
+-- is not representable in a global modifier without a sale-path context. The
+-- per-farm mechanic (the original brief's intent) can only return with a
+-- dedicated-server-safe farm context, which is a design decision for Arissani.
 --
 -- Contract facts (MarketEngine.lua):
 --   ctx            = { fillTypeIndex, basePrice, marketPrice }
@@ -42,13 +44,18 @@ function OrganicPremiumBridge.getOrganicHandle()
 end
 
 ---The modifier. Returns the premium multiplier for the fill type, or nil to opt
----out (SF absent, no organic share, or no selling farm context).
+---out (SF absent, no organic share, or no farm to resolve on a dedicated server).
 ---@param ctx table { fillTypeIndex, basePrice, marketPrice }
 ---@return number|nil multiplier (>= 1.0) or nil
 function OrganicPremiumBridge.modifierFn(ctx)
     if ctx == nil or ctx.fillTypeIndex == nil then return nil end
-    local md = g_MarketDynamics
-    local farmId = md and md._organicSellingFarmId or 0
+
+    -- Market-wide reading: the local/server farm is the only farm a global
+    -- modifier can see. Nil on a dedicated server -> opt out (vanilla price).
+    local farmId = 0
+    if g_currentMission ~= nil and type(g_currentMission.getFarmId) == "function" then
+        farmId = g_currentMission:getFarmId() or 0
+    end
     if farmId == nil or farmId <= 0 then return nil end
 
     local organic = OrganicPremiumBridge.getOrganicHandle()
