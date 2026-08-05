@@ -313,5 +313,13 @@
 		<text name="mdm_label_close" text="[EN] Close"/>
 		<text name="mdm_label_delete" text="[EN] Delete"/>
 		<text name="mdm_label_remove" text="[EN] Remove"/>
-		<text name="mdm_label_add" text="[EN] Add"/></texts>
+		<text name="mdm_label_add" text="[EN] Add"/>        <text name="rf_pda_col_area" text="[EN] Area" />
+        <text name="rf_pda_col_fert" text="[EN] Fertilizer" />
+        <text name="rf_pda_sample_hint" text="[EN] Soil sample dates appear here when available." />
+        <text name="rf_pda_section_treatment" text="[EN] Treatment" />
+        <text name="rf_pda_treat_products" text="[EN] Products" />
+        <text name="sf_pda_col_field" text="[EN] Field" />
+        <text name="sf_pda_col_status" text="[EN] Status" />
+        <text name="sf_pda_no_fields" text="[EN] No field data recorded yet." />
+    </texts>
 </l10n>

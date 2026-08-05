@@ -352,5 +352,13 @@
         <text name="md_rf_pda_ct_col_price" text="Locked price" />
         <text name="md_rf_pda_ct_col_status" text="Status" />
         <text name="md_rf_pda_open_market" text="Open full Market" />
+            <text name="rf_pda_col_area" text="Area" />
+        <text name="rf_pda_col_fert" text="Fertilizer" />
+        <text name="rf_pda_sample_hint" text="Soil sample dates appear here when available." />
+        <text name="rf_pda_section_treatment" text="Treatment" />
+        <text name="rf_pda_treat_products" text="Products" />
+        <text name="sf_pda_col_field" text="Field" />
+        <text name="sf_pda_col_status" text="Status" />
+        <text name="sf_pda_no_fields" text="No field data recorded yet." />
     </texts>
 </l10n>
