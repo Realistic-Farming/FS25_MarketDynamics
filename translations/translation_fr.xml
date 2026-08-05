@@ -281,6 +281,8 @@
         <text name="mdm_desc_event_freq"         text="Échelonner la probabilité d'apparition de nouveaux événements mondiaux." />
         <text name="mdm_set_event_notify"        text="Notifications d'événements" />
         <text name="mdm_desc_event_notify"       text="Afficher une boîte de dialogue à l'écran lorsqu'un nouvel événement mondial commence." />
+        <text name="mdm_set_experimental" text="[EN] Experimental Systems" />
+        <text name="mdm_desc_experimental" text="[EN] Turn on systems that are still being tested. Off ships only the proven baseline." />
         <text name="mdm_set_event_banner"        text="Bannière d'événement compacte" />
         <text name="mdm_desc_event_banner"       text="Afficher les événements mondiaux sous forme de petite bannière plutôt que d'une boîte de dialogue contextuelle." />
         <text name="mdm_set_contract_hud"        text="HUD des contrats" />

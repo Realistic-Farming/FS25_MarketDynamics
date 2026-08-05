@@ -204,6 +204,10 @@
 		<text name="mdm_desc_event_freq" text="[EN] Scale the probability of new world events occurring."/>
 		<text name="mdm_set_event_notify" text="[EN] Event Notifications"/>
 		<text name="mdm_desc_event_notify" text="[EN] Show an on-screen dialog when a new world event begins."/>
+        <text name="mdm_set_event_banner" text="[EN] Notifications As Banner" />
+        <text name="mdm_desc_event_banner" text="[EN] Show world events as a quiet corner banner instead of a full-screen dialog." />
+        <text name="mdm_set_experimental" text="[EN] Experimental Systems" />
+        <text name="mdm_desc_experimental" text="[EN] Turn on systems that are still being tested. Off ships only the proven baseline." />
 		<text name="mdm_set_contract_hud" text="[EN] Contract HUD"/>
 		<text name="mdm_desc_contract_hud" text="[EN] Show a persistent progress tracker for active futures contracts."/>
 		<text name="mdm_set_debug_mode" text="[EN] Debug Mode"/>
