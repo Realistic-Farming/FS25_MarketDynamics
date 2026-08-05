@@ -95,7 +95,25 @@ if SellingStation and SellingStation.sellFillType then
     SellingStation.sellFillType = Utils.overwrittenFunction(
         SellingStation.sellFillType,
         function(self, superFunc, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
+            -- OM-213 organic premium: expose the SELLING FARM to the price modifiers
+            -- during this sale. The modifier reads g_MarketDynamics._organicSellingFarmId
+            -- (dedi-safe: this is the engine-passed farmId, never the local-player read),
+            -- and the price is recomputed so this sale prices against the seller's own
+            -- organic share. MDM stays the sole price owner; this only feeds context.
+            local md = g_MarketDynamics
+            local prevFarm = md and md._organicSellingFarmId or nil
+            if md ~= nil and g_server ~= nil and farmId ~= nil and farmId > 0 then
+                md._organicSellingFarmId = farmId
+                if md.marketEngine and md.marketEngine._recalculate and fillTypeIndex ~= nil then
+                    md.marketEngine:_recalculate(fillTypeIndex)
+                end
+            end
+
             local result = superFunc(self, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
+
+            if md ~= nil then
+                md._organicSellingFarmId = prevFarm
+            end
 
             if g_server ~= nil
                 and g_MarketDynamics and g_MarketDynamics.isActive

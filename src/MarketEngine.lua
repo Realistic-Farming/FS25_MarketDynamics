@@ -273,7 +273,7 @@ function MarketEngine:_recalculate(fillTypeIndex)
                 consumerMult = consumerMult * mult
             end
         end
-        -- Clamp B: consumer composition band (provisional 0.5-3.0)
+        -- Clamp B: consumer composition band (ruled 0.5-3.0, authority #3)
         consumerMult = math.max(0.5, math.min(3.0, consumerMult))
         currentPrice = currentPrice * consumerMult
     end

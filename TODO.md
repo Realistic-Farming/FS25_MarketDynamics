@@ -5,6 +5,7 @@
 > Convention: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked. Newest at the top of each section.
 
 ## From the ecosystem audit (Arissani)
+- [x] Organic market premium (OM-213, MDM half, 2026-08-05): `OrganicPremiumBridge` registers the reserved "OrganicPremium" consumer modifier, reads SF's `getFarmOrganicFraction` for the selling farm (dedi-safe context from MDM's own sellFillType hook), applies `1 + (P - 1) * frac` with P = 1.20 (AWAITING-SPINE Economy dial). Removed the stale PROVISIONAL clamp-B comment. Ships LOCKED; unlock gated on the FarmTablet market-report line. Built on development, PR open.
 - [ ] Expose a stable companion read API so peers stop reading internal tables (`marketEngine.prices`, `worldEvents.active`, `futuresMarket`).
 - [ ] Handle capitalization is `g_currentMission.MarketDynamics` (capital M); ensure CropDisease and ProStaff briefs use it, and poll `getActiveEvents()` matching by id string.
 

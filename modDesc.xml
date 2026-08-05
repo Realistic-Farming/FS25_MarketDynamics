@@ -52,6 +52,7 @@
         <sourceFile filename="src/events/ColdSnapEvent.lua" />
         <sourceFile filename="src/events/FinancialPanicEvent.lua" />
         <sourceFile filename="src/events/ProteinPremiumEvent.lua" />
+        <sourceFile filename="src/OrganicPremiumBridge.lua" />
         <sourceFile filename="src/MarketDynamics.lua" />
         <sourceFile filename="src/MDMSettingsHubBridge.lua" />
         <sourceFile filename="src/MDMStateLedgerBridge.lua" />

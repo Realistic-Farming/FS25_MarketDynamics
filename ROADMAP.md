@@ -15,6 +15,7 @@
 - Baseline date: 2026-06-29 (updated 2026-07-25)
 
 ## Near-term (next release cycle)
+- [x] Organic market premium (OM-213, MDM half, 2026-08-05): `OrganicPremiumBridge` registers the reserved "OrganicPremium" price modifier (name-keyed registry, clobber-safe). The modifier reads SoilFertilizer's `getFarmOrganicFraction` for the SELLING farm, fed through a dedi-safe context MDM's own sellFillType hook sets from the engine-passed farmId (never `g_currentMission:getFarmId()`), and applies `1 + (P - 1) * frac` with P = 1.20 (named constant, AWAITING-SPINE for the Economy dial). Removes the stale PROVISIONAL comment from clamp B. MarketDynamics stays the sole price owner; no base-game sale path is patched. Ships LOCKED; unlock gated on the FarmTablet market-report line (Wizard lane). Built on development, PR open.
 - [x] Release gate mechanism (2026-08-04): wired per Arissani's 2026-08-03 lock set (EMPTY for MDM - the price-modifier contract is inert, OM-213 is unbuilt and owed). `ReleaseGate.lua` with an empty registry, `experimentalSystems` opt-in (default false, orthogonal to difficulty) through settings/persistence/MP sync/SettingsHub/panel, and the `mdmRelease` status command. Nothing gated today.
 - [x] Witcombe join load-phase guard (ad958a0): load-phase flag prevents expire/restore/price-shift logic during MP join. Pushed 2026-07-28.
 - [~] Companion read API on `g_currentMission.MarketDynamics`: getActiveEvents() is live; getEligibleEvents() is still pending (ProStaff L20 early-warning). Price/trend reads to follow.

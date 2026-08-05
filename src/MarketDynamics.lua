@@ -116,6 +116,10 @@ function MarketDynamics:onMissionLoaded(mission)
     -- NetworkSync is absent. Server->client state broadcasts stay on their own events.
     MDMNetworkSyncBridge.register(self)
 
+    -- OM-213 organic market premium: register the "OrganicPremium" price modifier
+    -- (reads SoilFertilizer's organic provenance; a no-op when SF is absent).
+    OrganicPremiumBridge.register()
+
     MDMLog.info("MarketDynamics: mission loaded, system active")
 end
 
@@ -266,6 +270,7 @@ function MarketDynamics:delete()
     if g_MDMHud then
         g_MDMHud:delete()
     end
+    OrganicPremiumBridge.unregister()
     MDMLog.info("MarketDynamics: deleted")
 end
 
