@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0.0] - 2026-08-04
+
+### Added
+- **Release gate.** Market Dynamics now carries a lock registry that keeps experimental systems off until they are deliberately released. The gate is an explicit opt-in, independent of the difficulty setting. No systems are gated yet - this release wires the mechanism only.
+
+---
+
 ## [1.2.0.1] - 2026-05-25
 
 ### Fixed

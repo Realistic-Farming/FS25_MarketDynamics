@@ -129,7 +129,7 @@ This mod is licensed under **[CC BY-NC-ND 4.0](https://creativecommons.org/licen
 
 You may share it in its original form with attribution. You may not sell it, modify and redistribute it, or reupload it under a different name or authorship. Contributions via pull request are explicitly permitted and encouraged.
 
-**Author:** TisonK & LeGrizzly &nbsp;·&nbsp; **Version:** 1.2.0.8
+**Author:** TisonK & LeGrizzly &nbsp;·&nbsp; **Version:** 1.3.0.0
 
 © 2026 TisonK — See [LICENSE](LICENSE) for full terms.
 
