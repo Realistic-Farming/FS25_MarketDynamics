@@ -38,3 +38,4 @@
 
 ## Esc panel buttons for MDM as door host (2026-08-07)
 - [x] MDM builds the shared Esc door (alphabetically first), so its RfPdaMenuPage now carries the bottom-bar button set for every module (Help, Rotation Planner, Field Detail, Open Worker Manager, Open full Market), with showWhenPaused and cross-mod resolution. Deployed and verified in-game.
+- [x] Help button shows only on the Soil module; other modules show Back only.
