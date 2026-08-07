@@ -37,4 +37,4 @@
 - [x] Bedrock migrations: ALL FOUR bridges DONE (StateLedger + MasterHUD + SettingsHub + NetworkSync action channel AND state-sync). Only the whole-wave two-machine MP test remains.
 
 ## Esc panel buttons for MDM as door host (2026-08-07)
-- [x] MDM builds the shared Esc door (alphabetically first), so its RfPdaMenuPage now carries the full bottom-bar button set for every module (Help, Rotation Planner, Treatment, Field Detail, Open Worker Manager, Open full Market), with showWhenPaused and cross-mod resolution. Deployed. In-game verification pending.
+- [x] MDM builds the shared Esc door (alphabetically first), so its RfPdaMenuPage now carries the bottom-bar button set for every module (Help, Rotation Planner, Field Detail, Open Worker Manager, Open full Market), with showWhenPaused and cross-mod resolution. Deployed and verified in-game.
