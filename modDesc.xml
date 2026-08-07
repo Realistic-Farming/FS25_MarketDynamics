@@ -37,6 +37,11 @@
         <sourceFile filename="src/gui/MDMBrowseFillTypesDialog.lua" />
         <sourceFile filename="src/gui/MarketScreenGraph.lua" />
         <sourceFile filename="src/gui/MarketScreen.lua" />
+        <sourceFile filename="src/gui/RfEscModules.lua" />
+        <sourceFile filename="src/gui/RfPdaMenuPage.lua" />
+        <sourceFile filename="src/gui/RfEscBootstrap.lua" />
+        <sourceFile filename="src/gui/RfEscUiDebugger.lua" />
+        <sourceFile filename="src/gui/MdRfPdaGuest.lua" />
         <sourceFile filename="src/events/MDMContractRequestEvent.lua" />
         <sourceFile filename="src/events/MDMContractSyncEvent.lua" />
         <sourceFile filename="src/events/MDMContractSyncRequestEvent.lua" />

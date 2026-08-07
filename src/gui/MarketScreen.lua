@@ -73,6 +73,90 @@ function MDMMarketScreen.register(modDir)
     MDMLog.info("MarketScreen: deferred registration until GUI/InGameMenu ready")
 end
 
+--- RF Esc door live, or suite RF stack will host (never inject-then-remove).
+--- Matches Soil/CS/WC: skip legacy Esc rail when menuRealisticFarming / rfEscModules / RfEscBootstrap.
+function MDMMarketScreen._rfEscDoorPresentOrWillHost()
+    if g_inGameMenu ~= nil and g_inGameMenu.menuRealisticFarming ~= nil then
+        return true
+    end
+    if g_currentMission ~= nil and g_currentMission.rfEscModules ~= nil then
+        return true
+    end
+    local env = getfenv and getfenv(0)
+    if env ~= nil and env.g_rfEscModules ~= nil then
+        return true
+    end
+    -- MDM ships RfEscBootstrap and always ensureDoor via MdRfPdaGuest — treat as will-host.
+    if RfEscBootstrap ~= nil then
+        return true
+    end
+    return false
+end
+
+--- Load deep MarketScreen for F10 / Open full Market without Esc rail registration.
+function MDMMarketScreen._loadDeepScreenOnly(modDir)
+    if MDMMarketScreen._retainedDeepScreen ~= nil then
+        MDMLog.info("MarketScreen: deep screen already retained (RF Esc path)")
+        return true
+    end
+    if g_gui == nil then
+        return false
+    end
+
+    local screen = MDMMarketScreen.new()
+    MDMLog.info("MarketScreen: loading deep-only GUI '" .. tostring(modDir .. MDMMarketScreen.XML_FILENAME) .. "' (no Esc rail)")
+    local okLoad, errLoad = pcall(function()
+        g_gui:loadGui(modDir .. MDMMarketScreen.XML_FILENAME, MDMMarketScreen.CLASS_NAME, screen, true)
+    end)
+    if not okLoad then
+        MDMLog.error("MarketScreen: deep-only loadGui failed: " .. tostring(errLoad))
+        return false
+    end
+
+    if type(screen.initialize) == "function" then
+        local okInit, errInit = pcall(screen.initialize, screen)
+        if not okInit then
+            MDMLog.error("MarketScreen: deep-only initialize failed: " .. tostring(errInit))
+        end
+    end
+
+    MDMMarketScreen._retainedDeepScreen = screen
+    if MdRfPdaGuest ~= nil then
+        MdRfPdaGuest._legacyNeverInjected = true
+    end
+    MDMLog.info("MarketScreen: deep Market retained; skipped addPageTab/registerPage (RF Esc door hosts glance)")
+    return true
+end
+
+--- Ensure deep MarketScreen is in InGameMenu paging (no Esc tab) for F10 / deep open only.
+function MDMMarketScreen._ensureDeepPageInjectable(inGameMenu, page)
+    if inGameMenu == nil or page == nil or inGameMenu.pagingElement == nil then
+        return false
+    end
+    local pe = inGameMenu.pagingElement
+    local inElements = false
+    if pe.elements ~= nil then
+        for _, el in ipairs(pe.elements) do
+            if el == page then
+                inElements = true
+                break
+            end
+        end
+    end
+    if not inElements and type(pe.addElement) == "function" then
+        pe:addElement(page)
+    end
+    -- Bind for goToPage without restoring Esc rail tab icon.
+    inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] = page
+    if type(pe.updateAbsolutePosition) == "function" then
+        pcall(pe.updateAbsolutePosition, pe)
+    end
+    if type(pe.updatePageMapping) == "function" then
+        pcall(pe.updatePageMapping, pe)
+    end
+    return true
+end
+
 function MDMMarketScreen.show()
     if g_gui and g_gui.currentGuiName ~= nil and g_gui.currentGuiName ~= "" and g_gui.currentGuiName ~= "InGameMenu" then
         return
@@ -82,10 +166,14 @@ function MDMMarketScreen.show()
         MDMLog.info("MarketScreen.show: inGameMenu is nil — cannot open")
         return
     end
-    local page = inGameMenu[MDMMarketScreen.MENU_PAGE_NAME]
+    local page = inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] or MDMMarketScreen._retainedDeepScreen
     if page == nil then
         MDMLog.info("MarketScreen.show: page '" .. MDMMarketScreen.MENU_PAGE_NAME .. "' not registered — cannot open")
         return
+    end
+    -- After Esc rail stand-down, page lives only on _retainedDeepScreen; re-inject without tab.
+    if inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] == nil or MDMMarketScreen._retainedDeepScreen == page then
+        MDMMarketScreen._ensureDeepPageInjectable(inGameMenu, page)
     end
     MDMLog.info("MarketScreen.show: opening screen")
     g_gui:showGui("InGameMenu")
@@ -96,7 +184,8 @@ function MDMMarketScreen.toggle()
     MDMLog.info("MarketScreen.toggle: called")
     if g_gui.currentGuiName == "InGameMenu" then
         local inGameMenu = g_gui.screenControllers[InGameMenu] or g_inGameMenu
-        if inGameMenu and inGameMenu.currentPage == inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] then
+        local page = inGameMenu and (inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] or MDMMarketScreen._retainedDeepScreen)
+        if inGameMenu and page ~= nil and inGameMenu.currentPage == page then
             g_gui:changeScreen(nil)
             return
         end
@@ -175,10 +264,15 @@ function MDMMarketScreen:onGuiSetupFinished()
         self.contractList.delegate   = self
     end
 
+    -- Missing-reject via MDMUtil.getModText (same class as resolveEventName).
+    -- Bare g_i18n:getText returns truthy "Missing '…'" and must never paint.
     local function _setTextSafe(el, key, fallback)
         if el == nil then return end
-        local ok, txt = pcall(function() return g_i18n and g_i18n:getText(key) end)
-        if ok and txt and txt ~= "" then
+        local txt = nil
+        if MDMUtil ~= nil and type(MDMUtil.getModText) == "function" then
+            txt = MDMUtil.getModText(key)
+        end
+        if type(txt) == "string" and txt ~= "" then
             el:setText(txt)
         else
             el:setText(fallback or tostring(key))
@@ -190,9 +284,9 @@ function MDMMarketScreen:onGuiSetupFinished()
     _setTextSafe(self.categoryHeaderText, "mdm_screen_title", "Market Dynamics")
     if self.currentBalanceText then self.currentBalanceText:setText("") end
     _setTextSafe(self.commoditiesHeader, "mdm_screen_commodities", "COMMODITIES")
-    _setTextSafe(self.colHeaderCrop, "mdm_label_crop", "Crop")
-    _setTextSafe(self.colHeaderPrice, "mdm_label_price", "Price")
-    _setTextSafe(self.colHeaderChange, "mdm_label_change", "Change")
+    _setTextSafe(self.colHeaderCrop, "mdm_screen_col_crop", "Crop")
+    _setTextSafe(self.colHeaderPrice, "mdm_screen_col_price", "Price")
+    _setTextSafe(self.colHeaderChange, "mdm_screen_col_change", "Change")
     self:_updateSortHeaders()
     _setTextSafe(self.graphTitle, "mdm_screen_session_trend", "Session Price Trend")
     _setTextSafe(self.graphHint, "mdm_screen_collecting", "Collecting data...")
@@ -686,8 +780,15 @@ end
 
 function MDMMarketScreen:_updateSortHeaders()
     local asc = self.sortAscending and " ^" or " v"  -- ASCII sort indicators
+    -- getModText Missing-reject; append sort marker after resolved label.
     local function hdr(key, fallback, isActive)
-        local txt = (g_i18n and g_i18n:getText(key)) or fallback
+        local txt = nil
+        if MDMUtil ~= nil and type(MDMUtil.getModText) == "function" then
+            txt = MDMUtil.getModText(key)
+        end
+        if type(txt) ~= "string" or txt == "" then
+            txt = fallback
+        end
         return isActive and (txt .. asc) or txt
     end
     if self.colHeaderCrop then
@@ -1034,8 +1135,26 @@ function MDMMarketScreen._performRegistration(modDir)
         return false
     end
 
+    -- Prefer RF door first (Soil/CS/WC pattern): never addPageTab then standDown.
+    if MdRfPdaGuest ~= nil and type(MdRfPdaGuest.tryRegister) == "function" then
+        pcall(MdRfPdaGuest.tryRegister)
+    elseif RfEscBootstrap ~= nil and modDir ~= nil then
+        pcall(RfEscBootstrap.ensureDoor, modDir, {
+            profilesXml = modDir .. "xml/gui/rfEscProfiles.xml",
+            iconPath = "textures/ui/menuIcon.dds",
+        })
+    end
+
+    if MDMMarketScreen._rfEscDoorPresentOrWillHost() then
+        return MDMMarketScreen._loadDeepScreenOnly(modDir)
+    end
+
     if g_inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] ~= nil then
         MDMLog.info("MarketScreen: page already registered, skipping")
+        return true
+    end
+    if MDMMarketScreen._retainedDeepScreen ~= nil then
+        MDMLog.info("MarketScreen: deep screen retained (no Esc rail), skipping re-register")
         return true
     end
 
@@ -1052,11 +1171,11 @@ function MDMMarketScreen._performRegistration(modDir)
                 MDMLog.info("MarketScreen: applyGuiLocalization - control '" .. tostring(id) .. "' not found")
                 return
             end
-            local okTxt, txt = false, nil
-            if key ~= nil then
-                okTxt, txt = pcall(function() return g_i18n and g_i18n:getText(key) end)
+            local txt = nil
+            if key ~= nil and MDMUtil ~= nil and type(MDMUtil.getModText) == "function" then
+                txt = MDMUtil.getModText(key)
             end
-            if okTxt and txt and txt ~= "" then
+            if type(txt) == "string" and txt ~= "" then
                 pcall(function() el:setText(txt) end)
             else
                 pcall(function() el:setText(fallback or (key and tostring(key) or "")) end)
@@ -1065,9 +1184,9 @@ function MDMMarketScreen._performRegistration(modDir)
 
         _setById("categoryHeaderText", "mdm_screen_title", "Market Dynamics")
         _setById("commoditiesHeader", "mdm_screen_commodities", "COMMODITIES")
-        _setById("colHeaderCrop", "mdm_label_crop", "Crop")
-        _setById("colHeaderPrice", "mdm_label_price", "Price")
-        _setById("colHeaderChange", "mdm_label_change", "Change")
+        _setById("colHeaderCrop", "mdm_screen_col_crop", "Crop")
+        _setById("colHeaderPrice", "mdm_screen_col_price", "Price")
+        _setById("colHeaderChange", "mdm_screen_col_change", "Change")
 
         _setById("graphHint", "mdm_screen_collecting", "Collecting data...")
         _setById("noEventsText", "mdm_screen_no_events", "No events")
@@ -1192,6 +1311,11 @@ function MDMMarketScreen._performRegistration(modDir)
                 MDMLog.info("MarketScreen: screen.initialize OK")
             end
         end
+
+        -- Keep this tab hidden until selected (suite ESC-menu stacking fix).
+        if screen.setVisible ~= nil then
+            pcall(screen.setVisible, screen, false)
+        end
     end
 
     MDMLog.info("MarketScreen: GUI loaded and registered")
@@ -1218,10 +1342,18 @@ end
 local function _onUpdate(mission, dt)
     MDMMarketScreenGraph.update(dt)
     MDMMarketScreen._attemptDeferredRegister(dt)
+    -- Esc RF Module join + legacy rail stand-down (idempotent; early-outs when done).
+    if MdRfPdaGuest ~= nil and type(MdRfPdaGuest.tryRegister) == "function" then
+        pcall(MdRfPdaGuest.tryRegister)
+    end
 end
 
 local function _onDelete(mission)
     MDMMarketScreenGraph.reset()
+    if MdRfPdaGuest ~= nil and type(MdRfPdaGuest.reset) == "function" then
+        MdRfPdaGuest.reset()
+    end
+    MDMMarketScreen._retainedDeepScreen = nil
 end
 
 Mission00.loadMission00Finished = Utils.appendedFunction(Mission00.loadMission00Finished, _onMissionLoaded)

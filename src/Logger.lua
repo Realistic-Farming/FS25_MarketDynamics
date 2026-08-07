@@ -46,6 +46,66 @@ MDMLog.debugEnabled = false
 -- ---------------------------------------------------------------------------
 MDMUtil = {}
 
+-- Captured at load so event/notify paths keep MDM modEnv even if caller context shifts.
+local MDM_MOD_NAME = g_currentModName
+
+-- Mod-scoped i18n with Missing-reject (same spirit as MdRfPdaGuest.tr).
+-- Giants g_i18n:getText returns a truthy "Missing '…'" banner on miss; never paint that.
+function MDMUtil.getModText(key)
+    if key == nil or key == "" then
+        return nil
+    end
+    local modEnv = g_modEnvironments and g_modEnvironments[MDM_MOD_NAME]
+    local i18n = (modEnv and modEnv.i18n) or nil
+    if i18n == nil then
+        return nil
+    end
+    local ok, text = pcall(function() return i18n:getText(key) end)
+    if not ok or type(text) ~= "string" or text == "" then
+        return nil
+    end
+    local lower = text:lower()
+    if lower == tostring(key):lower()
+        or text == ("$l10n_" .. key)
+        or lower:find("^missing%s")
+        or lower:find("^missing_")
+    then
+        return nil
+    end
+    return text
+end
+
+-- Resolve event display name: modEnv i18n → desc.name → id. Never Giants Missing banners.
+-- Accepts a registry desc table, or (nameKey, fallbackName, id).
+function MDMUtil.resolveEventName(descOrNameKey, fallbackName, id)
+    local nameKey, fallback, eventId
+    if type(descOrNameKey) == "table" then
+        nameKey = descOrNameKey.nameKey
+        fallback = descOrNameKey.name
+        eventId = descOrNameKey.id or id
+    else
+        nameKey = descOrNameKey
+        fallback = fallbackName
+        eventId = id
+    end
+    if nameKey ~= nil and nameKey ~= "" then
+        local text = MDMUtil.getModText(nameKey)
+        if text ~= nil then
+            return text
+        end
+    end
+    if fallback ~= nil and fallback ~= "" then
+        return fallback
+    end
+    if eventId ~= nil and eventId ~= "" then
+        return tostring(eventId)
+    end
+    if nameKey ~= nil and nameKey ~= "" then
+        return tostring(nameKey)
+    end
+    return ""
+end
+
 -- Returns absolute game-world time in milliseconds.
 --
 -- WHY NOT g_currentMission.time?
