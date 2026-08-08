@@ -30,6 +30,9 @@ local COLOR_LIME = {0.659, 0.878, 0.290, 1}
 local _registered = false
 local _legacyStoodDown = false
 local _selectedFillType = nil
+-- Set only while we programmatically restore the list highlight, so the delegate's
+-- selection callback does not treat our own restore as a fresh player pick.
+local _suppressSelectionCallback = false
 local _commoditySig = nil
 local _lastEventsSig = nil
 local _lastContractsSig = nil
@@ -269,7 +272,26 @@ function MdRfPdaGuest.buildCommodities()
             hudOverlay = hudOverlay,
         })
     end
+    -- Stable title order for the Esc list. This used to sort by biggest absolute price
+    -- move, so the list re-ordered under the player on every refresh and the highlight
+    -- chased it (eyes-on FAIL 2026-08-07). Title first, fill type id as tiebreak, so the
+    -- order is fully deterministic and does not depend on prices at all.
     table.sort(out, function(a, b)
+        local at, bt = a.title or "", b.title or ""
+        if at ~= bt then
+            return at < bt
+        end
+        return (a.fillTypeIndex or 0) < (b.fillTypeIndex or 0)
+    end)
+    return out
+end
+
+-- Back-compat for any host still calling buildMovers. buildCommodities is title-sorted
+-- now, so this does its own biggest-mover sort rather than truncating an alphabetical
+-- list and quietly returning the wrong thing.
+function MdRfPdaGuest.buildMovers(limit)
+    local all = MdRfPdaGuest.buildCommodities()
+    table.sort(all, function(a, b)
         local aa = math.abs(a.changePct or 0)
         local bb = math.abs(b.changePct or 0)
         if aa ~= bb then
@@ -277,12 +299,6 @@ function MdRfPdaGuest.buildCommodities()
         end
         return (a.title or "") < (b.title or "")
     end)
-    return out
-end
-
--- Back-compat for any host still calling buildMovers.
-function MdRfPdaGuest.buildMovers(limit)
-    local all = MdRfPdaGuest.buildCommodities()
     limit = limit or 5
     while #all > limit do
         table.remove(all)
@@ -290,15 +306,25 @@ function MdRfPdaGuest.buildMovers(limit)
     return all
 end
 
+--- Identity of the commodity SET, deliberately order-independent.
+-- Row order changes every time prices move, so an order-sensitive signature forced a
+-- reloadData on every light refresh and SmoothList reset the highlight to row 1 (the
+-- "always snaps back to ADS Coolant Premium" eyes-on FAIL, Wizard 2026-08-07). Only a
+-- genuinely different set of fill types should cost a reload.
 local function commoditiesSignature(rows)
     if rows == nil or #rows == 0 then
         return "empty"
     end
-    local parts = {}
+    local seen, ids = {}, {}
     for _, r in ipairs(rows) do
-        table.insert(parts, tostring(r.fillTypeIndex))
+        local id = tostring(r.fillTypeIndex)
+        if not seen[id] then
+            seen[id] = true
+            ids[#ids + 1] = id
+        end
     end
-    return table.concat(parts, "|")
+    table.sort(ids)
+    return table.concat(ids, "|")
 end
 
 local function defaultSelection(rows)
@@ -310,7 +336,7 @@ end
 
 local function paintSideInfo(container)
     local body = tr("rf_pda_side_info_market_dynamics",
-        "Market Dynamics\n\nPause Market glance with three pages: Prices, Events, Contracts.\n\nTop table = crop icons, prices, and swings. Icons help you spot the crop fast. On Prices, pick a crop to drive the graph.\n\nEvents page = what is hitting the market now, how strong, and how long left.\n\nContracts page = your open deals (read-only). Manage them in full Market.\n\nOpen full Market (SPACE) for the deep desk.")
+        "Market Dynamics\n\nPrices table + bottom Events / Contracts / Price trend.\nPick a crop for trend stats. Chart lives in full Market.\nEsc is a glance - open full Market for admin.")
     -- Nest under mdSubnavShell (WC twin). Never force Soil rfSideInfoShell on MDM.
     setVis(findDescendant(container, "rfSideInfoShell"), false)
     local shell = findDescendant(container, "mdSideInfoShell")
@@ -374,12 +400,22 @@ local function syncCommodityList(container, rows, forceReload)
         list:reloadData()
     end
 
-    -- Selection highlight: quiet index only (no reload).
+    -- Selection highlight: quiet index only (no reload), suppressed so restoring the
+    -- highlight cannot echo back through the delegate as a new player selection, and
+    -- skipped entirely when the list already sits on the right row. Re-asserting the
+    -- index on every 2s light tick was itself a way for the highlight to get nudged.
     if _selectedFillType ~= nil and rows ~= nil then
         for i, r in ipairs(rows) do
             if r.fillTypeIndex == _selectedFillType then
-                if type(list.setSelectedIndex) == "function" then
+                local already = false
+                if type(list.getSelectedIndex) == "function" then
+                    local ok, cur = pcall(function() return list:getSelectedIndex() end)
+                    already = ok and cur == i
+                end
+                if not already and type(list.setSelectedIndex) == "function" then
+                    _suppressSelectionCallback = true
                     pcall(function() list:setSelectedIndex(i) end)
+                    _suppressSelectionCallback = false
                 end
                 break
             end
@@ -401,9 +437,10 @@ local function paintDetail(container)
     for _, el in ipairs({ cropEl, priceEl, pressEl }) do
         setVis(el, has)
     end
-    setVis(emptyEl, not has)
+    setVis(emptyEl, false)
+    setText(emptyEl, "")
     if not has then
-        setText(emptyEl, tr("md_rf_pda_select_crop", "Pick a crop in the table to see the graph."))
+        -- Pick-crop lives on mdGraphEmptyHint only (no H1 / dual shout).
         return
     end
 
@@ -438,15 +475,16 @@ local function paintGraphHints(container)
             and type(MDMMarketScreenGraph.getSampleCount) == "function" then
         count = MDMMarketScreenGraph.getSampleCount(_selectedFillType) or 0
     end
+    -- Honest empty graph this build (George 2026-08-06): never silent dead lake.
     if _selectedFillType == nil then
         setVis(emptyEl, true)
-        setText(emptyEl, tr("md_rf_pda_select_crop", "Pick a crop in the table to see the graph."))
+        setText(emptyEl, tr("md_rf_pda_select_crop", "Pick a crop. Graph stays empty here - open full Market for the chart."))
     elseif count < 2 then
         setVis(emptyEl, true)
-        setText(emptyEl, tr("md_rf_pda_building_history", "Building price history..."))
+        setText(emptyEl, tr("md_rf_pda_building_history", "Building price history... Stats update on the right."))
     else
-        setVis(emptyEl, false)
-        setText(emptyEl, "")
+        setVis(emptyEl, true)
+        setText(emptyEl, tr("md_rf_pda_graph_empty_honest", "No chart drawn on this pause page. Open full Market for the price path."))
     end
 end
 
@@ -461,7 +499,23 @@ local function eventsSignature(events)
     return table.concat(parts, "|")
 end
 
+
+local function clearPricesBandGhosts(container)
+    -- Events/Contracts must not show Prices empty/detail leftovers.
+    for _, id in ipairs({
+        "mdGraphTitle", "mdDetailCommodity", "mdDetailPrice", "mdDetailPressure",
+        "mdDetailEmpty", "mdGraphEmptyHint",
+    }) do
+        local el = findDescendant(container, id)
+        setText(el, "")
+        if id == "mdDetailEmpty" or id == "mdGraphEmptyHint" then
+            setVis(el, false)
+        end
+    end
+end
+
 local function paintEventsBand(container)
+    clearPricesBandGhosts(container)
     setText(findDescendant(container, "mdEventsTitle"), tr("md_rf_pda_page_events", "Events"))
     setText(findDescendant(container, "mdEvColName"), tr("md_rf_pda_ev_col_name", "Event"))
     setText(findDescendant(container, "mdEvColIntensity"), tr("md_rf_pda_ev_col_intensity", "Intensity"))
@@ -558,6 +612,7 @@ local function contractsSignature(list)
 end
 
 local function paintContractsBand(container)
+    clearPricesBandGhosts(container)
     local mdm = getMdm()
     local fm = mdm and mdm.futuresMarket
     local fid = farmId()
@@ -681,6 +736,9 @@ function MdRfPdaGuest.onShow(container, lightOnly)
     end
 
     local rows = MdRfPdaGuest.buildCommodities()
+    -- Only ever fall back to row 1 when there is genuinely nothing to keep. A valid
+    -- selection is never re-defaulted, because with a title sort row 1 is ADS Coolant
+    -- Premium and any stray re-default reads to the player as the old ADS snap.
     if _selectedFillType == nil then
         _selectedFillType = defaultSelection(rows)
     else
@@ -692,6 +750,8 @@ function MdRfPdaGuest.onShow(container, lightOnly)
             end
         end
         if not still then
+            print(string.format("[MarketDynamics] selection %s no longer in commodity list - falling back to first row",
+                tostring(_selectedFillType)))
             _selectedFillType = defaultSelection(rows)
         end
     end
@@ -725,6 +785,12 @@ function MdRfPdaGuest.getSelectedFillType()
 end
 
 function MdRfPdaGuest.selectCommodityIndex(index)
+    -- Ignore selection callbacks raised by our own highlight restore during a sync.
+    -- Without this, restoring the highlight can echo back through the delegate and
+    -- overwrite the player's real choice with whatever row the list settled on.
+    if _suppressSelectionCallback then
+        return
+    end
     local page = getHostPage()
     local rows = (page and page.mdCommodityData) or {}
     local row = rows[index]
@@ -748,6 +814,7 @@ function MdRfPdaGuest.onMoverChanged(_container)
 end
 
 function MdRfPdaGuest.onOpenFullMarket()
+    print("[MarketDynamics] onOpenFullMarket entered")
     if MDMMarketScreen ~= nil and type(MDMMarketScreen.show) == "function" then
         MDMMarketScreen.show()
     end

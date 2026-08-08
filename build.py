@@ -37,7 +37,8 @@ EXCLUDE_FILES = {
     "build.sh", "build.py",
     "find_unused_code.sh", "find_unused_code.py",
     "lang_sync.js", "lang_sync.py",
-    "CLAUDE.md", "Thumbs.db", ".DS_Store", ".gitignore", "nul",
+    "CLAUDE.md", "Thumbs.db", ".DS_Store", ".gitignore", ".gitattributes", "nul",
+    "ROADMAP.md", "TODO.md", "VISION.md", "CHANGELOG.md", "README.md",
 }
 EXCLUDE_EXTS = {".zip", ".swp", ".swo"}
 

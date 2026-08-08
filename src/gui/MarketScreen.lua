@@ -64,6 +64,10 @@ end
 -- ---------------------------------------------------------------------------
 
 function MDMMarketScreen.register(modDir)
+    -- Stash on the table: show() is defined long before the file-local _modDir, so it
+    -- cannot see that local and needs its own way back to the mod directory for the
+    -- lazy deep load.
+    MDMMarketScreen._modDir = modDir or MDMMarketScreen._modDir
     if MDMMarketScreen._performRegistration(modDir) then
         return
     end
@@ -146,6 +150,24 @@ function MDMMarketScreen._ensureDeepPageInjectable(inGameMenu, page)
     if not inElements and type(pe.addElement) == "function" then
         pe:addElement(page)
     end
+    -- PagingElement keeps .pages separately from .elements and builds the goToPage
+    -- mapping from .pages, so a page present only in .elements cannot be navigated to.
+    -- addElement() normally creates the pages entry for us (it calls addPage internally,
+    -- which also assigns the id and registers idPageHash), so only repair the gap when a
+    -- page really is missing - and repair it through addPage, never by hand-building the
+    -- entry, or the id / mappingIndex / idPageHash bookkeeping would be wrong.
+    if type(pe.pages) == "table" and type(pe.addPage) == "function" then
+        local inPages = false
+        for _, p in ipairs(pe.pages) do
+            if p.element == page then
+                inPages = true
+                break
+            end
+        end
+        if not inPages then
+            pcall(function() pe:addPage(MDMMarketScreen.MENU_PAGE_NAME, page, "") end)
+        end
+    end
     -- Bind for goToPage without restoring Esc rail tab icon.
     inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] = page
     if type(pe.updateAbsolutePosition) == "function" then
@@ -158,17 +180,32 @@ function MDMMarketScreen._ensureDeepPageInjectable(inGameMenu, page)
 end
 
 function MDMMarketScreen.show()
+    print("[MarketDynamics] MarketScreen.show entered")
     if g_gui and g_gui.currentGuiName ~= nil and g_gui.currentGuiName ~= "" and g_gui.currentGuiName ~= "InGameMenu" then
+        print("[MarketDynamics] show EARLY-OUT: wrong currentGuiName=" .. tostring(g_gui.currentGuiName))
         return
     end
     local inGameMenu = g_gui.screenControllers[InGameMenu] or g_inGameMenu
     if inGameMenu == nil then
         MDMLog.info("MarketScreen.show: inGameMenu is nil — cannot open")
+        print("[MarketDynamics] show EARLY-OUT: inGameMenu nil")
         return
     end
     local page = inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] or MDMMarketScreen._retainedDeepScreen
     if page == nil then
+        -- Lazy deep load: with the RF Esc door hosting, the deep screen may never have
+        -- been built, so Open full Market silently did nothing (eyes-on FAIL 2026-08-07).
+        -- Build it on first use instead of bailing.
+        local modDir = MDMMarketScreen._modDir or g_currentModDirectory
+        if modDir ~= nil then
+            MDMLog.info("MarketScreen.show: deep screen missing, loading on demand")
+            pcall(MDMMarketScreen._loadDeepScreenOnly, modDir)
+            page = inGameMenu[MDMMarketScreen.MENU_PAGE_NAME] or MDMMarketScreen._retainedDeepScreen
+        end
+    end
+    if page == nil then
         MDMLog.info("MarketScreen.show: page '" .. MDMMarketScreen.MENU_PAGE_NAME .. "' not registered — cannot open")
+        print("[MarketDynamics] show EARLY-OUT: page still nil after lazy load")
         return
     end
     -- After Esc rail stand-down, page lives only on _retainedDeepScreen; re-inject without tab.
@@ -176,6 +213,7 @@ function MDMMarketScreen.show()
         MDMMarketScreen._ensureDeepPageInjectable(inGameMenu, page)
     end
     MDMLog.info("MarketScreen.show: opening screen")
+    print("[MarketDynamics] opening screen")
     g_gui:showGui("InGameMenu")
     inGameMenu:goToPage(page)
 end

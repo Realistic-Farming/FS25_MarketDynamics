@@ -131,7 +131,7 @@ function MDMMarketSyncEvent.applyState(prices, activeEvents)
             g_MarketDynamics.worldEvents:loadActiveEvent(e.id, e.endsAt, e.intensity, e.extraData)
             if g_MarketDynamics.worldEvents.isInitialized and not oldActive[e.id] then
                 local desc = g_MarketDynamics.worldEvents.registry[e.id]
-                local name = (desc and desc.nameKey and g_i18n:getText(desc.nameKey)) or (desc and desc.name) or e.id
+                local name = MDMUtil.resolveEventName(desc or e.id, desc and desc.name, e.id)
                 table.insert(newEventNames, name)
             end
         end
