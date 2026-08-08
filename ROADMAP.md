@@ -38,3 +38,6 @@
 
 ## Deferred / parked
 - Event prediction / schedule API: parked by design. Events are probabilistic; peers poll active/eligible, they do not get a forecast.
+
+## 2026-08-07 (Fred): module page dots always visible
+- [x] The Esc RF module selector hid its page dots when Worker Costs or Market Dynamics was the active module. Soil and Crop Stress always showed theirs, so WC never read as the 3rd module and the left panel was inconsistent. All four RfPdaMenuPage copies now keep the dots visible (dots = N, chrome unchanged, per the esc-rf-pda umbrella brief). Built, deployed, PR open.

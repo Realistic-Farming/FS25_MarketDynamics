@@ -1203,8 +1203,8 @@ function RfPdaMenuPage:_syncHostGuestChrome(activeId)
     setVis(self.wcSideVersion, false)
     setVis(self.mdSideInfoShell, isMd)
     setVis(self.rfSideInfoShell, isSoil or isCs)
-    -- On WC or MDM: hide Brand mid chrome so page sibling band owns that Y; Modules dock stays.
-    setVis(self.rfPanelDotBox, not isWc and not isMd)
+    -- Module page dots always visible (umbrella: dots = N, chrome geometry unchanged).
+    setVis(self.rfPanelDotBox, true)
     setVis(self.rfDotLegend, false)
     setVis(self.rfSuiteHint, false)
     setVis(self.rfSideMidSeparator, false)
