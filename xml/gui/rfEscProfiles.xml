@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
 <GUIProfiles>
     <!-- ============================================================ -->
     <!-- Realistic Farming PDA profiles — MOCKUP-ESC-RF-PDA swatches  -->
@@ -381,7 +381,7 @@
 
     <!-- MDM TOP commodities vs BOTTOM band (368)+L(~20): MDM-only; do not change shared Soil table shell. -->
     <Profile name="RF_MdTableRegionShell" extends="emptyPanel" with="anchorStretchingYStretchingX pivotTopLeft">
-        <absoluteSizeOffset value="0px 388px"/>
+        <absoluteSizeOffset value="0px 404px"/>
         <position value="0px 0px"/>
     </Profile>
 
@@ -403,7 +403,7 @@
 
     <!-- Treatment / CS detail: clipChildren keeps PRODUCTS inside strip. -->
     <Profile name="RF_TreatmentStrip" extends="emptyPanel" with="anchorBottomStretchingX pivotBottomLeft">
-        <height value="384px"/>
+        <height value="400px"/>
         <position value="0px 0px"/>
         <clipChildren value="true"/>
     </Profile>

@@ -115,10 +115,7 @@ function MDMEventSettingsDialog:onOpen()
     self._eventOrder = {}
     if g_MarketDynamics and g_MarketDynamics.worldEvents then
         for id, ev in pairs(g_MarketDynamics.worldEvents.registry) do
-            local name = ev.name or id
-            if ev.nameKey and g_i18n then
-                name = g_i18n:getText(ev.nameKey) or name
-            end
+            local name = MDMUtil.resolveEventName(ev)
             table.insert(self._eventOrder, { id = id, name = name })
         end
         table.sort(self._eventOrder, function(a, b) return a.name < b.name end)

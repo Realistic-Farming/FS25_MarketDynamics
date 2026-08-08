@@ -368,6 +368,9 @@ function RfPdaMenuPage:onGuiSetupFinished()
     self.rfSideMidSeparator = self:getDescendantById("rfSideMidSeparator") or self.rfSideMidSeparator
     self.rfModuleListShell = self:getDescendantById("rfModuleListShell") or self.rfModuleListShell
     self.wcPageShell = self:getDescendantById("wcPageShell") or self.wcPageShell
+    self.rfFrameworkGlanceShell = self:getDescendantById("rfFrameworkGlanceShell") or self.rfFrameworkGlanceShell
+    self.rfFwStatusBlock = self:getDescendantById("rfFwStatusBlock") or self.rfFwStatusBlock
+    self.rfFwTableBlock = self:getDescendantById("rfFwTableBlock") or self.rfFwTableBlock
     self.wcPageDashboard = self:getDescendantById("wcPageDashboard") or self.wcPageDashboard
     self.wcPageWages = self:getDescendantById("wcPageWages") or self.wcPageWages
     self.wcPageWorkers = self:getDescendantById("wcPageWorkers") or self.wcPageWorkers
@@ -380,6 +383,12 @@ function RfPdaMenuPage:onGuiSetupFinished()
     self.soilColFert = self:getDescendantById("soilColFert") or self.soilColFert
     self.soilSectionTreatment = self:getDescendantById("soilSectionTreatment") or self.soilSectionTreatment
     self.soilTreatProducts = self:getDescendantById("soilTreatProducts") or self.soilTreatProducts
+    -- Read-only rotation card (2026-08-07). Nil-safe: older door XML lacks these ids.
+    self.soilRotationCard   = self:getDescendantById("soilRotationCard") or self.soilRotationCard
+    self.soilRotationTitle  = self:getDescendantById("soilRotationTitle") or self.soilRotationTitle
+    self.soilRotationLast   = self:getDescendantById("soilRotationLast") or self.soilRotationLast
+    self.soilRotationStatus = self:getDescendantById("soilRotationStatus") or self.soilRotationStatus
+    self.soilRotationTip    = self:getDescendantById("soilRotationTip") or self.soilRotationTip
     self.treatSelectedLabel = self:getDescendantById("treatSelectedLabel") or self.treatSelectedLabel
     self.treatNextLabel     = self:getDescendantById("treatNextLabel") or self.treatNextLabel
     self.treatTargetsLabel  = self:getDescendantById("treatTargetsLabel") or self.treatTargetsLabel
@@ -488,22 +497,61 @@ function RfPdaMenuPage:initialize()
             end
         end
     }
-    -- SPACE / MENU_ACTIVATE: Open full Market when MDM module is active (bottom strip twin).
+    -- Open full Market when MDM module is active (bottom strip twin).
+    -- MENU_EXTRA_1, NOT MENU_ACTIVATE: the commodity SmoothList consumes ACTIVATE/SPACE
+    -- first, so the footer callback never fired at all - zero MarketScreen.show lines in
+    -- the client log on click (Ash+George r2 2026-08-07). EXTRA_1 is free while MDM is
+    -- the active module, since Help / Rotation Planner / Field Detail are Soil-only footers.
     self.btnOpenMarket = {
-        inputAction = InputAction.MENU_ACTIVATE,
+        inputAction = InputAction.MENU_EXTRA_1,
         showWhenPaused = true,
         text = tr("md_rf_pda_open_market", "Open full Market"),
         callback = function()
-            if MdRfPdaGuest ~= nil and type(MdRfPdaGuest.onOpenFullMarket) == "function" then
-                MdRfPdaGuest.onOpenFullMarket()
-            elseif MDMMarketScreen ~= nil and type(MDMMarketScreen.show) == "function" then
-                MDMMarketScreen.show()
+            print("[MarketDynamics] Esc footer Open full Market pressed")
+            -- Cross-mod resolve (Vera F2 2026-08-07). MdRfPdaGuest / MDMMarketScreen are
+            -- MarketDynamics-env globals and are nil on a Soil/WC/SCS hosted door, so the
+            -- bare calls silently did nothing there. Same shape as the Worker Manager
+            -- resolve below and Soil's soilGlobal: try in-env, then g_modEnvironments.
+            local host = self:_getHost()
+            local activeId = host ~= nil and host.activeModuleId or nil
+            local mod = (host ~= nil and host.modules ~= nil and activeId ~= nil)
+                and host.modules[activeId] or nil
+            if mod ~= nil and type(mod.onOpenFullMarket) == "function" then
+                print("[MarketDynamics] Open full Market via active module def")
+                mod.onOpenFullMarket()
+                return
             end
+            if MdRfPdaGuest ~= nil and type(MdRfPdaGuest.onOpenFullMarket) == "function" then
+                print("[MarketDynamics] Open full Market via in-env MdRfPdaGuest")
+                MdRfPdaGuest.onOpenFullMarket()
+                return
+            end
+            local mdEnv = g_modEnvironments ~= nil and g_modEnvironments["FS25_MarketDynamics"] or nil
+            local guest = mdEnv ~= nil and mdEnv.MdRfPdaGuest or nil
+            if guest ~= nil and type(guest.onOpenFullMarket) == "function" then
+                print("[MarketDynamics] Open full Market via g_modEnvironments MdRfPdaGuest")
+                guest.onOpenFullMarket()
+                return
+            end
+            local scr = mdEnv ~= nil and mdEnv.MDMMarketScreen or nil
+            if scr ~= nil and type(scr.show) == "function" then
+                print("[MarketDynamics] Open full Market via g_modEnvironments MDMMarketScreen")
+                scr.show()
+                return
+            end
+            if MDMMarketScreen ~= nil and type(MDMMarketScreen.show) == "function" then
+                print("[MarketDynamics] Open full Market via in-env MDMMarketScreen")
+                MDMMarketScreen.show()
+                return
+            end
+            print("[MarketDynamics] Open full Market: no handler available (all resolve paths nil)")
         end
     }
     -- SPACE / MENU_ACTIVATE: open the Worker Manager deep desk when WC is active.
     self.btnOpenWorkerManager = {
-        inputAction = InputAction.MENU_ACTIVATE,
+        -- MENU_EXTRA_2, not MENU_ACTIVATE: same SmoothList swallow class as Open full
+        -- Market (Ash 2026-08-07). Free while WC is active, Rotation Planner is Soil-only.
+        inputAction = InputAction.MENU_EXTRA_2,
         showWhenPaused = true,
         text = tr("wc_rf_pda_open_manager", "Open Worker Manager"),
         callback = function()
@@ -992,6 +1040,9 @@ end
 function RfPdaMenuPage:_refreshPageHeader(active)
     local isSoil = active == nil or active.id == "soilFertilizer"
     local isWc = active ~= nil and active.id == "workerCosts"
+    local activeId = active ~= nil and active.id or nil
+    local isFw = activeId == "income" or activeId == "tax" or activeId == "dairy"
+            or activeId == "npcFavor" or activeId == "fertilizerDepot"
     if self.rfPageTitle then
         if isSoil then
             self.rfPageTitle:setText(tr("rf_pda_panel_soil", "Soil Fertilizer"))
@@ -1000,11 +1051,23 @@ function RfPdaMenuPage:_refreshPageHeader(active)
         end
     end
     if self.rfPageBlurb then
-        if isSoil then
+        -- Framework overlap FAILFIX (George 2026-08-05): side About owns story; blank+hide blurb.
+        if isFw then
+            self.rfPageBlurb:setText("")
+            if type(self.rfPageBlurb.setVisible) == "function" then
+                self.rfPageBlurb:setVisible(false)
+            end
+        elseif isSoil then
+            if type(self.rfPageBlurb.setVisible) == "function" then
+                self.rfPageBlurb:setVisible(true)
+            end
             self.rfPageBlurb:setText(tr("rf_pda_menu_blurb",
                 "Monitor your fields' nutrient levels. Apply fertilizer to maintain optimal yields."))
         elseif isWc then
             -- Chrome FAIL-FIX: never leave Soil nutrient/treatment copy on Worker Costs.
+            if type(self.rfPageBlurb.setVisible) == "function" then
+                self.rfPageBlurb:setVisible(true)
+            end
             local rawBlurb = active and active.blurb
             local wcBlurb = "Wage mode, active workers, next settlement estimate. Open Worker Manager for hire and settings."
             if type(rawBlurb) == "string" and rawBlurb ~= "" then
@@ -1015,6 +1078,9 @@ function RfPdaMenuPage:_refreshPageHeader(active)
             end
             self.rfPageBlurb:setText(wcBlurb)
         elseif active ~= nil and type(active.blurb) == "string" and active.blurb ~= "" then
+            if type(self.rfPageBlurb.setVisible) == "function" then
+                self.rfPageBlurb:setVisible(true)
+            end
             local lower = active.blurb:lower()
             if not lower:find("^missing%s") and not lower:find("^missing_") then
                 self.rfPageBlurb:setText(active.blurb)
@@ -1023,6 +1089,9 @@ function RfPdaMenuPage:_refreshPageHeader(active)
                     "Quick look at this module. Open Farm Tablet for the full tools."))
             end
         else
+            if type(self.rfPageBlurb.setVisible) == "function" then
+                self.rfPageBlurb:setVisible(true)
+            end
             self.rfPageBlurb:setText(tr("rf_pda_host_blurb",
                 "Quick look at this module. Open Farm Tablet for the full tools."))
         end
@@ -1039,22 +1108,26 @@ function RfPdaMenuPage:_refreshSideInfo(activeId)
     local isCs = activeId == "seasonalCropStress"
     local isWc = activeId == "workerCosts"
     local isMd = activeId == "marketDynamics"
+    local isFw = activeId == "income" or activeId == "tax" or activeId == "dairy"
+            or activeId == "npcFavor" or activeId == "fertilizerDepot"
+    local isFwStatus = activeId == "tax"
+    local isFwTable = activeId == "income" or activeId == "dairy" or activeId == "npcFavor" or activeId == "fertilizerDepot"
     local function setVis(el, visible)
         if el ~= nil and type(el.setVisible) == "function" then
             el:setVisible(visible)
         end
     end
-    setVis(self.rfSideInfoShell, isSoil or isCs)
+    setVis(self.rfSideInfoShell, isSoil or isCs or isFw)
     setVis(self.wcSideInfoShell, isWc)
     setVis(self.mdSideInfoShell, isMd)
     setVis(self.rfSuiteHint, false)
     if self.rfSideInfoBody and self.rfSideInfoBody.setText then
         if isSoil then
             self.rfSideInfoBody:setText(tr("rf_pda_side_info_soil",
-                "Soil Fertilizer\n\nThis table lists every field you own. One row = one field.\n\nColumns: Field #, Area, N/P/K (% of a healthy target), Status (Good / Fair / Poor), Fertilizer need (short cue for what still looks short).\n\nClick a row. Treatment (below) is the plan for that field:\n- PRODUCT = what to buy (first is preferred; \"or ...\" is an alternate)\n- RATE = amount per area / TOTAL = amount for this field\n- Selected names the field; Next (under it) says what to do first\n\nHow to apply: dry goods (urea, MAP, potash, lime) go through a fertilizer spreader; liquids go in a sprayer tank. If pH and nutrients both show, fix lime or gypsum first so nutrients can work. Weed, pest, or disease lines mean spray (or weed mechanically) before you expect a full crop.\n\nStart with the weakest Status, open Treatment, follow Next, then the rest of the list."))
+                "Soil Fertilizer\n\nOwned fields: Field #, Area, N/P/K, Status, Fert need.\n\nClick a row for Treatment: product, rate, total, Next.\nDry goods = spreader; liquids = sprayer. Fix lime/gypsum before nutrients when pH is off.\nStart with the weakest Status."))
         elseif isCs then
             self.rfSideInfoBody:setText(tr("rf_pda_side_info_crop_stress",
-                "Crop Stress\n\nThis table lists every field you own. One row = one field.\n\nColumns: Field # / Crop, Moisture (how wet the soil is), Stress (how hard the crop is fighting dry spells), Irrigation (water help covering this field), Status (Healthy / Warning / Critical).\n\nClick a row. The strip below names the field, then Next says what to do first:\n- Critical or Warning Moisture → water that field (turn on irrigation if covered, or spray WATER / place coverage)\n- High Stress or a sensitive growth window → protect now; stress today cuts harvest later\n- Looking fine → recheck later; worse fields first\n\nIrrigation: Yes means a system can cover this field. The strip under the table shows this field's schedule, water rate, yield keep, and air dry-pull. Edit systems on Farm Tablet / Crop Consultant when you need to change them.\n\nIf Soil Fertilizer is also loaded, check nutrients there too. Dry soil drains faster when soil health is poor.\n\nStart with Critical Status, follow Next, then work up the list."))
+                "Crop Stress\n\nOwned fields: Crop, Moisture, Stress, Irrigation, Status.\n\nClick a row. Next says water / protect / recheck.\nIrrigation Yes = coverage. Edit systems on Farm Tablet when needed.\nStart with Critical Status."))
         else
             self.rfSideInfoBody:setText("")
         end
@@ -1068,6 +1141,10 @@ function RfPdaMenuPage:_syncHostGuestChrome(activeId)
     local isCs = activeId == "seasonalCropStress"
     local isWc = activeId == "workerCosts"
     local isMd = activeId == "marketDynamics"
+    local isFw = activeId == "income" or activeId == "tax" or activeId == "dairy"
+            or activeId == "npcFavor" or activeId == "fertilizerDepot"
+    local isFwStatus = activeId == "tax"
+    local isFwTable = activeId == "income" or activeId == "dairy" or activeId == "npcFavor" or activeId == "fertilizerDepot"
     local function setVis(el, visible)
         if el ~= nil and type(el.setVisible) == "function" then
             el:setVisible(visible)
@@ -1202,21 +1279,44 @@ function RfPdaMenuPage:_syncHostGuestChrome(activeId)
     setVis(self.wcSideInfoShell, isWc)
     setVis(self.wcSideVersion, false)
     setVis(self.mdSideInfoShell, isMd)
-    setVis(self.rfSideInfoShell, isSoil or isCs)
+    -- Keep framework (Income/Depot/etc) side shell; dots always visible per origin/development tip.
+    setVis(self.rfSideInfoShell, isSoil or isCs or isFw)
     -- Module page dots always visible (umbrella: dots = N, chrome geometry unchanged).
     setVis(self.rfPanelDotBox, true)
     setVis(self.rfDotLegend, false)
     setVis(self.rfSuiteHint, false)
     setVis(self.rfSideMidSeparator, false)
     setVis(self.wcPageShell, isWc)
+    setVis(self.rfFrameworkGlanceShell, isFw)
+    setVis(self.rfFwStatusBlock, isFw and isFwStatus)
+    setVis(self.rfFwTableBlock, isFw and isFwTable)
+    -- Duplex title kill: rfPageTitle owns module name (George 2026-08-05).
+    -- Income / Depot densify: rfFwTableTitle is the summary band; do not blank/hide for those panels.
+    local fwStatusTitle = self:getDescendantById("rfFwStatusTitle")
+    local fwTableTitle = self:getDescendantById("rfFwTableTitle")
+    setVis(fwStatusTitle, false)
+    if activeId ~= "income" and activeId ~= "fertilizerDepot" then
+        setVis(fwTableTitle, false)
+    end
+    if fwStatusTitle ~= nil and type(fwStatusTitle.setText) == "function" then
+        fwStatusTitle:setText("")
+    end
+    if activeId ~= "income" and activeId ~= "fertilizerDepot" and fwTableTitle ~= nil and type(fwTableTitle.setText) == "function" then
+        fwTableTitle:setText("")
+    end
+    -- Framework overlap FAILFIX: hide page blurb on fw doors (side About owns story).
+    setVis(self.rfPageBlurb, not isFw)
+    if isFw and self.rfPageBlurb ~= nil and type(self.rfPageBlurb.setText) == "function" then
+        self.rfPageBlurb:setText("")
+    end
     setVis(self.wcGlanceShell, false)
     self:_refreshSideInfo(activeId)
     -- CS: hide host body so table+detail get room (not isWc alone - body was still on for CS).
-    setVis(self.rfHostBody, not isWc and not isCs and not isMd)
+    setVis(self.rfHostBody, not isWc and not isCs and not isMd and not isFw)
     -- Keep right hero title/blurb; hide duplicate host title/blurb on WC, MDM and CS.
-    setVis(self.rfHostTitle, not isWc and not isMd and not isCs)
-    setVis(self.rfHostBlurb, not isWc and not isMd and not isCs)
-    if (isWc or isCs or isMd) and self.rfHostBody and self.rfHostBody.setText then
+    setVis(self.rfHostTitle, not isWc and not isMd and not isCs and not isFw)
+    setVis(self.rfHostBlurb, not isWc and not isMd and not isCs and not isFw)
+    if (isWc or isCs or isMd or isFw) and self.rfHostBody and self.rfHostBody.setText then
         self.rfHostBody:setText("")
     end
     -- Bottom bar: SPACE opens full Market while MDM is active.
@@ -1270,8 +1370,32 @@ function RfPdaMenuPage:_syncHostGuestChrome(activeId)
             shell:setVisible(true)
         end
     end
-    if isWc and self.wcPageShell ~= nil and self.wcPageShell.updateAbsolutePosition then
+    -- Rank 1 containment (George 2026-08-06): force abs after show so shell/gray rect match Texts.
+    if self.rfHostPlaceholder ~= nil and type(self.rfHostPlaceholder.updateAbsolutePosition) == "function" then
+        self.rfHostPlaceholder:updateAbsolutePosition()
+    end
+    if isFw then
+        if self.rfFrameworkGlanceShell ~= nil and type(self.rfFrameworkGlanceShell.updateAbsolutePosition) == "function" then
+            self.rfFrameworkGlanceShell:updateAbsolutePosition()
+        end
+        if isFwStatus and self.rfFwStatusBlock ~= nil and type(self.rfFwStatusBlock.updateAbsolutePosition) == "function" then
+            self.rfFwStatusBlock:updateAbsolutePosition()
+        end
+        if isFwTable and self.rfFwTableBlock ~= nil and type(self.rfFwTableBlock.updateAbsolutePosition) == "function" then
+            self.rfFwTableBlock:updateAbsolutePosition()
+        end
+    end
+    if isWc and self.wcPageShell ~= nil and type(self.wcPageShell.updateAbsolutePosition) == "function" then
         self.wcPageShell:updateAbsolutePosition()
+        for _, pid in ipairs({"wcPageDashboard", "wcPageWages", "wcPageWorkers"}) do
+            local pe = self[pid] or (self.getDescendantById and self:getDescendantById(pid))
+            if pe ~= nil and type(pe.updateAbsolutePosition) == "function" and pe.visible ~= false then
+                pe:updateAbsolutePosition()
+            end
+        end
+    end
+    if isCs and self.rfHostTableRegion ~= nil and type(self.rfHostTableRegion.updateAbsolutePosition) == "function" then
+        self.rfHostTableRegion:updateAbsolutePosition()
     end
     if not isWc then
         self._wcSubnavSeeded = false
