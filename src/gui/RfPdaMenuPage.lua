@@ -570,7 +570,10 @@ function RfPdaMenuPage:initialize()
         end
     }
 
-    self.menuButtonInfo = { self.btnBack, self.btnHelp }
+    -- Back only. Help is Soil-only and _syncHostGuestChrome adds it when the Soil
+    -- module is the active one; seeding it here leaked Help onto every module's
+    -- footer for the window before the first sync ran.
+    self.menuButtonInfo = { self.btnBack }
     self:_applyChromeL10n()
     self:_bindHostListener()
 end
@@ -1124,10 +1127,10 @@ function RfPdaMenuPage:_refreshSideInfo(activeId)
     if self.rfSideInfoBody and self.rfSideInfoBody.setText then
         if isSoil then
             self.rfSideInfoBody:setText(tr("rf_pda_side_info_soil",
-                "Soil Fertilizer\n\nOwned fields: Field #, Area, N/P/K, Status, Fert need.\n\nClick a row for Treatment: product, rate, total, Next.\nDry goods = spreader; liquids = sprayer. Fix lime/gypsum before nutrients when pH is off.\nStart with the weakest Status."))
+                "Soil Fertilizer\n\nThis table lists every field you own. One row = one field.\n\nColumns: Field #, Area, N/P/K (% of a healthy target), pH (like the soil monitor - e.g. 6.2), Status (Good / Fair / Poor), Fertilizer need (short cue for what still looks short).\n\nClick a row. Treatment (below) is the plan for that field:\n- PRODUCT = what to buy (first is preferred; \"or ...\" is an alternate)\n- RATE = amount per area / TOTAL = amount for this field\n- Selected names the field; Next (under it) says what to do first\n\nHow to apply: dry goods (urea, MAP, potash, lime) go through a fertilizer spreader; liquids go in a sprayer tank. If pH and nutrients both show, fix lime or gypsum first so nutrients can work. Weed, pest, or disease lines mean spray (or weed mechanically) before you expect a full crop.\n\nStart with the weakest Status, open Treatment, follow Next, then the rest of the list."))
         elseif isCs then
             self.rfSideInfoBody:setText(tr("rf_pda_side_info_crop_stress",
-                "Crop Stress\n\nOwned fields: Crop, Moisture, Stress, Irrigation, Status.\n\nClick a row. Next says water / protect / recheck.\nIrrigation Yes = coverage. Edit systems on Farm Tablet when needed.\nStart with Critical Status."))
+                "Crop Stress\n\nThis table lists every field you own. One row = one field.\n\nColumns: Field # / Crop, Moisture (how wet the soil is), Stress (how hard the crop is fighting dry spells), Irrigation (water help covering this field), Status (Healthy / Warning / Critical).\n\nClick a row. The strip below names the field, then Next says what to do first:\n- Critical or Warning Moisture → water that field (turn on irrigation if covered, or spray WATER / place coverage)\n- High Stress or a sensitive growth window → protect now; stress today cuts harvest later\n- Looking fine → recheck later; worse fields first\n\nIrrigation: Yes means a system can cover this field. The strip under the table shows this field's schedule, water rate, yield keep, and air dry-pull. Edit systems on Farm Tablet / Crop Consultant when you need to change them.\n\nIf Soil Fertilizer is also loaded, check nutrients there too. Dry soil drains faster when soil health is poor.\n\nStart with Critical Status, follow Next, then work up the list."))
         else
             self.rfSideInfoBody:setText("")
         end
