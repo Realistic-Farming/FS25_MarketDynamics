@@ -27,6 +27,18 @@ local COLOR_DOWN = {0.90, 0.25, 0.20, 1}
 local COLOR_FLAT = {0.70, 0.72, 0.75, 1}
 local COLOR_LIME = {0.659, 0.878, 0.290, 1}
 
+--- BUILD 21:41: defensive cross-env resolve. Inside this mod MarketScreenGraph.lua is
+--- sourced at modDesc line 38, ahead of this file, so the bare global already resolves -
+--- the real out-of-scope failure was host-side. Kept anyway so a future modDesc reorder
+--- cannot silently take the graph away, and so guest and host read the same way.
+local function mdGraphClass()
+    if MDMMarketScreenGraph ~= nil then
+        return MDMMarketScreenGraph
+    end
+    local env = g_modEnvironments ~= nil and g_modEnvironments[MD_RF_MOD_NAME] or nil
+    return env ~= nil and env.MDMMarketScreenGraph or nil
+end
+
 local _registered = false
 local _legacyStoodDown = false
 local _selectedFillType = nil
@@ -36,6 +48,8 @@ local _suppressSelectionCallback = false
 local _commoditySig = nil
 local _lastEventsSig = nil
 local _lastContractsSig = nil
+-- One-time ring seeds from MarketEngine history (fillTypeIndex → true). Never invent samples.
+local _historySeeded = {}
 -- Set by MarketScreen when deep-only load skipped Esc rail inject (prefer never stand-down mutate).
 MdRfPdaGuest._legacyNeverInjected = false
 
@@ -336,7 +350,7 @@ end
 
 local function paintSideInfo(container)
     local body = tr("rf_pda_side_info_market_dynamics",
-        "Market Dynamics\n\nPrices table + bottom Events / Contracts / Price trend.\nPick a crop for trend stats. Chart lives in full Market.\nEsc is a glance - open full Market for admin.")
+        "Market Dynamics\n\nPause Market glance with three pages: Prices, Events, Contracts.\n\nTop table = crop icons, prices, and swings. On Prices, pick a crop to drive the graph. Graph under the table = price path for the crop you pick. A new crop's line appears once it has price history.\n\nEvents page = what is hitting the market now.\n\nContracts page = your open deals (read-only). Manage them in full Market.\n\nOpen full Market (SPACE) for the deep desk.")
     -- Nest under mdSubnavShell (WC twin). Never force Soil rfSideInfoShell on MDM.
     setVis(findDescendant(container, "rfSideInfoShell"), false)
     local shell = findDescendant(container, "mdSideInfoShell")
@@ -395,9 +409,41 @@ local function syncCommodityList(container, rows, forceReload)
         setText(emptyEl, "")
     end
 
-    -- Hang fence: reloadData only on full show or commodity id signature change.
+    -- Hang fence + scroll stability (BUILD 10:10): a light tick NEVER reloads.
+    -- reloadData → updateView(nil, true) clamps viewOffset and jumps the list to top.
+    if not forceReload then
+        needReload = false
+    end
     if needReload and type(list.reloadData) == "function" then
+        -- Full pass: reload is legitimate; save/restore scroll so re-enter keeps place.
+        -- BUILD 21:41: viewOffset is PIXELS. SmoothListElement clamps it against
+        -- contentSize - absSize[lengthAxis]; the old restore clamped it to #rows - 1, a
+        -- ROW COUNT, so with 20 commodities any scroll position collapsed to 19 pixels
+        -- and the list read as "jumps to top". Restore both offsets raw and let
+        -- updateView apply the element's own correct clamp - no hand-rolled maximum.
+        local savedOffset = list.viewOffset
+        local savedTarget = list.targetViewOffset
         list:reloadData()
+        if savedOffset ~= nil then
+            list.viewOffset = savedOffset
+        end
+        if savedTarget ~= nil then
+            list.targetViewOffset = savedTarget
+        end
+        if (savedOffset ~= nil or savedTarget ~= nil) and type(list.updateView) == "function" then
+            pcall(function() list:updateView(true) end)
+        end
+    elseif not forceReload and page ~= nil and type(page._populateMdCommodityRow) == "function" then
+        -- Light: data table already replaced; repaint visible cell texts in place.
+        local elements = list.elements
+        if type(elements) == "table" then
+            for _, cell in pairs(elements) do
+                local idx = cell and cell.rowDataIndex
+                if type(idx) == "number" and idx >= 1 then
+                    pcall(function() page:_populateMdCommodityRow(idx, cell) end)
+                end
+            end
+        end
     end
 
     -- Selection highlight: quiet index only (no reload), suppressed so restoring the
@@ -407,11 +453,20 @@ local function syncCommodityList(container, rows, forceReload)
     if _selectedFillType ~= nil and rows ~= nil then
         for i, r in ipairs(rows) do
             if r.fillTypeIndex == _selectedFillType then
+                -- getSelectedIndex does not exist on SmoothListElement; the real probe is
+                -- getSelectedIndexInSection, so this test was always false and the branch
+                -- below ran on every light tick. With a working probe it runs only when the
+                -- list is genuinely on the wrong row.
                 local already = false
-                if type(list.getSelectedIndex) == "function" then
-                    local ok, cur = pcall(function() return list:getSelectedIndex() end)
+                if type(list.getSelectedIndexInSection) == "function" then
+                    local ok, cur = pcall(function() return list:getSelectedIndexInSection() end)
                     already = ok and cur == i
                 end
+                -- NOTE: SmoothListElement publishes no setter either - its API is
+                -- getSelectedIndexInSection / getSelectedPath / applyElementSelection. This
+                -- guarded call has therefore always been inert. Left in place because it
+                -- costs nothing and becomes correct if a setter ever appears; the highlight
+                -- itself is owned by the element via activateInput.
                 if not already and type(list.setSelectedIndex) == "function" then
                     _suppressSelectionCallback = true
                     pcall(function() list:setSelectedIndex(i) end)
@@ -465,26 +520,74 @@ local function paintDetail(container)
     setTextColor(pressEl, unpack(coachColor or COLOR_FLAT))
 end
 
+local function ensureGraphHistorySeed(fillTypeIndex)
+    if fillTypeIndex == nil or _historySeeded[fillTypeIndex] then
+        return
+    end
+    local graph = mdGraphClass()
+    if graph == nil or type(graph.seedFromHistory) ~= "function" then
+        return
+    end
+    local count = 0
+    if type(graph.getSampleCount) == "function" then
+        count = graph.getSampleCount(fillTypeIndex) or 0
+    end
+    if count >= 2 then
+        _historySeeded[fillTypeIndex] = true
+        return
+    end
+    local mdm = getMdm()
+    local engine = mdm and mdm.marketEngine
+    if engine == nil or type(engine.getPriceHistory) ~= "function" then
+        return
+    end
+    local history = engine:getPriceHistory(fillTypeIndex)
+    if history ~= nil and #history >= 2 then
+        -- One-time only; never invent samples (George G3).
+        if graph.seedFromHistory(fillTypeIndex, history) then
+            _historySeeded[fillTypeIndex] = true
+        end
+    end
+end
+
 local function paintGraphHints(container)
     local titleEl = findDescendant(container, "mdGraphTitle")
     local emptyEl = findDescendant(container, "mdGraphEmptyHint")
     setText(titleEl, tr("md_rf_pda_graph_title", "Price trend"))
 
     local count = 0
-    if _selectedFillType ~= nil and MDMMarketScreenGraph ~= nil
-            and type(MDMMarketScreenGraph.getSampleCount) == "function" then
-        count = MDMMarketScreenGraph.getSampleCount(_selectedFillType) or 0
+    if _selectedFillType ~= nil then
+        ensureGraphHistorySeed(_selectedFillType)
+        local graph = mdGraphClass()
+        if graph ~= nil and type(graph.getSampleCount) == "function" then
+            count = graph.getSampleCount(_selectedFillType) or 0
+        end
+        -- Brief: samples OR MarketEngine history length >= 2 hides the empty hint.
+        if count < 2 then
+            local mdm = getMdm()
+            local engine = mdm and mdm.marketEngine
+            if engine ~= nil and type(engine.getPriceHistory) == "function" then
+                local history = engine:getPriceHistory(_selectedFillType)
+                if type(history) == "table" then
+                    count = math.max(count, #history)
+                end
+            end
+        end
     end
-    -- Honest empty graph this build (George 2026-08-06): never silent dead lake.
+    -- Graph draws under the table (BUILD 10:10). Honest empties only: pick crop /
+    -- not enough history. Never deny with "open full Market for the chart".
     if _selectedFillType == nil then
         setVis(emptyEl, true)
-        setText(emptyEl, tr("md_rf_pda_select_crop", "Pick a crop. Graph stays empty here - open full Market for the chart."))
+        setText(emptyEl, tr("md_rf_pda_esc_graph_pick",
+            "Pick a crop in the table to see its price trend."))
     elseif count < 2 then
         setVis(emptyEl, true)
-        setText(emptyEl, tr("md_rf_pda_building_history", "Building price history... Stats update on the right."))
+        setText(emptyEl, tr("md_rf_pda_esc_graph_thin",
+            "Not enough price history yet - the trend line appears as prices build across in-game days."))
     else
-        setVis(emptyEl, true)
-        setText(emptyEl, tr("md_rf_pda_graph_empty_honest", "No chart drawn on this pause page. Open full Market for the price path."))
+        -- Hide the hint and let MDMMarketScreenGraph.draw own the area.
+        setVis(emptyEl, false)
+        setText(emptyEl, "")
     end
 end
 
@@ -774,6 +877,50 @@ function MdRfPdaGuest.onShow(container, lightOnly)
     end
 end
 
+--- BUILD 22:27: the 2s price refresh, and nothing else.
+---
+--- The host used to call onShow(container, true) on this timer. That path runs three
+--- updateAbsolutePosition calls (mdTableRegion, mdPageBand, mdGraphArea), re-seeds the
+--- subnav, re-runs the page visibility sync, rebuilds the commodity table and re-asserts
+--- the selection - twice a second. Re-laying out the table that often is what kept
+--- nudging the scroll position, and none of it is needed to make digits current.
+---
+--- So this does the minimum: fresh rows into the data source, repaint the cells that are
+--- actually on screen, then the detail and graph hint text. No UAP, no visibility sync,
+--- no subnav seed, no reloadData, and no selection write of any kind - the player owns
+--- the highlight between full shows.
+function MdRfPdaGuest.onLightTick(container)
+    local page = getHostPage()
+    if page == nil then
+        return
+    end
+    if currentPageIndex() == PAGE_PRICES then
+        local rows = MdRfPdaGuest.buildCommodities()
+        page.mdCommodityData = rows or {}
+        -- Signature kept current so the next FULL show does not see a phantom change
+        -- and reload a table that is already correct.
+        _commoditySig = commoditiesSignature(rows)
+        local list = page.mdCommodityList
+        if list ~= nil and type(page._populateMdCommodityRow) == "function" then
+            local elements = list.elements
+            if type(elements) == "table" then
+                for _, cell in pairs(elements) do
+                    local idx = cell and cell.rowDataIndex
+                    if type(idx) == "number" and idx >= 1 then
+                        pcall(function() page:_populateMdCommodityRow(idx, cell) end)
+                    end
+                end
+            end
+        end
+        paintDetail(container)
+        paintGraphHints(container)
+    elseif currentPageIndex() == PAGE_EVENTS then
+        paintEventsBand(container)
+    else
+        paintContractsBand(container)
+    end
+end
+
 function MdRfPdaGuest.onHide()
     _commoditySig = nil
     _lastEventsSig = nil
@@ -952,7 +1099,29 @@ function MdRfPdaGuest.standDownLegacyEsc()
     return false
 end
 
+--- BUILD 12:59: re-publish on every register attempt, not only at mission onLoad.
+--- onLoad publishes once; if the door bootstraps later, or a reload re-creates these
+--- tables, the published handle can go stale while registration succeeds. Cheap, and it
+--- keeps the mission handle true whenever the guest is actually live. getfenv is braced
+--- by the mission publish rather than trusted on its own.
+local function mdPublishHandles()
+    local okEnv, root = pcall(getfenv, 0)
+    if okEnv and type(root) == "table" then
+        root["MdRfPdaGuest"] = MdRfPdaGuest
+        if MDMMarketScreenGraph ~= nil then
+            root["MDMMarketScreenGraph"] = MDMMarketScreenGraph
+        end
+    end
+    if g_currentMission ~= nil then
+        g_currentMission.MdRfPdaGuest = MdRfPdaGuest
+        if MDMMarketScreenGraph ~= nil then
+            g_currentMission.MDMMarketScreenGraph = MDMMarketScreenGraph
+        end
+    end
+end
+
 function MdRfPdaGuest.tryRegister()
+    mdPublishHandles()
     if RfEscBootstrap ~= nil then
         if MOD_DIR == nil then
             print("[MDM] MdRfPdaGuest: WARNING MOD_DIR nil - cannot ensureDoor")
@@ -991,6 +1160,12 @@ function MdRfPdaGuest.tryRegister()
                 return getMdm() ~= nil
             end,
             onShow = MdRfPdaGuest.onShow,
+            -- BUILD 23:51: registered so the host can take the quiet 2s path. Adding the
+            -- function to this table is only half the job - registerModule whitelists.
+            onLightTick = MdRfPdaGuest.onLightTick,
+            -- BUILD 12:59: registered so a foreign door can drive selection without
+            -- resolving this table at all.
+            selectCommodityIndex = MdRfPdaGuest.selectCommodityIndex,
             onHide = MdRfPdaGuest.onHide,
             onMoverChanged = MdRfPdaGuest.onMoverChanged,
             onOpenFullMarket = MdRfPdaGuest.onOpenFullMarket,

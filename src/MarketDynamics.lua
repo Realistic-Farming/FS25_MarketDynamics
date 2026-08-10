@@ -201,6 +201,18 @@ function MarketDynamics:update(dt)
     end
 
     self.marketEngine:update(dt)              -- intraday and daily price ticks
+
+    -- BUILD 22:27b: warm the price-trend ring here rather than only inside a GUI.
+    -- MDMMarketScreenGraph.update samples one point per 20s, and draw needs 2, but it
+    -- was called ONLY from MarketScreen:update and the Esc Prices page - both of which
+    -- run only while that screen is open. So the trend could not plot until the player
+    -- had stared at the page for 40 continuous seconds, which is exactly the "PRICE
+    -- TREND still empty" report. Sampling beside the engine tick that moves the prices
+    -- means the ring is already warm when a screen opens. Same 20s interval, same real
+    -- prices from engine.prices - no invented samples, no extra sampling rate.
+    if MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.update) == "function" then
+        pcall(MDMMarketScreenGraph.update, dt)
+    end
     self.worldEvents:update(dt)               -- event expiry and probability rolls
     self.rweIntegration:update(dt)            -- sync RWE world events + CS stress → price modifiers
     self.futuresMarket:checkExpiry()          -- settle contracts past delivery date

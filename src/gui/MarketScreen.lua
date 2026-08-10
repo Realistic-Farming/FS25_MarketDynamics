@@ -474,44 +474,12 @@ function MDMMarketScreen:draw()
         local crop = self.commodities[self.selectedCropIndex]
         local fillIdx = crop and crop.idx or nil
 
-        local sampleCount = 0
-        if fillIdx then
-            sampleCount = MDMMarketScreenGraph.getSampleCount(fillIdx)
-        end
-        if sampleCount < 2 then
-            sampleCount = MDMMarketScreenGraph.getGlobalSampleCount()
-        end
-
-        if sampleCount >= 2 then
-            if self.graphHint then
-                self.graphHint:setVisible(false)
-            end
-
-            if fillIdx and MDMMarketScreenGraph.getSampleCount(fillIdx) >= 2 then
-                MDMMarketScreenGraph.draw(fillIdx, pos[1], pos[2], sz[1], sz[2])
-            else
-                MDMMarketScreenGraph.drawAggregatedMedian(pos[1], pos[2], sz[1], sz[2])
-            end
-        elseif fillIdx and g_MarketDynamics and g_MarketDynamics.marketEngine then
-            local history = g_MarketDynamics.marketEngine:getPriceHistory(fillIdx)
-            if history and #history >= 2 then
-                if self.graphHint then
-                    self.graphHint:setVisible(false)
-                end
-                local series = {}
-                for _, h in ipairs(history) do
-                    series[#series + 1] = h.price
-                end
-                MDMMarketScreenGraph._drawLineChart(series, pos[1], pos[2], sz[1], sz[2])
-            else
-                if self.graphHint then
-                    self.graphHint:setVisible(true)
-                end
-            end
-        else
-            if self.graphHint then
-                self.graphHint:setVisible(true)
-            end
+        -- BUILD 23:43: this tree moved into MDMMarketScreenGraph.drawPriceTrend so the
+        -- Esc Prices page draws the identical decision instead of a thinner copy of it.
+        -- Behaviour here is unchanged; the hint now follows the branch the helper reports.
+        local branch = MDMMarketScreenGraph.drawPriceTrend(fillIdx, pos[1], pos[2], sz[1], sz[2])
+        if self.graphHint then
+            self.graphHint:setVisible(branch == "thin")
         end
     end
 end

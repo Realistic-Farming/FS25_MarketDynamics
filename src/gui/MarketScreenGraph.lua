@@ -68,6 +68,44 @@ function MDMMarketScreenGraph.getSampleCount(fillTypeIndex)
     return buf.count
 end
 
+--- One-time seed of the ring buffer from MarketEngine daily history.
+--- Only when the ring has fewer than 2 samples and history has at least 2 real prices.
+--- Does not invent samples. Safe to call repeatedly (no-op once seeded / ring warm).
+function MDMMarketScreenGraph.seedFromHistory(fillTypeIndex, history)
+    if fillTypeIndex == nil or history == nil or #history < 2 then
+        return false
+    end
+    local buf = _buffers[fillTypeIndex]
+    if buf ~= nil and (buf.count or 0) >= 2 then
+        return false
+    end
+    local prices = {}
+    for _, h in ipairs(history) do
+        local p = h and h.price
+        if type(p) == "number" then
+            prices[#prices + 1] = p
+        end
+    end
+    if #prices < 2 then
+        return false
+    end
+    -- Take the most recent MAX_SAMPLES real prices only.
+    local start = math.max(1, #prices - MAX_SAMPLES + 1)
+    buf = { samples = {}, head = 0, count = 0 }
+    for i = start, #prices do
+        buf.head = buf.head + 1
+        if buf.head > MAX_SAMPLES then
+            buf.head = 1
+        end
+        buf.samples[buf.head] = prices[i]
+        if buf.count < MAX_SAMPLES then
+            buf.count = buf.count + 1
+        end
+    end
+    _buffers[fillTypeIndex] = buf
+    return buf.count >= 2
+end
+
 function MDMMarketScreenGraph.getGlobalSampleCount()
     local maxCount = 0
     for _, buf in pairs(_buffers) do
@@ -110,6 +148,60 @@ function MDMMarketScreenGraph.draw(fillTypeIndex, gx, gy, gw, gh)
     if #ordered < 2 then return end
 
     MDMMarketScreenGraph._drawLineChart(ordered, gx, gy, gw, gh)
+end
+
+--- BUILD 23:43: the ONE price-trend decision tree, shared by the full Market screen and
+--- the Esc Prices page. It was duplicated, and the two copies disagreed: the Esc copy had
+--- no getGlobalSampleCount step and no aggregated-median branch, so whenever the selected
+--- crop was thin but other crops were warm, Market drew the median and Esc drew nothing.
+--- Same data, two answers. Neither caller keeps a private copy any more.
+---
+--- Returns the branch actually taken, so callers drive their own hint element without
+--- re-deciding: "ring" / "median" / "history" all painted something, "thin" did not.
+function MDMMarketScreenGraph.drawPriceTrend(fillTypeIndex, gx, gy, gw, gh)
+    if gx == nil or gy == nil or gw == nil or gh == nil or gw <= 0 or gh <= 0 then
+        return "thin"
+    end
+
+    local sampleCount = 0
+    if fillTypeIndex ~= nil then
+        sampleCount = MDMMarketScreenGraph.getSampleCount(fillTypeIndex) or 0
+    end
+    if sampleCount < 2 then
+        sampleCount = MDMMarketScreenGraph.getGlobalSampleCount() or 0
+    end
+
+    if sampleCount >= 2 then
+        if fillTypeIndex ~= nil and (MDMMarketScreenGraph.getSampleCount(fillTypeIndex) or 0) >= 2 then
+            MDMMarketScreenGraph.draw(fillTypeIndex, gx, gy, gw, gh)
+            return "ring"
+        end
+        MDMMarketScreenGraph.drawAggregatedMedian(gx, gy, gw, gh)
+        return "median"
+    end
+
+    -- Ring too thin everywhere: fall back to the engine's own daily history for this crop.
+    if fillTypeIndex ~= nil then
+        local mdm = (g_currentMission ~= nil and g_currentMission.MarketDynamics) or g_MarketDynamics
+        local engine = mdm ~= nil and mdm.marketEngine or nil
+        if engine ~= nil and type(engine.getPriceHistory) == "function" then
+            local history = engine:getPriceHistory(fillTypeIndex)
+            if type(history) == "table" and #history >= 2 then
+                local series = {}
+                for _, h in ipairs(history) do
+                    if h ~= nil and type(h.price) == "number" then
+                        series[#series + 1] = h.price
+                    end
+                end
+                if #series >= 2 then
+                    MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
+                    return "history"
+                end
+            end
+        end
+    end
+
+    return "thin"
 end
 
 -- ---------------------------------------------------------------------------
