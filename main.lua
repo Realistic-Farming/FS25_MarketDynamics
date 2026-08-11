@@ -38,6 +38,28 @@ local function onLoad(mission)
     if g_currentMission then
         g_currentMission.MarketDynamics = mdm
     end
+    -- BUILD 11:43: publish the graph class the same way the instance is published above.
+    -- The Esc door is hosted by whichever suite mod bootstrapped first, and from that
+    -- environment a bare MDMMarketScreenGraph is nil. It was reachable only by guessing
+    -- our g_modEnvironments key, which is exactly what failed on the Dairy door
+    -- (GATE log: graph=false). Putting it in the real global table and on the mission
+    -- makes it findable without anyone knowing our mod name.
+    if MDMMarketScreenGraph ~= nil then
+        getfenv(0)["MDMMarketScreenGraph"] = MDMMarketScreenGraph
+        if g_currentMission then
+            g_currentMission.MDMMarketScreenGraph = MDMMarketScreenGraph
+        end
+    end
+    -- BUILD 12:32: the guest needs the same treatment. It sits in exactly the position
+    -- the graph class was in before 11:43 - reachable from a foreign door only through
+    -- belts that evidently do not reach - so the host resolved nil, selectCommodityIndex
+    -- never fired, and picking a row moved the highlight without moving the trend.
+    if MdRfPdaGuest ~= nil then
+        getfenv(0)["MdRfPdaGuest"] = MdRfPdaGuest
+        if g_currentMission then
+            g_currentMission.MdRfPdaGuest = MdRfPdaGuest
+        end
+    end
 end
 
 local function onLoadFinished(mission)
@@ -81,8 +103,12 @@ local function onDelete(mission)
         mdm:delete()
         mdm = nil
         getfenv(0)["g_MarketDynamics"] = nil
+        getfenv(0)["MDMMarketScreenGraph"] = nil
+        getfenv(0)["MdRfPdaGuest"] = nil
         if g_currentMission then
             g_currentMission.MarketDynamics = nil
+            g_currentMission.MDMMarketScreenGraph = nil
+            g_currentMission.MdRfPdaGuest = nil
         end
     end
 end
