@@ -197,7 +197,7 @@
         <text name="input_MDM_SETTINGS_PANEL" text="Paramètres de Market Dynamics"/>
 		<text name="md_rf_pda_module_title" text="[EN] Market Dynamics"/>
 		<text name="md_rf_pda_blurb" text="[EN] Pause Market glance: Prices, Events, Contracts. Top table stays; bottom swaps. Open full Market for the deep desk."/>
-		<text name="rf_pda_side_info_market_dynamics" text="[EN] Market Dynamics&#10;&#10;Pause Market glance with three pages: Prices, Events, Contracts.&#10;&#10;Top table = crop icons, prices, and swings. Icons help you spot the crop fast. On Prices, pick a crop to drive the graph. Graph under the table = price path for the crop you pick. A new crop's line appears once it has price history.&#10;&#10;Events page = what is hitting the market now, how strong, and how long left.&#10;&#10;Contracts page = your open deals (read-only). Manage them in full Market.&#10;&#10;Open full Market (SPACE) for the deep desk."/>
+		<text name="rf_pda_side_info_market_dynamics" text="[EN] Market Dynamics&#10;&#10;Pause Market glance with three pages: Prices, Events, Contracts.&#10;&#10;Top table = crops, prices, and swings. On Prices, pick a crop to drive the graph.&#10;&#10;Events page = what is hitting the market now, how strong, and how long left.&#10;&#10;Contracts page = your open deals (read-only). Manage them in full Market.&#10;&#10;Open full Market (SPACE) for the deep desk."/>
 		<text name="md_rf_pda_page_prices" text="[EN] Prices"/>
 		<text name="md_rf_pda_page_events" text="[EN] Events"/>
 		<text name="md_rf_pda_page_contracts" text="[EN] Contracts"/>
@@ -220,11 +220,9 @@
 		<text name="md_rf_pda_remaining_unknown" text="[EN] time unknown"/>
 		<text name="md_rf_pda_detail_title" text="[EN] Market Detail"/>
 		<text name="md_rf_pda_select_mover" text="[EN] Pick a mover to see price detail."/>
-		<text name="md_rf_pda_select_crop" text="[EN] Pick a crop in the table to see its price trend."/>
-		<text name="md_rf_pda_building_history" text="[EN] Not enough price history yet - the trend line appears as prices build across in-game days."/>
-        <text name="md_rf_pda_graph_empty_honest" text="[EN] Not enough price history yet - the trend line appears as prices build across in-game days." />
-        <text name="md_rf_pda_esc_graph_thin" text="[EN] Not enough price history yet - the trend line appears as prices build across in-game days." />
-        <text name="md_rf_pda_esc_graph_pick" text="[EN] Pick a crop in the table to see its price trend." />
+		<text name="md_rf_pda_select_crop" text="Pick a crop. Graph stays empty here - open full Market for the chart."/>
+		<text name="md_rf_pda_building_history" text="[EN] Building price history..."/>
+        <text name="md_rf_pda_graph_empty_honest" text="No chart drawn on this pause page. Open full Market for the price path." />
 		<text name="md_rf_pda_pressure_up_sharp" text="[EN] up sharply vs base"/>
 		<text name="md_rf_pda_pressure_up" text="[EN] softly up vs base"/>
 		<text name="md_rf_pda_pressure_near" text="[EN] near base"/>
@@ -320,5 +318,5 @@
         <text name="wc_rf_pda_open_manager" text="Ouvrir le gestionnaire d'ouvriers" />
         <text name="sf_pda_btn_rotation_planner" text="Planificateur de rotation" />
         <text name="sf_pda_btn_field_detail" text="Détail du champ" />
-    </texts>
+</texts>
 </l10n>
