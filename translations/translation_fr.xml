@@ -220,8 +220,9 @@
 		<text name="md_rf_pda_remaining_unknown" text="[EN] time unknown"/>
 		<text name="md_rf_pda_detail_title" text="[EN] Market Detail"/>
 		<text name="md_rf_pda_select_mover" text="[EN] Pick a mover to see price detail."/>
-		<text name="md_rf_pda_select_crop" text="[EN] Pick a crop in the table to see the graph."/>
+		<text name="md_rf_pda_select_crop" text="Pick a crop. Graph stays empty here - open full Market for the chart."/>
 		<text name="md_rf_pda_building_history" text="[EN] Building price history..."/>
+        <text name="md_rf_pda_graph_empty_honest" text="No chart drawn on this pause page. Open full Market for the price path." />
 		<text name="md_rf_pda_pressure_up_sharp" text="[EN] up sharply vs base"/>
 		<text name="md_rf_pda_pressure_up" text="[EN] softly up vs base"/>
 		<text name="md_rf_pda_pressure_near" text="[EN] near base"/>
@@ -281,8 +282,6 @@
         <text name="mdm_desc_event_freq"         text="Échelonner la probabilité d'apparition de nouveaux événements mondiaux." />
         <text name="mdm_set_event_notify"        text="Notifications d'événements" />
         <text name="mdm_desc_event_notify"       text="Afficher une boîte de dialogue à l'écran lorsqu'un nouvel événement mondial commence." />
-        <text name="mdm_set_experimental" text="[EN] Experimental Systems" />
-        <text name="mdm_desc_experimental" text="[EN] Turn on systems that are still being tested. Off ships only the proven baseline." />
         <text name="mdm_set_event_banner"        text="Bannière d'événement compacte" />
         <text name="mdm_desc_event_banner"       text="Afficher les événements mondiaux sous forme de petite bannière plutôt que d'une boîte de dialogue contextuelle." />
         <text name="mdm_set_contract_hud"        text="HUD des contrats" />
@@ -315,13 +314,5 @@
 		<text name="mdm_label_close" text="[EN] Close"/>
 		<text name="mdm_label_delete" text="[EN] Delete"/>
 		<text name="mdm_label_remove" text="[EN] Remove"/>
-		<text name="mdm_label_add" text="[EN] Add"/>        <text name="rf_pda_col_area" text="[EN] Area" />
-        <text name="rf_pda_col_fert" text="[EN] Fertilizer" />
-        <text name="rf_pda_sample_hint" text="[EN] Soil sample dates appear here when available." />
-        <text name="rf_pda_section_treatment" text="[EN] Treatment" />
-        <text name="rf_pda_treat_products" text="[EN] Products" />
-        <text name="sf_pda_col_field" text="[EN] Field" />
-        <text name="sf_pda_col_status" text="[EN] Status" />
-        <text name="sf_pda_no_fields" text="[EN] No field data recorded yet." />
-    </texts>
+		<text name="mdm_label_add" text="[EN] Add"/></texts>
 </l10n>

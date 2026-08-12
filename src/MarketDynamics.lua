@@ -201,6 +201,18 @@ function MarketDynamics:update(dt)
     end
 
     self.marketEngine:update(dt)              -- intraday and daily price ticks
+
+    -- BUILD 22:27b: warm the price-trend ring here rather than only inside a GUI.
+    -- MDMMarketScreenGraph.update samples one point per 20s, and draw needs 2, but it
+    -- was called ONLY from MarketScreen:update and the Esc Prices page - both of which
+    -- run only while that screen is open. So the trend could not plot until the player
+    -- had stared at the page for 40 continuous seconds, which is exactly the "PRICE
+    -- TREND still empty" report. Sampling beside the engine tick that moves the prices
+    -- means the ring is already warm when a screen opens. Same 20s interval, same real
+    -- prices from engine.prices - no invented samples, no extra sampling rate.
+    if MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.update) == "function" then
+        pcall(MDMMarketScreenGraph.update, dt)
+    end
     self.worldEvents:update(dt)               -- event expiry and probability rolls
     self.rweIntegration:update(dt)            -- sync RWE world events + CS stress → price modifiers
     self.futuresMarket:checkExpiry()          -- settle contracts past delivery date
@@ -218,6 +230,10 @@ end
 function MarketDynamics:draw()
     if not self.isActive then return end
     if MDMMasterHUDBridge and MDMMasterHUDBridge.active then return end
+    if MDMMasterHUDBridge then
+        MDMMasterHUDBridge.drawStack()
+        return
+    end
     if g_MDMHud then
         g_MDMHud:draw()
     end
@@ -325,7 +341,8 @@ function MarketDynamics:showEventNotification(eventListString)
         return 
     end
 
-    local title = g_i18n:getText("mdm_screen_title") or "Market Dynamics"
+    -- getText returns truthy "Missing '…'" when l10n failed to load; never paint that.
+    local title = (MDMUtil and MDMUtil.getModText("mdm_screen_title")) or "Market Dynamics"
 
     if self.settings.eventNotificationBanner then
         -- Discreet, non-modal banner: a quiet in-game notification in the corner
@@ -341,9 +358,9 @@ function MarketDynamics:showEventNotification(eventListString)
         end
     else
         -- Full pop-up dialog (default): asks whether to open the Market Screen.
-        local text = string.format(g_i18n:getText("mdm_msg_event_started")
-            or "A new world event has started: %s\n\nWould you like to open the Market Screen to see the impact?",
-            eventListString)
+        local fmt = (MDMUtil and MDMUtil.getModText("mdm_msg_event_started"))
+            or "A new world event has started: %s\n\nWould you like to open the Market Screen to see the impact?"
+        local text = string.format(fmt, eventListString)
 
         MDMLog.info("MarketDynamics: calling YesNoDialog.show")
         YesNoDialog.show(function(yes)

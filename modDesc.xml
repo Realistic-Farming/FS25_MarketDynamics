@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="106">
     <author>TisonK &amp; LeGrizzly</author>
-    <version>1.3.0.0</version>
+    <version>1.3.0.48</version>
     <title>
         <en>Market Dynamics</en>
     </title>
     <description>
-        <en>Real-world inspired dynamic crop pricing. Prices fluctuate daily and intraday based on global events, weather, and supply/demand. Includes a futures contract system — lock in prices months in advance and hedge your harvest like a real farmer.</en>
+        <en>Real-world inspired dynamic crop pricing. Prices fluctuate daily and intraday based on global events, weather, and supply/demand. Includes a futures contract system â€” lock in prices months in advance and hedge your harvest like a real farmer.</en>
     </description>
 
     <iconFilename>images/icon.dds</iconFilename>

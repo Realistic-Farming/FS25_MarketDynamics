@@ -30,6 +30,9 @@ MDMMasterHUDBridge.active = false   -- MasterHUD present and we registered
 -- Resolves the coordinator from the canonical global so it can be driven either by
 -- MasterHUD or by MDM's own draw hook.
 function MDMMasterHUDBridge.drawStack()
+    -- Suite hide: MasterHUD # key. No-op when MasterHUD absent.
+    local mh = (g_currentMission ~= nil and g_currentMission.masterHUD) or g_masterHUD
+    if mh ~= nil and mh.areHudsHidden ~= nil and mh:areHudsHidden() then return end
     local mdm = g_MarketDynamics
     if mdm == nil or not mdm.isActive then return end
     if g_MDMHud then
