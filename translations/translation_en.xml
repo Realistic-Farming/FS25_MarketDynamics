@@ -353,5 +353,9 @@
         <text name="md_rf_pda_ct_col_price" text="Locked price" />
         <text name="md_rf_pda_ct_col_status" text="Status" />
         <text name="md_rf_pda_open_market" text="Open full Market" />
-    </texts>
+            <!-- BUILD 11:27 F155 Esc RF button labels -->
+        <text name="wc_rf_pda_open_manager" text="Open Worker Manager" />
+        <text name="sf_pda_btn_rotation_planner" text="Rotation Planner" />
+        <text name="sf_pda_btn_field_detail" text="Field Detail" />
+</texts>
 </l10n>
