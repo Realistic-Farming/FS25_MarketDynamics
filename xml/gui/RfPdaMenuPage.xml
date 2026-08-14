@@ -209,18 +209,30 @@
 
                         <!-- Card 2 of 3 (BUILD 12:59): Selected + Next now live INSIDE the
                              PRODUCTS card, so the card owns the whole middle column. -->
-                        <GuiElement profile="RF_EscCardFrame" id="treatProductsShell" position="220px -22px">
-                            <Text profile="RF_TreatSelected" id="treatSelectedLabel" position="10px -6px" size="540px 20px"
-                              textAlignment="left"/>
-                            <Text profile="RF_TreatNext" id="treatNextLabel" position="10px -26px" size="540px 36px"
-                              textAlignment="left" textMaxNumLines="2" textVerticalAlignment="top"/>
+                        <!-- GO 21:06 (BUILD 21:01): PRODUCTS was inheriting 560 from
+                             RF_EscCardFrame, so its right edge sat at 220 + 560 = 780 against
+                             ROTATION at 850: a dark 70px canyon down the middle of a three-card
+                             family. The inline 620 lands the right edge on 840, leaving 10px of
+                             air, and TREATMENT already ends at 210 against PRODUCTS at 220, so
+                             both gutters read as the same gap. Family rhythm, not a kiss.
+                             Bodies follow 540 -> 600 in step so the 10px left inset is kept and
+                             nothing is re-centred; RATE and TOTAL keep their left-anchored
+                             recipe and simply gain trailing air.
+                             This edit is in ALL NINE door copies on purpose. The Esc page is
+                             built by whichever mod loads first, from its own copy, so a change
+                             in Soil alone would be overwritten by whoever won the race. -->
+                        <GuiElement profile="RF_EscCardFrame" id="treatProductsShell" position="220px -22px" size="620px 248px">
+                            <Text profile="RF_TreatSelected" id="treatSelectedLabel" position="10px -6px" size="600px 20px"
+                                  textAlignment="left"/>
+                            <Text profile="RF_TreatNext" id="treatNextLabel" position="10px -26px" size="600px 36px"
+                                  textAlignment="left" textMaxNumLines="2" textVerticalAlignment="top"/>
                             <!-- Zone split (BUILD 16:19): Selected + Next stay on top, then ~16px of
                                  air with one 1px hairline centred in it, then the PRODUCTS table.
                                  One outer outline only; the rule is a Bitmap, not a second frame.
                                  Bodies inset X 0 -> 10 and widths 560 -> 540 so nothing kisses the
                                  white stroke on either side. -->
-                            <Bitmap profile="RF_EscCardRule" id="treatProductsRule" position="10px -70px" size="540px 1px"/>
-                            <Text profile="RF_ProductsTitle" id="soilTreatProducts" position="10px -80px" size="540px 18px"
+                            <Bitmap profile="RF_EscCardRule" id="treatProductsRule" position="10px -70px" size="600px 1px"/>
+                            <Text profile="RF_ProductsTitle" id="soilTreatProducts" position="10px -80px" size="600px 18px"
                                   text="$l10n_rf_pda_treat_products"/>
                             <Text profile="RF_ProductColHeaderDense" position="10px -100px" size="40px 16px" text="NUT"/>
                             <Text profile="RF_ProductColHeaderDense" position="54px -100px" size="270px 16px" text="PRODUCT"/>
@@ -228,54 +240,54 @@
                                   textAlignment="right" text="RATE"/>
                             <Text profile="RF_ProductColHeaderDense" position="440px -100px" size="110px 16px"
                                   textAlignment="right" text="TOTAL"/>
-                            <Text profile="RF_ProductOk" id="treatPlanLines" position="10px -120px" size="540px 22px"
+                            <Text profile="RF_ProductOk" id="treatPlanLines" position="10px -120px" size="600px 22px"
                                   visible="false"/>
                             <!-- Clip sized to exactly the eight densified rows (8 x 15 = 120), so the
                                  card bottom keeps 8px of air instead of cutting row 8 mid-glyph. -->
-                            <GuiElement profile="RF_ProductsRowsClip" id="treatProdRowsClip" position="10px -120px" size="540px 120px">
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow1" position="0px 0px" size="540px 15px" visible="false">
+                            <GuiElement profile="RF_ProductsRowsClip" id="treatProdRowsClip" position="10px -120px" size="600px 120px">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow1" position="0px 0px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd1Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd1Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd1Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd1Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow2" position="0px -15px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow2" position="0px -15px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd2Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd2Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd2Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd2Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow3" position="0px -30px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow3" position="0px -30px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd3Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd3Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd3Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd3Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow4" position="0px -45px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow4" position="0px -45px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd4Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd4Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd4Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd4Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow5" position="0px -60px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow5" position="0px -60px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd5Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd5Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd5Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd5Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow6" position="0px -75px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow6" position="0px -75px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd6Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd6Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd6Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd6Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow7" position="0px -90px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow7" position="0px -90px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd7Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd7Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd7Rate" position="320px 0px" size="100px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd7Total" position="430px 0px" size="110px 15px"/>
                                 </GuiElement>
-                                <GuiElement profile="RF_ProductRow" id="treatProdRow8" position="0px -105px" size="540px 15px" visible="false">
+                                <GuiElement profile="RF_ProductRow" id="treatProdRow8" position="0px -105px" size="600px 15px" visible="false">
                                     <Text profile="RF_ProductCellDense" id="treatProd8Nut" position="0px 0px" size="40px 15px"/>
                                     <Text profile="RF_ProductCellDense" id="treatProd8Name" position="44px 0px" size="270px 15px"/>
                                     <Text profile="RF_ProductCellDenseRight" id="treatProd8Rate" position="320px 0px" size="100px 15px"/>
@@ -371,22 +383,22 @@
                             <GuiElement profile="RF_EscCardFrameWide" id="wcWagesCardA" position="0px 0px" size="1140px 326px" handleFocus="false">
                                 <Text profile="RF_TreatTargetLine" id="wcWageLblEnabled" position="10px -10px" size="200px 22px" text=""/>
                                 <MultiTextOption profile="RF_WcWageOption" id="wcOptEnabled" position="230px -18px"
-                                             disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
+                                                 disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
                                 <Text profile="RF_TreatTargetLine" id="wcWageLblMode" position="10px -62px" size="200px 22px" text=""/>
                                 <MultiTextOption profile="RF_WcWageOption" id="wcOptCostMode" position="230px -70px"
-                                             disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
+                                                 disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
                                 <Text profile="RF_TreatTargetLine" id="wcWageLblLevel" position="10px -114px" size="200px 22px" text=""/>
                                 <MultiTextOption profile="RF_WcWageOption" id="wcOptWageLevel" position="230px -122px"
-                                             disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
+                                                 disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
                                 <Text profile="RF_TreatTargetLine" id="wcWageLblNotify" position="10px -166px" size="200px 22px" text=""/>
                                 <MultiTextOption profile="RF_WcWageOption" id="wcOptNotifications" position="230px -174px"
-                                             disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
+                                                 disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
                                 <Text profile="RF_TreatTargetLine" id="wcWageLblDebug" position="10px -218px" size="200px 22px" text=""/>
                                 <MultiTextOption profile="RF_WcWageOption" id="wcOptDebugMode" position="230px -226px"
-                                             disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
+                                                 disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
                                 <Text profile="RF_TreatTargetLine" id="wcWageLblSalary" position="10px -270px" size="200px 22px" text=""/>
                                 <MultiTextOption profile="RF_WcWageOption" id="wcOptMonthlySalary" position="230px -278px"
-                                             disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
+                                                 disableButtonsOnSingleText="false" onClick="onClickWcWageOption"/>
                             </GuiElement>
                             <GuiElement profile="RF_EscCardFrameWide" id="wcWagesCardB" position="0px -342px" size="1140px 238px" handleFocus="false">
                                 <Text profile="RF_SectionTitle" id="wcWageBigRate" position="10px -6px" size="1120px 36px" text=""/>
@@ -395,7 +407,7 @@
                                 <Text profile="RF_HintText" id="wcWageHelpBody" position="10px -86px" size="1120px 100px"
                                       textMaxNumLines="4" textVerticalAlignment="top" text=""/>
                                 <Button profile="buttonActivate" id="wcBtnWageReset" position="10px -194px" size="200px 36px"
-                                    text="Reset" onClick="onClickWcWageReset"/>
+                                        text="Reset" onClick="onClickWcWageReset"/>
                             </GuiElement>
                         </GuiElement>
 
@@ -615,7 +627,7 @@
                         <GuiElement profile="RF_EscCardFrame" id="csFieldDetailCard" position="10px -16px" size="600px 236px">
                             <Text profile="RF_SectionTitle" id="csDetailTitle" position="10px -6px" size="580px 18px" text=""/>
                             <Text profile="RF_TreatSelected" id="csDetailField" position="10px -28px" size="580px 18px"
-                              textAlignment="left" text=""/>
+                                  textAlignment="left" text=""/>
                             <Text profile="RF_TreatTargetLine" id="csDetailMoisture" position="10px -50px" size="580px 36px"
                                   textMaxNumLines="2" text=""/>
                             <Text profile="RF_TreatTargetLine" id="csDetailStress" position="10px -92px" size="580px 18px" text=""/>
@@ -624,7 +636,7 @@
                             <Text profile="RF_HintText" id="csDetailEmpty" position="10px -28px" size="580px 44px"
                                   textMaxNumLines="2" visible="false" text=""/>
                             <Text profile="RF_HintText" id="csDetailNoCoverage" position="10px -160px" size="580px 36px"
-                              textMaxNumLines="2" visible="false" text=""/>
+                                  textMaxNumLines="2" visible="false" text=""/>
                         </GuiElement>
 
                         <!-- Agronomist (blue): top-right beside Field Detail; always visible with Pivot on CS. -->
@@ -759,15 +771,15 @@
                             <Text profile="RF_SectionTitle" id="mdGraphTitle" position="10px -6px" size="700px 22px" text=""/>
                             <GuiElement profile="RF_MdGraphArea" id="mdGraphArea" position="30px -28px"/>
             <Text profile="RF_EmptyHint" id="mdGraphEmptyHint" position="30px -86px" size="720px 40px"
-                                  visible="false" text=""/>
+                  visible="false" text=""/>
             <Text profile="RF_TreatSelected" id="mdDetailCommodity" position="770px -32px" size="350px 22px"
-                                  textAlignment="left" text=""/>
+                  textAlignment="left" text=""/>
             <Text profile="RF_TreatTargetLine" id="mdDetailPrice" position="770px -64px" size="350px 20px" text=""/>
             <Text profile="RF_TreatTargetLine" id="mdDetailPressure" position="770px -92px" size="350px 20px" text=""/>
             <Text profile="RF_HintText" id="mdDetailEmpty" position="770px -64px" size="350px 44px"
-                                  textMaxNumLines="2" visible="false" text=""/>
+                  textMaxNumLines="2" visible="false" text=""/>
             <Button profile="buttonActivate" id="mdOpenMarketBtn" position="770px -280px" size="350px 36px"
-                                    onClick="onClickMdOpenMarket"/>
+                    onClick="onClickMdOpenMarket"/>
                         </GuiElement>
 
                         <!-- Page B — Events (fixed Text rows; no SmoothList thrash). -->
@@ -798,7 +810,7 @@
                             <Text profile="RF_HintText" id="mdEventsEmpty" position="10px -64px" size="1100px 44px"
                                   textMaxNumLines="2" visible="false" text=""/>
             <Button profile="buttonActivate" id="mdOpenMarketBtnEvents" position="770px -280px" size="350px 36px"
-                                    onClick="onClickMdOpenMarket"/>
+                    onClick="onClickMdOpenMarket"/>
                         </GuiElement>
 
                         <!-- Page C — Contracts (read-only fixed rows). -->
@@ -832,7 +844,7 @@
                             <Text profile="RF_HintText" id="mdContractsEmpty" position="10px -64px" size="1100px 44px"
                                   textMaxNumLines="2" visible="false" text=""/>
             <Button profile="buttonActivate" id="mdOpenMarketBtnContracts" position="770px -280px" size="350px 36px"
-                                    onClick="onClickMdOpenMarket"/>
+                    onClick="onClickMdOpenMarket"/>
                         </GuiElement>
                     </GuiElement>
 
