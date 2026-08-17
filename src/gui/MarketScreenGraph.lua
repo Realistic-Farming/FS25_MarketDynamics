@@ -36,6 +36,12 @@ end
 function MDMMarketScreenGraph.update(dt)
     if not g_MarketDynamics or not g_MarketDynamics.isActive then return end
 
+    -- BUILD 19:47: nothing is seeded or logged until the player has entered. The 19:20:43
+    -- flood happened during load, so a _loadPhase flag was not enough on its own; the guard
+    -- belongs inside this function, ahead of the sample timer, so no buffer is created and
+    -- no "seeded buffer" line is written while the machine is still compiling.
+    if not (g_currentMission ~= nil and g_currentMission.isMissionStarted == true) then return end
+
     _sampleTimer = _sampleTimer + dt
     if _sampleTimer < SAMPLE_INTERVAL_MS then return end
     _sampleTimer = _sampleTimer - SAMPLE_INTERVAL_MS

@@ -309,5 +309,9 @@
 		<text name="mdm_label_close" text="[EN] Close"/>
 		<text name="mdm_label_delete" text="[EN] Delete"/>
 		<text name="mdm_label_remove" text="[EN] Remove"/>
-		<text name="mdm_label_add" text="[EN] Add"/></texts>
+		<text name="mdm_label_add" text="[EN] Add"/>        <!-- BUILD 11:27 F155 Esc RF button labels -->
+        <text name="wc_rf_pda_open_manager" text="Werkersbeheer openen" />
+        <text name="sf_pda_btn_rotation_planner" text="Rotatieplanner" />
+        <text name="sf_pda_btn_field_detail" text="Veldgegevens" />
+</texts>
 </l10n>
