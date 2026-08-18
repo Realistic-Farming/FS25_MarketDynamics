@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="Відкрити менеджер працівників" />
         <text name="sf_pda_btn_rotation_planner" text="Планувальник сівозміни" />
         <text name="sf_pda_btn_field_detail" text="Деталі поля" />
+        <text name="mdm_evt_tracked_label" text="Відстежувані категорії ринку" />
+        <text name="mdm_cat_crops" text="Культури" />
+        <text name="mdm_cat_silage" text="Силос" />
+        <text name="mdm_cat_livestock" text="Худоба" />
+        <text name="mdm_cat_other" text="Інше" />
+        <text name="mdm_screen_per_head" text="/ голову" />
+        <text name="mdm_screen_per_1000l" text="/ 1 000 л" />
+        <text name="mdm_screen_price_trend" text="Динаміка цін" />
+        <text name="mdm_screen_graph_oldest" text="раніше" />
+        <text name="mdm_screen_graph_newest" text="зараз" />
+        <text name="mdm_screen_graph_span" text="%d замірів" />
+        <text name="mdm_screen_graph_median" text="Усі товари (медіана)" />
 </texts>
 </l10n>

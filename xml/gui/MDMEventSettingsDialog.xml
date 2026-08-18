@@ -66,7 +66,9 @@
       <Text profile="mdmEvtS_colHdr" text="$l10n_mdm_col_status"        position="258px -222px" size="115px 24px"/>
       <Text profile="mdmEvtS_colHdr" text="$l10n_mdm_col_custom_fills"  position="380px -222px" size="75px 24px"/>
       <Text profile="mdmEvtS_colHdr" text=""              position="462px -222px" size="90px 24px"/>
-      <Text profile="mdmEvtS_colHdr" text="$l10n_mdm_col_test"          position="558px -222px" size="135px 24px"/>
+      <!-- BUILD 15:39 (PB-08): dev-only column, hidden unless debugMode is on.
+           _refreshEventRows drives it via evtSColHdrTest. -->
+      <Text profile="mdmEvtS_colHdr" id="evtSColHdrTest" text="$l10n_mdm_col_test" position="558px -222px" size="135px 24px" visible="false"/>
 
       <!-- ── Row 0 ── -->
       <Text   profile="mdmEvtS_evtName" id="evtRowName0"     text="" position="0px -254px"   size="250px 28px" visible="false"/>
@@ -191,7 +193,10 @@
 
       <!-- ═══ FILL TYPE REFERENCE ═══ -->
       <Bitmap profile="mdmEvtS_sep" position="0px -618px" size="700px 2px"/>
-      <Text profile="mdmEvtS_sectionLabel" text="TRACKED FILL TYPES" position="0px -634px" size="300px 20px"/>
+      <!-- BUILD 15:39 (PB-08): the label was a hardcoded English internal-sounding
+           heading over a list of raw engine keys. It is localised now, and the
+           list underneath is plain categories unless debugMode is on. -->
+      <Text profile="mdmEvtS_sectionLabel" id="evtSFillTypeLabel" text="$l10n_mdm_evt_tracked_label" position="0px -634px" size="300px 20px"/>
       <Text profile="mdmEvtS_ftHint" id="evtSFillTypeHint" text="" position="0px -654px" size="700px 38px"/>
 
     </GuiElement>

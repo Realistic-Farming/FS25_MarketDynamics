@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="작업자 관리자 열기" />
         <text name="sf_pda_btn_rotation_planner" text="윤작 계획기" />
         <text name="sf_pda_btn_field_detail" text="밯 상세" />
+        <text name="mdm_evt_tracked_label" text="Tracked market categories" />
+        <text name="mdm_cat_crops" text="Crops" />
+        <text name="mdm_cat_silage" text="Silage" />
+        <text name="mdm_cat_livestock" text="Livestock" />
+        <text name="mdm_cat_other" text="Other" />
+        <text name="mdm_screen_per_head" text="/ head" />
+        <text name="mdm_screen_per_1000l" text="/ 1,000L" />
+        <text name="mdm_screen_price_trend" text="Price trend" />
+        <text name="mdm_screen_graph_oldest" text="oldest" />
+        <text name="mdm_screen_graph_newest" text="now" />
+        <text name="mdm_screen_graph_span" text="%d samples" />
+        <text name="mdm_screen_graph_median" text="All commodities (median)" />
 </texts>
 </l10n>

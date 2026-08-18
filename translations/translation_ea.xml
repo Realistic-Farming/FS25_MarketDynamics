@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="Abrir gestor de trabajadores" />
         <text name="sf_pda_btn_rotation_planner" text="Planificador de rotación" />
         <text name="sf_pda_btn_field_detail" text="Detalle del campo" />
+        <text name="mdm_evt_tracked_label" text="Categorías de mercado seguidas" />
+        <text name="mdm_cat_crops" text="Cultivos" />
+        <text name="mdm_cat_silage" text="Ensilado" />
+        <text name="mdm_cat_livestock" text="Ganado" />
+        <text name="mdm_cat_other" text="Otros" />
+        <text name="mdm_screen_per_head" text="/ cabeza" />
+        <text name="mdm_screen_per_1000l" text="/ 1.000 L" />
+        <text name="mdm_screen_price_trend" text="Tendencia de precios" />
+        <text name="mdm_screen_graph_oldest" text="más antiguo" />
+        <text name="mdm_screen_graph_newest" text="ahora" />
+        <text name="mdm_screen_graph_span" text="%d muestras" />
+        <text name="mdm_screen_graph_median" text="Todas las mercancías (mediana)" />
 </texts>
 </l10n>

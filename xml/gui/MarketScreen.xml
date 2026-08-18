@@ -140,15 +140,21 @@
 
         <!-- tabBar LAST: FS25 processes mouse events in reverse XML order.
              Declared after all content panels so it gets click priority. -->
+        <!-- BUILD 15:39 (PB-04). The hit Buttons used to sit at y=0 while their
+             labels sat at y=28 in the same 30px bar, so the rectangle that
+             answers a click was never underneath the words the player can see.
+             Clicking Events or Contracts hit empty bar and Prices stayed
+             selected. Button and label now share one anchor, one position and
+             one size, so the engine's own ButtonElement dispatch fires. -->
         <GuiElement id="tabBar" profile="emptyPanel" position="0px 668px" width="1000px" height="30px">
-          <Button profile="mdm_tabBtnHit" onClick="onClickTabPrices"    position="0px 0px"   size="160px 28px"/>
-          <Text   profile="mdm_tabLabel"  id="tabLabelPrices"    text="$l10n_mdm_screen_tab_prices"    onClick="onClickTabPrices"    position="0px 28px"   size="160px 28px"/>
+          <Button profile="mdm_tabBtnHit" id="tabHitPrices"    onClick="onClickTabPrices"    position="0px 28px"   size="160px 28px"/>
+          <Text   profile="mdm_tabLabel"  id="tabLabelPrices"    text="$l10n_mdm_screen_tab_prices"    position="0px 28px"   size="160px 28px"/>
           <Bitmap profile="mdm_tabUnderline" id="tabUnderlinePrices"    position="0px 0px"   size="160px 2px"/>
-          <Button profile="mdm_tabBtnHit" onClick="onClickTabEvents"    position="170px 0px" size="160px 28px"/>
-          <Text   profile="mdm_tabLabel"  id="tabLabelEvents"    text="$l10n_mdm_screen_tab_events"    onClick="onClickTabEvents"    position="170px 28px" size="160px 28px"/>
+          <Button profile="mdm_tabBtnHit" id="tabHitEvents"    onClick="onClickTabEvents"    position="170px 28px" size="160px 28px"/>
+          <Text   profile="mdm_tabLabel"  id="tabLabelEvents"    text="$l10n_mdm_screen_tab_events"    position="170px 28px" size="160px 28px"/>
           <Bitmap profile="mdm_tabUnderline" id="tabUnderlineEvents"    position="170px 0px" size="160px 2px" visible="false"/>
-          <Button profile="mdm_tabBtnHit" onClick="onClickTabContracts" position="340px 0px" size="200px 28px"/>
-          <Text   profile="mdm_tabLabel"  id="tabLabelContracts" text="$l10n_mdm_screen_tab_contracts" onClick="onClickTabContracts" position="340px 28px" size="200px 28px"/>
+          <Button profile="mdm_tabBtnHit" id="tabHitContracts" onClick="onClickTabContracts" position="340px 28px" size="200px 28px"/>
+          <Text   profile="mdm_tabLabel"  id="tabLabelContracts" text="$l10n_mdm_screen_tab_contracts" position="340px 28px" size="200px 28px"/>
           <Bitmap profile="mdm_tabUnderline" id="tabUnderlineContracts" position="340px 0px" size="200px 2px" visible="false"/>
         </GuiElement>
         <Bitmap profile="mdm_tabDivider" position="0px 666px" size="1000px 2px"/>
@@ -166,11 +172,16 @@
       <imageFilename value="g_MDMIconMenu"/>
       <imageColor value="$preset_fs25_colorMainDark"/>
     </Profile>
-    <!-- Invisible hit area for tab clicks — UsedPlus fmfRowHit pattern -->
-    <Profile name="mdm_tabBtnHit" extends="emptyPanel">
+    <!-- Invisible hit area for tab clicks - UsedPlus fmfRowHit pattern.
+         BUILD 15:39 (PB-04): the anchor is now explicit and matches
+         mdm_tabLabel, so "same position" in the XML really is the same rect. -->
+    <Profile name="mdm_tabBtnHit" extends="emptyPanel" with="anchorTopLeft">
       <isFocusable value="true"/>
     </Profile>
-    <!-- Visual tab label — isFocusable so it receives mouse clicks as a fallback hit target -->
+    <!-- Visual tab label. A Text element does not dispatch mouse clicks, so it
+         carries no onClick: the co-located mdm_tabBtnHit Button above it is the
+         control, and MarketScreen:mouseEvent hit-tests the same rect as a
+         belt-and-braces fallback. -->
     <Profile name="mdm_tabLabel" extends="fs25_textDefault" with="anchorTopLeft">
       <isFocusable value="true"/>
       <textSize value="14px"/>
