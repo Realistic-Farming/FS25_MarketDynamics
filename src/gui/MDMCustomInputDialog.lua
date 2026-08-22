@@ -8,7 +8,7 @@
 --   onConfirmed  = function(value)
 -- }
 
-MDMCustomInputDialog = {}
+MDMCustomInputDialog = MDMCustomInputDialog or {}
 local MDMCustomInputDialog_mt = Class(MDMCustomInputDialog, MessageDialog)
 
 function MDMCustomInputDialog.new(target, custom_mt)

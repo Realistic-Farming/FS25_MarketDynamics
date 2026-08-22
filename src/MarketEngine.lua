@@ -25,7 +25,7 @@
 --
 -- Author: tison (dev-1)
 
-MarketEngine = {}
+MarketEngine = MarketEngine or {}
 MarketEngine.__index = MarketEngine
 
 -- Update intervals (ms of in-game time)

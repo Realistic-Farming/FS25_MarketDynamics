@@ -1,4 +1,4 @@
-MDMMarketScreenGraph = {}
+MDMMarketScreenGraph = MDMMarketScreenGraph or {}
 
 -- ---------------------------------------------------------------------------
 -- Constants

@@ -12,7 +12,7 @@
 -- causes a layout stack overflow during showDialog. Crop selection happens in
 -- the main MarketScreen price list; the dialog operates on the selected crop.
 
-MDMContractDialog = {}
+MDMContractDialog = MDMContractDialog or {}
 local MDMContractDialog_mt = Class(MDMContractDialog, MessageDialog)
 
 -- -----------------------------------------------------------------------

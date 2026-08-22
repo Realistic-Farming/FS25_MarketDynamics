@@ -21,7 +21,7 @@
 -- The cross-mod handle is g_currentMission.masterHUD (published in Mission00.load).
 -- =========================================================
 
-MDMMasterHUDBridge = {}
+MDMMasterHUDBridge = MDMMasterHUDBridge or {}
 
 MDMMasterHUDBridge.HUD_ID = "MarketDynamics_HUD"
 MDMMasterHUDBridge.active = false   -- MasterHUD present and we registered

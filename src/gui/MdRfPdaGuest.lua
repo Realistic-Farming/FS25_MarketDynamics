@@ -9,10 +9,10 @@
 -- HARD VETO: never reintroduce addPageTab + raw stand-down product path.
 -- =========================================================
 
-MdRfPdaGuest = {}
+MdRfPdaGuest = MdRfPdaGuest or {}
 
-local MOD_DIR = g_currentModDirectory
-local MD_RF_MOD_NAME = g_currentModName
+local MOD_DIR = (MarketDynamicsModDirectory or g_currentModDirectory)
+local MD_RF_MOD_NAME = (MarketDynamicsModName or g_currentModName)
 local PANEL_ID = "marketDynamics"
 local PANEL_ORDER = 40
 local MAX_EVENT_ROWS = 6

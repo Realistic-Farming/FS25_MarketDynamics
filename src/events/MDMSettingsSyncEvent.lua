@@ -1,7 +1,7 @@
 -- MDMSettingsSyncEvent.lua
 -- Network event for syncing Market Dynamics settings between server and clients.
 
-MDMSettingsSyncEvent = {}
+MDMSettingsSyncEvent = MDMSettingsSyncEvent or {}
 local MDMSettingsSyncEvent_mt = Class(MDMSettingsSyncEvent, Event)
 InitEventClass(MDMSettingsSyncEvent, "MDMSettingsSyncEvent")
 

@@ -16,7 +16,7 @@
 --
 -- Opened by MDMMarketScreen:onEventSettingsClick() from the Events tab.
 
-MDMEventSettingsDialog = {}
+MDMEventSettingsDialog = MDMEventSettingsDialog or {}
 local MDMEventSettingsDialog_mt = Class(MDMEventSettingsDialog, MessageDialog)
 
 local MAX_EVENT_ROWS = 10

@@ -32,7 +32,7 @@
 -- (server and client always run the same registerAction / requestAction call).
 -- =========================================================
 
-MDMNetworkSyncBridge = {}
+MDMNetworkSyncBridge = MDMNetworkSyncBridge or {}
 
 MDMNetworkSyncBridge.ACTION_ID = "MarketDynamics_Contract"
 

@@ -3,7 +3,7 @@
 -- Opened from MDMEventFillTypeDialog footer.
 -- Includes a real-time search/filter input for servers with many fill types.
 
-MDMBrowseFillTypesDialog = {}
+MDMBrowseFillTypesDialog = MDMBrowseFillTypesDialog or {}
 local MDMBrowseFillTypesDialog_mt = Class(MDMBrowseFillTypesDialog, MessageDialog)
 
 function MDMBrowseFillTypesDialog.new(target, custom_mt)

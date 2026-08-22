@@ -3,10 +3,10 @@
 -- Pattern based on SoilSettingsPanel (FS25_SoilFertilizer).
 
 ---@class MDMSettingsPanel
-MDMSettingsPanel = {}
+MDMSettingsPanel = MDMSettingsPanel or {}
 local MDMSettingsPanel_mt = Class(MDMSettingsPanel)
 
-local MDM_MOD_NAME = g_currentModName
+local MDM_MOD_NAME = (MarketDynamicsModName or g_currentModName)
 
 -- ── i18n helper ───────────────────────────────────────────
 local function tr(key, fallback)

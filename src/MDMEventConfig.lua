@@ -12,7 +12,7 @@
 --
 -- Author: tison (dev-1)
 
-MDMEventConfig = {}
+MDMEventConfig = MDMEventConfig or {}
 
 -- Returns the active extra fill type list for an event from settings.
 local function _getList(eventId)

@@ -8,7 +8,7 @@
 --   MDMDialogLoader.show("MDMContractDialog", "setData", data)
 --   MDMDialogLoader.cleanup()   -- call on FSBaseMission.delete
 
-MDMDialogLoader = {}
+MDMDialogLoader = MDMDialogLoader or {}
 
 MDMDialogLoader._registry = {}   -- name -> { class, xmlPath, instance, loaded }
 MDMDialogLoader._modDir   = nil
