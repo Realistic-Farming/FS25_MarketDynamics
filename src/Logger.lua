@@ -1,3 +1,10 @@
+-- Hot-reload latch: g_currentModDirectory/Name are nil on live re-source;
+-- latched into module globals on first load (FuelCosts reference pattern).
+MarketDynamicsModDirectory = MarketDynamicsModDirectory
+    or g_currentModDirectory
+    or (g_modsDirectory ~= nil and (g_modsDirectory .. "FS25_MarketDynamics/") or nil)
+MarketDynamicsModName = MarketDynamicsModName or g_currentModName or "FS25_MarketDynamics"
+
 -- Logger.lua
 -- [MDM]-prefixed logging helper. Wraps FS25's Logging.* functions so all
 -- mod output is consistently prefixed and easy to grep in log.txt.
@@ -13,7 +20,7 @@
 --
 -- Author: tison (dev-1)
 
-MDMLog = {}
+MDMLog = MDMLog or {}
 
 local PREFIX = "[MDM] "
 
@@ -44,10 +51,10 @@ MDMLog.debugEnabled = false
 -- ---------------------------------------------------------------------------
 -- MDMUtil — shared utilities available to all MDM modules
 -- ---------------------------------------------------------------------------
-MDMUtil = {}
+MDMUtil = MDMUtil or {}
 
 -- Captured at load so event/notify paths keep MDM modEnv even if caller context shifts.
-local MDM_MOD_NAME = g_currentModName
+local MDM_MOD_NAME = (MarketDynamicsModName or g_currentModName)
 
 -- Mod-scoped i18n with Missing-reject (same spirit as MdRfPdaGuest.tr).
 -- Giants g_i18n:getText returns a truthy "Missing '…'" banner on miss; never paint that.

@@ -5,13 +5,13 @@
 -- Authors: TheCodingDad (tison) — core systems
 --          LeGrizzly             — GUI systems
 
-local modDirectory = g_currentModDirectory
-local modName      = g_currentModName
+local modDirectory = (MarketDynamicsModDirectory or g_currentModDirectory)
+local modName      = (MarketDynamicsModName or g_currentModName)
 
 source(modDirectory .. "src/integrations/OptionScalingResolver.lua")
 
 -- Menu icon global (resolved by XML imageFilename via hook below)
-g_MDMIconMenu = Utils.getFilename("images/menuIcon.dds", g_currentModDirectory)
+g_MDMIconMenu = Utils.getFilename("images/menuIcon.dds", (MarketDynamicsModDirectory or g_currentModDirectory))
 
 -- Resolve mod icon globals in XML imageFilename attributes (EmployeeManager pattern)
 local MDM_ICON_GLOBALS = {

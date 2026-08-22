@@ -1,7 +1,7 @@
 -- MDMContractRequestEvent.lua
 -- Client-to-Server network event for contract actions (Create, Complete, Cancel, Delete).
 
-MDMContractRequestEvent = {}
+MDMContractRequestEvent = MDMContractRequestEvent or {}
 local MDMContractRequestEvent_mt = Class(MDMContractRequestEvent, Event)
 InitEventClass(MDMContractRequestEvent, "MDMContractRequestEvent")
 

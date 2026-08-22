@@ -10,7 +10,7 @@
 --
 -- Opened by MDMEventSettingsDialog:_handleEdit(rowIndex).
 
-MDMEventFillTypeDialog = {}
+MDMEventFillTypeDialog = MDMEventFillTypeDialog or {}
 local MDMEventFillTypeDialog_mt = Class(MDMEventFillTypeDialog, MessageDialog)
 
 local MAX_ROWS = 8

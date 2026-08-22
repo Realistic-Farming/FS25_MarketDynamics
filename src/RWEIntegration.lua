@@ -6,7 +6,7 @@
 -- CropStress detection: g_currentMission.cropStressManager (set by CS's Mission00.load hook).
 -- Pattern mirrors BCIntegration/UPIntegration — detected once in onMissionLoaded, then polled.
 
-MDMExternalIntegration = {}
+MDMExternalIntegration = MDMExternalIntegration or {}
 MDMExternalIntegration.__index = MDMExternalIntegration
 
 -- RWE event id → price multiplier applied to all tracked fill types.

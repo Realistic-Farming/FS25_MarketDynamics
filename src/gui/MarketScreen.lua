@@ -1,4 +1,4 @@
-MDMMarketScreen = {}
+MDMMarketScreen = MDMMarketScreen or {}
 
 MDMMarketScreen.CLASS_NAME = "MDMMarketScreen"
 MDMMarketScreen.MENU_PAGE_NAME = "menuMarketDynamics"
@@ -196,7 +196,7 @@ function MDMMarketScreen.show()
         -- Lazy deep load: with the RF Esc door hosting, the deep screen may never have
         -- been built, so Open full Market silently did nothing (eyes-on FAIL 2026-08-07).
         -- Build it on first use instead of bailing.
-        local modDir = MDMMarketScreen._modDir or g_currentModDirectory
+        local modDir = MDMMarketScreen._modDir or (MarketDynamicsModDirectory or g_currentModDirectory)
         if modDir ~= nil then
             MDMLog.info("MarketScreen.show: deep screen missing, loading on demand")
             pcall(MDMMarketScreen._loadDeepScreenOnly, modDir)
@@ -1256,7 +1256,7 @@ end
 -- Wired at source() time. MarketScreen manages its own registration.
 -- ---------------------------------------------------------------------------
 
-local _modDir = g_currentModDirectory
+local _modDir = (MarketDynamicsModDirectory or g_currentModDirectory)
 local _pendingRegistration = false
 local _pendingModDir = nil
 

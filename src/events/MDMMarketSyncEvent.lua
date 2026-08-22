@@ -1,7 +1,7 @@
 -- MDMMarketSyncEvent.lua
 -- Syncs prices and active world events from server to clients.
 
-MDMMarketSyncEvent = {}
+MDMMarketSyncEvent = MDMMarketSyncEvent or {}
 local MDMMarketSyncEvent_mt = Class(MDMMarketSyncEvent, Event)
 InitEventClass(MDMMarketSyncEvent, "MDMMarketSyncEvent")
 

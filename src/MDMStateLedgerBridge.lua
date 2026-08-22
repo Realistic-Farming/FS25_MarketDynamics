@@ -33,7 +33,7 @@
 -- The cross-mod handle is g_currentMission.stateLedger (published in Mission00.load).
 -- =========================================================
 
-MDMStateLedgerBridge = {}
+MDMStateLedgerBridge = MDMStateLedgerBridge or {}
 
 -- Provisional persistence key. This is the KEY inside the master file, so it must
 -- be locked with Claude(A) before any release (a later rename orphans saved market

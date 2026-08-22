@@ -1,7 +1,7 @@
 -- MDMContractSyncRequestEvent.lua
 -- Client-to-Server network event. A client sends this upon joining to request a full contract sync.
 
-MDMContractSyncRequestEvent = {}
+MDMContractSyncRequestEvent = MDMContractSyncRequestEvent or {}
 local MDMContractSyncRequestEvent_mt = Class(MDMContractSyncRequestEvent, Event)
 InitEventClass(MDMContractSyncRequestEvent, "MDMContractSyncRequestEvent")
 

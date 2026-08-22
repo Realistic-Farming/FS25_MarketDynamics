@@ -23,7 +23,7 @@
 --   Failure is silent by contract: a throwing or non-positive return is skipped.
 -- =========================================================
 
-OrganicPremiumBridge = {}
+OrganicPremiumBridge = OrganicPremiumBridge or {}
 
 OrganicPremiumBridge.MODIFIER_NAME = "OrganicPremium"
 

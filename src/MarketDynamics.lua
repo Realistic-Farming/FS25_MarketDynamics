@@ -19,7 +19,7 @@
 --
 -- Author: tison (dev-1)
 
-MarketDynamics = {}
+MarketDynamics = MarketDynamics or {}
 MarketDynamics.__index = MarketDynamics
 
 function MarketDynamics.new(modDir, modName)
