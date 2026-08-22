@@ -8,6 +8,8 @@
 local modDirectory = g_currentModDirectory
 local modName      = g_currentModName
 
+source(modDirectory .. "src/integrations/OptionScalingResolver.lua")
+
 -- Menu icon global (resolved by XML imageFilename via hook below)
 g_MDMIconMenu = Utils.getFilename("images/menuIcon.dds", g_currentModDirectory)
 

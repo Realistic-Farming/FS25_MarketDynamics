@@ -54,10 +54,29 @@ function MarketEngine.new()
     -- Scales both intraday and daily drift magnitudes.
     -- 0.5 = Low, 1.0 = Normal (default), 1.5 = High, 2.0 = Extreme.
     -- Written directly by SettingsUI; serialized by MarketSerializer.
+    -- When the Option-Scaling Spine is present, getVolatilityScale() reads
+    -- the economy dial instead (see SPINE_VOLATILITY declaration below).
     self.volatilityScale = 1.0
 
     MDMLog.info("MarketEngine initialized")
     return self
+end
+
+MarketEngine.SPINE_VOLATILITY = {
+    id   = "mdm_volatilityScale",
+    dial = "economy",
+    base = 1.0,
+}
+
+function MarketEngine:getVolatilityScale()
+    if OptionScalingResolver ~= nil then
+        local hub = (g_currentMission ~= nil and g_currentMission.settingsHub) or g_settingsHub
+        local profile = OptionScalingResolver.readProfile(hub)
+        if profile ~= nil then
+            return OptionScalingResolver.resolve(MarketEngine.SPINE_VOLATILITY, profile)
+        end
+    end
+    return self.volatilityScale or 1.0
 end
 
 -- Called once after mission load — snapshots base prices from the vanilla economy.
@@ -206,7 +225,7 @@ end
 
 -- Small random walk + mean reversion toward 1.0 (dampened).
 function MarketEngine:_applyIntradayVolatility()
-    local scale     = self.volatilityScale or 1.0
+    local scale     = self:getVolatilityScale()
     local magnitude = INTRADAY_MAGNITUDE * scale
     local reversion = INTRADAY_REVERSION
 
@@ -226,7 +245,7 @@ end
 -- Daily shift: mean-reversion toward 1.0 + random trend (±3% scaled).
 function MarketEngine:_applyDailyShift()
     local now            = MDMUtil.getGameTime()
-    local scale          = self.volatilityScale or 1.0
+    local scale          = self:getVolatilityScale()
     local dailyMagnitude = DAILY_MAGNITUDE * scale
     local dailyReversion = DAILY_REVERSION
 
