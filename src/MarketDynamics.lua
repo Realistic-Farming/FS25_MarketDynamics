@@ -314,7 +314,20 @@ end
 -- UI Helpers
 -- ---------------------------------------------------------------------------
 
----Shows a YesNoDialog when a world event starts.
+---Announce a world event on the suite's non-blocking notice channel.
+---
+--- BUILD 15:39 (PB-13). This used to default to a YesNoDialog asking whether to
+--- open the Market Screen. A world event starting is not a player decision - the
+--- event fires either way and the answer changes nothing about the world - so
+--- the modal bought nothing and cost a full-screen dim, a focus steal and a
+--- pause, three times in one of Brian's short sessions, on top of an open
+--- console. DESIGN 15:00 §6 retires it: every current market event uses the
+--- non-blocking line, and no market event qualifies to escalate to a modal.
+---
+--- Pacing, folding and the queue-while-covered rule all live in MasterHUD's
+--- shared notice queue, so Market Dynamics decides only what to say. Without
+--- MasterHUD the mod still ships standalone and falls back to the game's own
+--- notification list - never back to a dialog.
 ---@param eventListString string Concatenated list of event names.
 function MarketDynamics:showEventNotification(eventListString)
     -- If eventListString is not a string (e.g. nil or self from addTimer), 
@@ -344,30 +357,31 @@ function MarketDynamics:showEventNotification(eventListString)
     -- getText returns truthy "Missing '…'" when l10n failed to load; never paint that.
     local title = (MDMUtil and MDMUtil.getModText("mdm_screen_title")) or "Market Dynamics"
 
-    if self.settings.eventNotificationBanner then
-        -- Discreet, non-modal banner: a quiet in-game notification in the corner
-        -- instead of a full-screen modal that dims everything black. Preferred while
-        -- driving or working a field (issue #94). The active event is also listed in
-        -- the Market Screen's Events tab.
-        local msg = string.format("%s: %s", title, eventListString)
-        if g_currentMission and g_currentMission.addIngameNotification then
-            g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_INFO, msg)
-            MDMLog.info("MarketDynamics: event notification banner shown")
-        else
-            MDMLog.warn("MarketDynamics: addIngameNotification unavailable — notification skipped")
-        end
-    else
-        -- Full pop-up dialog (default): asks whether to open the Market Screen.
-        local fmt = (MDMUtil and MDMUtil.getModText("mdm_msg_event_started"))
-            or "A new world event has started: %s\n\nWould you like to open the Market Screen to see the impact?"
-        local text = string.format(fmt, eventListString)
+    -- One line, no question. The event is already listed on the Market Screen's
+    -- Events tab, which is where a player who wants the detail goes.
+    local msg = string.format("%s: %s", title, eventListString)
 
-        MDMLog.info("MarketDynamics: calling YesNoDialog.show")
-        YesNoDialog.show(function(yes)
-            if yes then
-                MDMMarketScreen.show()
-            end
-        end, nil, text, title)
+    -- Preferred path: the suite's shared queue. It is the thing that guarantees
+    -- one line per in-game-day window, folds a burst into "+N more today", and
+    -- stays silent while the tablet or the Esc menu is up.
+    local hud = (g_currentMission and g_currentMission.masterHUD) or g_masterHUD
+    if hud ~= nil and type(hud.postNotice) == "function" then
+        local ok, posted = pcall(hud.postNotice, hud, {
+            topic = "mdm_world_event",
+            text  = msg,
+        })
+        if ok and posted then
+            MDMLog.info("MarketDynamics: event notice queued on the shared channel")
+            return
+        end
+    end
+
+    -- Standalone fallback: still non-blocking, still not a dialog.
+    if g_currentMission and g_currentMission.addIngameNotification then
+        g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_INFO, msg)
+        MDMLog.info("MarketDynamics: event notification shown (no MasterHUD)")
+    else
+        MDMLog.warn("MarketDynamics: addIngameNotification unavailable - notification skipped")
     end
 end
 

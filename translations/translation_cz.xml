@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="Otevřít správce pracovníků" />
         <text name="sf_pda_btn_rotation_planner" text="Plánovač osevního postupu" />
         <text name="sf_pda_btn_field_detail" text="Detail pole" />
+        <text name="mdm_evt_tracked_label" text="Sledované kategorie trhu" />
+        <text name="mdm_cat_crops" text="Plodiny" />
+        <text name="mdm_cat_silage" text="Siláž" />
+        <text name="mdm_cat_livestock" text="Dobytek" />
+        <text name="mdm_cat_other" text="Ostatní" />
+        <text name="mdm_screen_per_head" text="/ kus" />
+        <text name="mdm_screen_per_1000l" text="/ 1 000 l" />
+        <text name="mdm_screen_price_trend" text="Vývoj cen" />
+        <text name="mdm_screen_graph_oldest" text="nejstarší" />
+        <text name="mdm_screen_graph_newest" text="nyní" />
+        <text name="mdm_screen_graph_span" text="%d vzorků" />
+        <text name="mdm_screen_graph_median" text="Všechny komodity (medián)" />
 </texts>
 </l10n>

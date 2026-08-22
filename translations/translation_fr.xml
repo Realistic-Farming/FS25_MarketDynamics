@@ -318,5 +318,17 @@
         <text name="wc_rf_pda_open_manager" text="Ouvrir le gestionnaire d'ouvriers" />
         <text name="sf_pda_btn_rotation_planner" text="Planificateur de rotation" />
         <text name="sf_pda_btn_field_detail" text="Détail du champ" />
+        <text name="mdm_evt_tracked_label" text="Catégories de marché suivies" />
+        <text name="mdm_cat_crops" text="Cultures" />
+        <text name="mdm_cat_silage" text="Ensilage" />
+        <text name="mdm_cat_livestock" text="Élevage" />
+        <text name="mdm_cat_other" text="Autres" />
+        <text name="mdm_screen_per_head" text="/ tête" />
+        <text name="mdm_screen_per_1000l" text="/ 1 000 L" />
+        <text name="mdm_screen_price_trend" text="Tendance des prix" />
+        <text name="mdm_screen_graph_oldest" text="plus ancien" />
+        <text name="mdm_screen_graph_newest" text="maintenant" />
+        <text name="mdm_screen_graph_span" text="%d relevés" />
+        <text name="mdm_screen_graph_median" text="Toutes les marchandises (médiane)" />
 </texts>
 </l10n>

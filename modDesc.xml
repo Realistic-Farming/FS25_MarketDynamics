@@ -35,6 +35,7 @@
         <sourceFile filename="src/gui/MDMEventSettingsDialog.lua" />
         <sourceFile filename="src/gui/MDMEventFillTypeDialog.lua" />
         <sourceFile filename="src/gui/MDMBrowseFillTypesDialog.lua" />
+        <sourceFile filename="src/gui/MdPriceFormat.lua" />
         <sourceFile filename="src/gui/MarketScreenGraph.lua" />
         <sourceFile filename="src/gui/MarketScreen.lua" />
         <sourceFile filename="src/gui/RfEscModules.lua" />
