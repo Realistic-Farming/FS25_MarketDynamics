@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Control Center actions** (suite Control Center, requires SettingsHub): `MDM_MARKET_SCREEN`, `MDM_CREATE_CONTRACT`, `MDM_OPEN_SETTINGS`.
+- **Playtest fixes:** MarketScreen + graph, MdPriceFormat, RF PDA guest page and Esc profiles, modDesc alignment.
+
+---
+
 ## [1.3.0.0] - 2026-08-04
 
 ### Added
