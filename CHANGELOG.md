@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to FS25_MarketDynamics will be documented in this file.
 
@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.0.1] - 2026-05-25
 
 ### Fixed
-- Swapped out the ▲/▼ indicators since FS25 does not like it
+- Swapped out the â–²/â–¼ indicators since FS25 does not like it
 - Fixed `nill` error from missing l10n string
 - Updated all translation files (new keys have been added)
 
@@ -25,10 +25,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.2.0.0] - 2026-05-24
 
 ### Added
-- **Commodity list sorting** — Click the Crop, Price, or Change column header in the Prices tab to sort the list by that field. Click again to reverse the sort direction. An ▲/▼ indicator shows the active sort column and direction. Default remains alphabetical by name.
+- **Commodity list sorting** â€” Click the Crop, Price, or Change column header in the Prices tab to sort the list by that field. Click again to reverse the sort direction. An â–²/â–¼ indicator shows the active sort column and direction. Default remains alphabetical by name.
 
 ### Fixed
-- **Realistic Economy Mod compatibility** — MDM now uses the live `EconomyManager.getPricePerLiter` at mission load time (not a source-time snapshot), so economy mods that adjust base prices after MDM loads are automatically picked up as MDM's price base. MDM's own volatility, world events, and futures contracts then apply on top.
+- **Realistic Economy Mod compatibility** â€” MDM now uses the live `EconomyManager.getPricePerLiter` at mission load time (not a source-time snapshot), so economy mods that adjust base prices after MDM loads are automatically picked up as MDM's price base. MDM's own volatility, world events, and futures contracts then apply on top.
 
 ---
 
@@ -59,10 +59,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.9.1] - 2026-05-02
 
 ### Added
-- **Browse Types (extended)** — You can now add individual fill types directly to events via the browser UI
+- **Browse Types (extended)** â€” You can now add individual fill types directly to events via the browser UI
 
 ### Changed
-- Commodity handling expanded — events now support **all fill types**, not just crops
+- Commodity handling expanded â€” events now support **all fill types**, not just crops
 - Multiplayer / dedicated server event settings improved for better consistency and reliability
 
 ### Fixed
@@ -73,8 +73,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.9.0] - 2026-05-02
 
 ### Added
-- **Browse Fill Types Dialog** — New scrollable list in the Event Settings UI that shows all currently tracked fill types. Players can now browse valid crop names and click to automatically populate the "Add Fill Type" input field, eliminating manual typing errors.
-- **Interactive Browsing** — Browse rows now feature hover highlighting and a selection callback system for seamless integration with the Event Fill Type editor.
+- **Browse Fill Types Dialog** â€” New scrollable list in the Event Settings UI that shows all currently tracked fill types. Players can now browse valid crop names and click to automatically populate the "Add Fill Type" input field, eliminating manual typing errors.
+- **Interactive Browsing** â€” Browse rows now feature hover highlighting and a selection callback system for seamless integration with the Event Fill Type editor.
 
 ### Fixed
 - Resolved `attempt to index nil with 'new'` crash when attempting to open the Browse Types dialog due to missing source registration in `modDesc.xml`.
@@ -96,9 +96,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.5.0] - 2026-04-29
 
 ### Added
-- Custom contract quantity — new text-input dialog lets you enter any amount instead of being limited to presets
-- Custom delivery window — type any number of in-game or real-world days for contract deadlines
-- MDM Settings Panel — new in-game settings UI accessible from the server settings screen
+- Custom contract quantity â€” new text-input dialog lets you enter any amount instead of being limited to presets
+- Custom delivery window â€” type any number of in-game or real-world days for contract deadlines
+- MDM Settings Panel â€” new in-game settings UI accessible from the server settings screen
 
 ### Fixed
 - Save file moved from `savegameDirectory/modSettings/` to `savegameDirectory/` directly, preventing dedicated servers from rejecting uploaded savegames that contain subfolders (#47)
@@ -143,7 +143,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.1.0] - 2026-04-09
 
 ### Changed
-- BetterContracts integration renamed to **FuturesMission** throughout — no functional change, aligns with the correct mod name
+- BetterContracts integration renamed to **FuturesMission** throughout â€” no functional change, aligns with the correct mod name
 
 ### Fixed
 - Multiplayer futures contract network sync (#31)
@@ -156,7 +156,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.1.0.0] - 2026-03-29
 
 ### Added
-- **BetterContracts integration** — full BC↔MDM handshake; futures contracts exposed to the BC UI
+- **BetterContracts integration** â€” full BCâ†”MDM handshake; futures contracts exposed to the BC UI
 - `BCIntegration.getContractsForFarm` for savegame migration support
 - 4 new API functions exposed for BetterContracts cross-mod use
 - InfoDialog shown when New Contract is pressed with BetterContracts active
@@ -180,12 +180,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [1.0.0.0] - 2026-03-24
 
 ### Added
-- **Futures contract system** — lock in a price for a future harvest; penalty applies for missed delivery
-- **Contract admin dialog** — server admins can view, manage, and delete contracts in-game
-- **World Events system** — randomized global events (trade disruption, drought, bumper harvest, etc.) that shift crop prices
-- **Market Settings** — dedicated ESC > Settings tab for event frequency, futures penalty, volatility scale, and price toggle
-- **UsedPlus integration** — futures contract payouts credit the UsedPlus market API when detected
-- **25-language localization** — full translations shipped at launch
+- **Futures contract system** â€” lock in a price for a future harvest; penalty applies for missed delivery
+- **Contract admin dialog** â€” server admins can view, manage, and delete contracts in-game
+- **World Events system** â€” randomized global events (trade disruption, drought, bumper harvest, etc.) that shift crop prices
+- **Market Settings** â€” dedicated ESC > Settings tab for event frequency, futures penalty, volatility scale, and price toggle
+- **UsedPlus integration** â€” futures contract payouts credit the UsedPlus market API when detected
+- **25-language localization** â€” full translations shipped at launch
 - Contract creation dialog with quantity presets and delivery window selection
 - Price history graph per crop on the Market Screen
 - HUD settlement notifications when a contract pays out or expires
@@ -194,7 +194,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Fixed
 - 7-bug audit pass covering tab UX, N key inputEvent, setTextColor crash
 - Native `fs25_dialogButtonBox` used for all dialogs (correct FS25 button bar pattern)
-- Dedicated server support — simulation runs headless with no GUI dependencies
+- Dedicated server support â€” simulation runs headless with no GUI dependencies
 - Settings tab no longer conflicts with the vanilla settings screen
 
 ---
