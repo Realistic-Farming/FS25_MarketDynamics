@@ -163,7 +163,8 @@ end
 -- ── State-sync serialization (server->client full snapshot) ───────────────────
 -- Flatten the whole syncable state into one typed array. Length-prefixed sub-lists so
 -- NetworkSync's flat, type-tagged array round-trips: contractCount, then 12 fields per
--- contract (mirroring MDMContractSyncEvent:writeContract); priceCount, then 2 per price;
+-- contract (mirroring MDMContractSyncEvent:writeContract); priceCount, then 3+2*histLen
+-- per price (index, volatilityFactor, histCount, then price+time pairs);
 -- eventCount, then 4 per active event.
 local function buildStateArray()
     local arr = {}
@@ -200,6 +201,12 @@ local function buildStateArray()
     for _, p in ipairs(prices) do
         arr[#arr + 1] = p.index or 0
         arr[#arr + 1] = p.volatilityFactor or 1
+        local hist = p.history or {}
+        arr[#arr + 1] = #hist
+        for _, h in ipairs(hist) do
+            arr[#arr + 1] = h.price or 0
+            arr[#arr + 1] = h.time or 0
+        end
     end
     arr[#arr + 1] = #events
     for _, e in ipairs(events) do
@@ -241,8 +248,16 @@ local function applyStateArray(arr)
     local pCount = tonumber(arr[i]) or 0; i = i + 1
     local prices = {}
     for _ = 1, pCount do
-        prices[#prices + 1] = { index = arr[i], volatilityFactor = arr[i + 1] }
-        i = i + 2
+        local pIndex = arr[i]
+        local pVol   = arr[i + 1]
+        local hCount = tonumber(arr[i + 2]) or 0
+        i = i + 3
+        local history = {}
+        for _ = 1, hCount do
+            history[#history + 1] = { price = arr[i], time = arr[i + 1] }
+            i = i + 2
+        end
+        prices[#prices + 1] = { index = pIndex, volatilityFactor = pVol, history = history }
     end
 
     local eCount = tonumber(arr[i]) or 0; i = i + 1
