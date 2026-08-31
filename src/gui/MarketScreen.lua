@@ -14,6 +14,82 @@ local TAB_CONTRACTS = 3
 
 local REFRESH_INTERVAL = 1000
 
+-- [MDM-LB] Live MDM_CREATE_CONTRACT chord (BUILD 22:36 hint sweep). File-scope
+-- so both localisation passes (per-frame safe-set and applyGuiLocalization)
+-- share one implementation. Prefers SettingsHub's RfLiveBinding, falls back to
+-- the proven engine call, then to the default literal.
+local function _liveCreateChord()
+    if RfLiveBinding ~= nil and RfLiveBinding.getChord ~= nil then
+        local c = RfLiveBinding.getChord("MDM_CREATE_CONTRACT")
+        if c then return c end
+    end
+    if g_inputDisplayManager ~= nil and InputAction ~= nil and InputAction.MDM_CREATE_CONTRACT ~= nil then
+        local ok, help = pcall(function()
+            return g_inputDisplayManager:getControllerSymbolOverlays(InputAction.MDM_CREATE_CONTRACT, "", "", false)
+        end)
+        if ok and help and help.keys and #help.keys > 0 then
+            local parts = {}
+            for _, k in ipairs(help.keys) do parts[#parts + 1] = tostring(k) end
+            return table.concat(parts, "+")
+        end
+    end
+    -- [MDM-LB2] BUILD 19:58: an unbound action must READ unbound. Returning the
+    -- old "Right Shift+3" literal here is what put a fake default on screen for
+    -- every player who had rebound (or never bound) the action.
+    if RfLiveBinding ~= nil and RfLiveBinding.UNASSIGNED ~= nil then
+        return RfLiveBinding.UNASSIGNED
+    end
+    return "unassigned"
+end
+
+--- [MDM-LB2] Plain-text, boundary-checked literal swap (BUILD 19:58).
+---
+--- Deliberately NOT a gsub: Lua patterns have no word boundary, and the shipped
+--- German chord "Umschalt+F" ends in the exact characters of "alt+F". A pattern
+--- sweep survives that only by case, which is one locale edit away from eating
+--- the tail of a real word. string.find(..., plain) plus an explicit neighbour
+--- check cannot: a hit is replaced only when the character before it is not a
+--- letter and the character after it is not alphanumeric.
+local function _swapLiteral(t, literal, replacement)
+    if type(t) ~= "string" or literal == nil or literal == "" then return t end
+    local out, i = {}, 1
+    while true do
+        local sPos, ePos = string.find(t, literal, i, true)
+        if sPos == nil then break end
+        local before = (sPos > 1) and string.sub(t, sPos - 1, sPos - 1) or ""
+        local after  = (ePos < #t) and string.sub(t, ePos + 1, ePos + 1) or ""
+        local leftOk  = (before == "") or (string.match(before, "%a") == nil)
+        local rightOk = (after  == "") or (string.match(after,  "%w") == nil)
+        out[#out + 1] = string.sub(t, i, sPos - 1)
+        out[#out + 1] = (leftOk and rightOk) and replacement or string.sub(t, sPos, ePos)
+        i = ePos + 1
+    end
+    out[#out + 1] = string.sub(t, i)
+    return table.concat(out)
+end
+
+--- Rewrite every stale default chord in an element's text to the live binding.
+--- [MDM-LB2] The BUILD 22:36 pass only covered the then-current English pair
+--- ("Right Shift+3" and X). The English l10n has since moved to N, and the 25
+--- other locales still ship the older "Alt+F", so a rebound player saw a stale
+--- hint in every language but one. Longest forms are swapped first so "Press N"
+--- is consumed before a bare "N:" can be.
+local function _applyCreateChordToEl(el)
+    if el == nil or type(el.getText) ~= "function" then return end
+    local t = el:getText()
+    if type(t) ~= "string" then return end
+    local chord = _liveCreateChord()
+    t = _swapLiteral(t, "Right Shift+3", chord)
+    t = _swapLiteral(t, "Alt+F",         chord)
+    t = _swapLiteral(t, "[X]", "[" .. chord .. "]")
+    t = _swapLiteral(t, "[N]", "[" .. chord .. "]")
+    t = _swapLiteral(t, "Press X", "Press " .. chord)
+    t = _swapLiteral(t, "Press N", "Press " .. chord)
+    t = _swapLiteral(t, "X:", chord .. ":")
+    t = _swapLiteral(t, "N:", chord .. ":")
+    pcall(function() el:setText(t) end)
+end
+
 -- Commodity list sort fields
 local SORT_NAME   = "name"
 local SORT_PRICE  = "price"
@@ -352,6 +428,9 @@ function MDMMarketScreen:onGuiSetupFinished()
     else
         _setTextSafe(self.noContractsText, "mdm_screen_no_contracts", "No contracts yet. Press X to create one.")
         _setTextSafe(self.newContractHint, "mdm_screen_new_contract_btn", "New Contract [X]")
+        -- [MDM-LB] rewrite the resolved default chord to the live binding.
+        _applyCreateChordToEl(self.noContractsText)
+        _applyCreateChordToEl(self.newContractHint)
         if self.newContractHint then self.newContractHint:setVisible(true) end
     end
 end
@@ -1332,6 +1411,8 @@ function MDMMarketScreen._performRegistration(modDir)
             if hint then hint:setVisible(false) end
         else
             _setById("noContractsText", "mdm_screen_no_contracts", "No contracts yet. Press X to create one.")
+            -- [MDM-LB] live chord on the resolved text.
+            pcall(function() _applyCreateChordToEl(scr:getDescendantById("noContractsText")) end)
             local hint = screen:getDescendantById("newContractHint")
             if hint then hint:setVisible(true) end
         end
@@ -1348,6 +1429,8 @@ function MDMMarketScreen._performRegistration(modDir)
         _setById("contractsColStatus",    "mdm_label_status",    "Status")
         if not BCIntegration.isEnabled() then
             _setById("newContractHint", "mdm_screen_new_contract_btn", "New Contract  [X]")
+            -- [MDM-LB] live chord on the resolved text.
+            pcall(function() _applyCreateChordToEl(scr:getDescendantById("newContractHint")) end)
         end
 
         _setById("detailCropName", "mdm_screen_select_crop", "Select a commodity")
