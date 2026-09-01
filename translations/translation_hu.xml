@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="Dolgozókezelő megnyitása" />
         <text name="sf_pda_btn_rotation_planner" text="Vetésforgó-tervező" />
         <text name="sf_pda_btn_field_detail" text="Táblarészletek" />
+        <text name="mdm_evt_tracked_label" text="Követett piaci kategóriák" />
+        <text name="mdm_cat_crops" text="Növények" />
+        <text name="mdm_cat_silage" text="Szilázs" />
+        <text name="mdm_cat_livestock" text="Állatok" />
+        <text name="mdm_cat_other" text="Egyéb" />
+        <text name="mdm_screen_per_head" text="/ állat" />
+        <text name="mdm_screen_per_1000l" text="/ 1000 l" />
+        <text name="mdm_screen_price_trend" text="Ártrend" />
+        <text name="mdm_screen_graph_oldest" text="legrégebbi" />
+        <text name="mdm_screen_graph_newest" text="most" />
+        <text name="mdm_screen_graph_span" text="%d minta" />
+        <text name="mdm_screen_graph_median" text="Minden áru (medián)" />
 </texts>
 </l10n>

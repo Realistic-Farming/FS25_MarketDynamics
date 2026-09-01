@@ -5,7 +5,7 @@
 --
 -- Author: tison (dev-1)
 
-MarketSerializer = {}
+MarketSerializer = MarketSerializer or {}
 
 local SAVE_PATH_TEMPLATE = "%sFS25_MarketDynamics.xml"
 

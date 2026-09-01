@@ -16,7 +16,7 @@
 --
 -- Opened by MDMMarketScreen:onEventSettingsClick() from the Events tab.
 
-MDMEventSettingsDialog = {}
+MDMEventSettingsDialog = MDMEventSettingsDialog or {}
 local MDMEventSettingsDialog_mt = Class(MDMEventSettingsDialog, MessageDialog)
 
 local MAX_EVENT_ROWS = 10
@@ -88,7 +88,10 @@ function MDMEventSettingsDialog:onGuiSetupFinished()
     self.freqHighTxt   = self:getDescendantById("evtFreqHighTxt")
 
     -- Fill type reference hint
-    self.fillTypeHint = self:getDescendantById("evtSFillTypeHint")
+    self.fillTypeHint  = self:getDescendantById("evtSFillTypeHint")
+    -- BUILD 15:39 (PB-08): dev-only Test column header.
+    self.colHdrTest    = self:getDescendantById("evtSColHdrTest")
+    self.fillTypeLabel = self:getDescendantById("evtSFillTypeLabel")
 
     -- Per-event rows
     for i = 0, MAX_EVENT_ROWS - 1 do
@@ -261,13 +264,81 @@ end
 
 -- ── Fill type reference hint ──────────────────────────────────────────────────
 
--- Populate the "TRACKED FILL TYPES" section at the bottom of the dialog with
--- every fill type currently tracked by MarketEngine (vanilla + all mod crops).
--- Players use this as a reference when typing names into the fill type editor.
+--- BUILD 15:39 (PB-08). Is this dialog being shown on a developer surface?
+---
+--- `settings.debugMode` is the player-visible developer switch Market Dynamics
+--- already ships (Settings ▸ Display ▸ Debug Mode). Off, which is the default
+--- and what every normal save runs, this is a player surface: no dev triggers,
+--- no internal identifiers. On, the developer view comes back in full.
+---@return boolean
+function MDMEventSettingsDialog:_isDevSurface()
+    local s = g_MarketDynamics and g_MarketDynamics.settings
+    return s ~= nil and s.debugMode == true
+end
+
+-- Populate the tracked-fill-type section at the bottom of the dialog.
+--
+-- BUILD 15:39 (PB-08). This used to print every tracked fill type's INTERNAL
+-- name, sorted and dot-joined - a long line of raw uppercase-ish engine keys
+-- that ran past the edge of its box and truncated mid-token. That is a
+-- developer reference on a player screen. Players now get the plain categories
+-- the engine tracks and a count; the raw key list is still there verbatim on the
+-- dev surface, because typing a name into the fill type editor is exactly the
+-- job it was written for.
 function MDMEventSettingsDialog:_refreshFillTypeHint()
     if not self.fillTypeHint then return end
-    local list = self:_buildAvailableFillTypeList()
-    self.fillTypeHint:setText(list ~= "" and list or "—")
+    if self:_isDevSurface() then
+        local list = self:_buildAvailableFillTypeList()
+        self.fillTypeHint:setText(list ~= "" and list or "-")
+        return
+    end
+    self.fillTypeHint:setText(self:_buildTrackedCategorySummary())
+end
+
+--- Player-language summary: which categories are tracked, and how many types.
+--- Categories come from the fill type's own title, never its internal name.
+function MDMEventSettingsDialog:_buildTrackedCategorySummary()
+    if not g_fillTypeManager or not g_MarketDynamics then return "-" end
+    local engine = g_MarketDynamics.marketEngine
+    if engine == nil or engine.prices == nil then return "-" end
+
+    -- The categories Market Dynamics prices, in the order a player thinks about
+    -- them. `match` is checked against the fill type's own category/name, so a
+    -- mod crop lands in Crops rather than in a bucket of its own.
+    local CATEGORIES = {
+        { key = "mdm_cat_crops",     fb = "Crops",     n = 0 },
+        { key = "mdm_cat_silage",    fb = "Silage",    n = 0 },
+        { key = "mdm_cat_livestock", fb = "Livestock", n = 0 },
+        { key = "mdm_cat_other",     fb = "Other",     n = 0 },
+    }
+    local SILAGE    = { silage = true, chaff = true, grass_windrow = true, drygrass_windrow = true, hay = true, straw = true }
+    local LIVESTOCK = { cow = true, sheep = true, pig = true, chicken = true, horse = true, goat = true, milk = true, egg = true, wool = true }
+
+    local total = 0
+    for _, ft in ipairs(g_fillTypeManager:getFillTypes()) do
+        if ft and ft.index and ft.index > 1 and ft.name and ft.name ~= ""
+           and engine.prices[ft.index] then
+            total = total + 1
+            local n = string.lower(ft.name)
+            local slot
+            if LIVESTOCK[n] then slot = 3
+            elseif SILAGE[n] then slot = 2
+            elseif ft.showOnPriceTable ~= false then slot = 1
+            else slot = 4 end
+            CATEGORIES[slot].n = CATEGORIES[slot].n + 1
+        end
+    end
+
+    if total == 0 then return "-" end
+
+    local parts = {}
+    for _, c in ipairs(CATEGORIES) do
+        if c.n > 0 then
+            local label = (g_i18n and g_i18n:hasText(c.key)) and g_i18n:getText(c.key) or c.fb
+            table.insert(parts, string.format("%s (%d)", label, c.n))
+        end
+    end
+    return table.concat(parts, "   ")
 end
 
 function MDMEventSettingsDialog:_buildAvailableFillTypeList()
@@ -287,6 +358,11 @@ end
 -- ── Per-event rows ────────────────────────────────────────────────────────────
 
 function MDMEventSettingsDialog:_refreshEventRows()
+    -- BUILD 15:39 (PB-08): the Test column header follows its buttons.
+    if self.colHdrTest ~= nil then
+        self.colHdrTest:setVisible(self:_isDevSurface())
+    end
+
     local s        = g_MarketDynamics and g_MarketDynamics.settings
     local disabled = (s and s.disabledEvents)         or {}
     local cft      = (s and s.eventCustomFillTypes)   or {}
@@ -301,8 +377,15 @@ function MDMEventSettingsDialog:_refreshEventRows()
         local function setVis(el) if el then el:setVisible(hasRow) end end
         setVis(self.rowNames[i]);    setVis(self.rowTogBgs[i]);   setVis(self.rowTogBtns[i])
         setVis(self.rowTogTxts[i]);  setVis(self.rowCounts[i]);   setVis(self.rowEditBgs[i])
-        setVis(self.rowEditBtns[i]); setVis(self.rowEditTxts[i]); setVis(self.rowForceBgs[i])
-        setVis(self.rowForceBtns[i]); setVis(self.rowForceTxts[i])
+        setVis(self.rowEditBtns[i]); setVis(self.rowEditTxts[i])
+
+        -- BUILD 15:39 (PB-08). The Test column is a developer trigger: it fires
+        -- a world event at full intensity on demand. It stays on the dev surface
+        -- and is not shipped to players. `mdmForceEvent` in AdminCommands is the
+        -- unchanged console route, so nothing is lost for the people who use it.
+        local devSurface = self:_isDevSurface()
+        local function setDevVis(el) if el then el:setVisible(hasRow and devSurface) end end
+        setDevVis(self.rowForceBgs[i]); setDevVis(self.rowForceBtns[i]); setDevVis(self.rowForceTxts[i])
 
         if hasRow then
             local id          = entry.id
@@ -408,6 +491,14 @@ end
 
 -- Force-fire if the event is idle; force-expire if it is currently active.
 function MDMEventSettingsDialog:_handleForce(rowIndex)
+    -- BUILD 15:39 (PB-08). The buttons are hidden off the dev surface, but the
+    -- onClick callbacks still exist on the dialog, so the gate is enforced here
+    -- too rather than relying on the control being invisible.
+    if not self:_isDevSurface() then
+        MDMLog.info("MDMEventSettingsDialog: force ignored (player surface; use mdmForceEvent)")
+        return
+    end
+
     local entry = self._eventOrder[rowIndex + 1]
     if not entry or not g_MarketDynamics then return end
 

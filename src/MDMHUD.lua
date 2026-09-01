@@ -2,12 +2,12 @@
 -- On-screen HUD for tracking active futures contracts.
 -- Shows fill type, progress bar, delivery status, and time remaining.
 --
--- Visual style matches FS25_SoilFertilizer (clean, neutral, high-contrast).
--- Uses a single pixel overlay for efficient rendering.
+-- Visual style follows the base-game HUD extension and fill-level display.
+-- Falls back to a single pixel overlay when MasterHUD is unavailable.
 --
 -- Author: tison (dev-1)
 
-MDMHUD = {}
+MDMHUD = MDMHUD or {}
 local MDMHUD_mt = Class(MDMHUD)
 
 -- ── Base dimensions at scale 1.0 ─────────────────────────
@@ -17,7 +17,7 @@ MDMHUD.PAD    = 0.006
 
 -- ── Layout constants ─────────────────────────────────────
 MDMHUD.TITLE_H   = 0.022
-MDMHUD.BAR_H     = 0.008
+MDMHUD.BAR_H     = 0.005556
 MDMHUD.BAR_W     = 0.165
 MDMHUD.LINE_H    = 0.016
 
@@ -85,6 +85,11 @@ function MDMHUD:drawRect(x, y, w, h, c, a)
     renderOverlay(self.fillOverlay, x, y, w, h)
 end
 
+local function getBaseGameRenderer()
+    local hud = (g_currentMission ~= nil and g_currentMission.masterHUD) or g_masterHUD
+    return hud ~= nil and hud.renderer or nil
+end
+
 function MDMHUD:getIconOverlay(filename)
     if not filename or filename == "" then return nil end
     if not self.iconOverlays[filename] then
@@ -130,32 +135,26 @@ function MDMHUD:drawPanel(contract)
     local ph  = MDMHUD.BASE_H * s
     local pad = MDMHUD.PAD * s
 
-    -- Shadow
-    self:drawRect(px + 0.002*s, py - 0.002*s, pw, ph, MDMHUD.C_SHADOW)
-
-    -- Background
-    self:drawRect(px, py, pw, ph, MDMHUD.C_BG)
-
-    -- Header / Title Bar
     local titleH = MDMHUD.TITLE_H * s
-    self:drawRect(px, py + ph - titleH, pw, titleH, MDMHUD.C_TITLE_BG)
+    local renderer = getBaseGameRenderer()
+    local usedNativePanel = renderer ~= nil and renderer.renderPanel ~= nil
+        and renderer:renderPanel(px, py, pw, ph)
+    if not usedNativePanel then
+        -- Compatibility fallback for standalone use without MasterHUD.
+        self:drawRect(px + 0.002*s, py - 0.002*s, pw, ph, MDMHUD.C_SHADOW)
+        self:drawRect(px, py, pw, ph, MDMHUD.C_BG)
+        self:drawRect(px, py + ph - titleH, pw, titleH, MDMHUD.C_TITLE_BG)
 
-    -- Border
-    local bw = 0.0006 * s
-    self:drawRect(px,           py,            pw, bw, MDMHUD.C_BORDER)
-    self:drawRect(px,           py + ph - bw,   pw, bw, MDMHUD.C_BORDER)
-    self:drawRect(px,           py,            bw, ph, MDMHUD.C_BORDER)
-    self:drawRect(px + pw - bw,  py,            bw, ph, MDMHUD.C_BORDER)
+        local bw = 0.0006 * s
+        self:drawRect(px,           py,            pw, bw, MDMHUD.C_BORDER)
+        self:drawRect(px,           py + ph - bw,   pw, bw, MDMHUD.C_BORDER)
+        self:drawRect(px,           py,            bw, ph, MDMHUD.C_BORDER)
+        self:drawRect(px + pw - bw,  py,            bw, ph, MDMHUD.C_BORDER)
+    end
 
-    -- Title text in header bar
-    local titleLabel = g_i18n:getText("mdm_hud_title") or "Market Watch"
-    local titleCX = px + pw * 0.5
-    setTextBold(true)
-    setTextColor(0.72, 0.72, 0.72, 1.0)
-    setTextAlignment(RenderText.ALIGN_CENTER)
-    renderText(titleCX, py + ph - titleH * 0.5 - 0.005 * s, 0.009 * s, titleLabel)
-
-    -- ── Content ───────────────────────────────────────────
+    -- The crop and completion value are the header row, matching the native
+    -- fill-level panel. A second generic title used to occupy this exact same
+    -- baseline and overprint both values.
     local tx = px + pad
     local ty = py + ph - titleH * 0.5
     
@@ -195,9 +194,14 @@ function MDMHUD:drawPanel(contract)
     -- Progress Bar
     local barX = px + (pw - MDMHUD.BAR_W * s) * 0.5
     local barY = cy - MDMHUD.BAR_H * s
-    self:drawRect(barX, barY, MDMHUD.BAR_W * s, MDMHUD.BAR_H * s, MDMHUD.C_BAR_BG)
-    if pct > 0 then
-        self:drawRect(barX, barY, MDMHUD.BAR_W * s * math.min(1, pct), MDMHUD.BAR_H * s, MDMHUD.C_MDM_GREEN)
+    local usedNativeBar = renderer ~= nil and renderer.renderProgressBar ~= nil
+        and renderer:renderProgressBar(barX, barY, MDMHUD.BAR_W * s,
+            MDMHUD.BAR_H * s, pct, MDMHUD.C_MDM_GREEN)
+    if not usedNativeBar then
+        self:drawRect(barX, barY, MDMHUD.BAR_W * s, MDMHUD.BAR_H * s, MDMHUD.C_BAR_BG)
+        if pct > 0 then
+            self:drawRect(barX, barY, MDMHUD.BAR_W * s * math.min(1, pct), MDMHUD.BAR_H * s, MDMHUD.C_MDM_GREEN)
+        end
     end
     
     cy = barY - pad * 1.2
@@ -290,5 +294,14 @@ function MDMHUD:scrollEvent(posX, posY, button)
     end
 end
 
--- Global singleton
-g_MDMHud = MDMHUD.new()
+-- Global singleton. Preserve and patch the live instance during script reloads.
+if g_MDMHud == nil then
+    g_MDMHud = MDMHUD.new()
+else
+    for key, value in pairs(MDMHUD) do
+        if type(value) == "function" then
+            g_MDMHud[key] = value
+        end
+    end
+    print("[MarketDynamics] MDMHUD live instance patched")
+end

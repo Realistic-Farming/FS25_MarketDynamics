@@ -14,7 +14,7 @@
 -- now, so applyChange only needs to set the value back on that table.
 -- =========================================================
 
-MDMSettingsHubBridge = {}
+MDMSettingsHubBridge = MDMSettingsHubBridge or {}
 
 local function applyChange(key, value)
     local mdm = g_MarketDynamics

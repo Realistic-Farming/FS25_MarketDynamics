@@ -8,7 +8,7 @@
 --   onCancel   = function(contractId)  called after admin cancel/remove,
 -- }
 
-MDMContractAdminDialog = {}
+MDMContractAdminDialog = MDMContractAdminDialog or {}
 local MDMContractAdminDialog_mt = Class(MDMContractAdminDialog, MessageDialog)
 
 -- -----------------------------------------------------------------------

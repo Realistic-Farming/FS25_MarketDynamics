@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="Åbn medarbejderstyring" />
         <text name="sf_pda_btn_rotation_planner" text="Rotationsplanlægger" />
         <text name="sf_pda_btn_field_detail" text="Markdetaljer" />
+        <text name="mdm_evt_tracked_label" text="Fulgte markedskategorier" />
+        <text name="mdm_cat_crops" text="Afgrøder" />
+        <text name="mdm_cat_silage" text="Ensilage" />
+        <text name="mdm_cat_livestock" text="Husdyr" />
+        <text name="mdm_cat_other" text="Andet" />
+        <text name="mdm_screen_per_head" text="/ dyr" />
+        <text name="mdm_screen_per_1000l" text="/ 1.000 L" />
+        <text name="mdm_screen_price_trend" text="Prisudvikling" />
+        <text name="mdm_screen_graph_oldest" text="ældste" />
+        <text name="mdm_screen_graph_newest" text="nu" />
+        <text name="mdm_screen_graph_span" text="%d målinger" />
+        <text name="mdm_screen_graph_median" text="Alle varer (median)" />
 </texts>
 </l10n>

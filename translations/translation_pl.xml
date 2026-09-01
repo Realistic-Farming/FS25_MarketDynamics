@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
 <l10n>
     <texts>
 
@@ -311,5 +311,17 @@
         <text name="wc_rf_pda_open_manager" text="Otwórz menedżera pracowników" />
         <text name="sf_pda_btn_rotation_planner" text="Planer płodozmianu" />
         <text name="sf_pda_btn_field_detail" text="Szczegóły pola" />
+        <text name="mdm_evt_tracked_label" text="Śledzone kategorie rynku" />
+        <text name="mdm_cat_crops" text="Uprawy" />
+        <text name="mdm_cat_silage" text="Kiszonka" />
+        <text name="mdm_cat_livestock" text="Zwierzęta" />
+        <text name="mdm_cat_other" text="Inne" />
+        <text name="mdm_screen_per_head" text="/ szt." />
+        <text name="mdm_screen_per_1000l" text="/ 1000 l" />
+        <text name="mdm_screen_price_trend" text="Trend cen" />
+        <text name="mdm_screen_graph_oldest" text="najstarsze" />
+        <text name="mdm_screen_graph_newest" text="teraz" />
+        <text name="mdm_screen_graph_span" text="%d próbek" />
+        <text name="mdm_screen_graph_median" text="Wszystkie towary (mediana)" />
 </texts>
 </l10n>

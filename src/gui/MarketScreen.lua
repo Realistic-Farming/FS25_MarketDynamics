@@ -1,4 +1,4 @@
-MDMMarketScreen = {}
+MDMMarketScreen = MDMMarketScreen or {}
 
 MDMMarketScreen.CLASS_NAME = "MDMMarketScreen"
 MDMMarketScreen.MENU_PAGE_NAME = "menuMarketDynamics"
@@ -13,6 +13,82 @@ local TAB_EVENTS    = 2
 local TAB_CONTRACTS = 3
 
 local REFRESH_INTERVAL = 1000
+
+-- [MDM-LB] Live MDM_CREATE_CONTRACT chord (BUILD 22:36 hint sweep). File-scope
+-- so both localisation passes (per-frame safe-set and applyGuiLocalization)
+-- share one implementation. Prefers SettingsHub's RfLiveBinding, falls back to
+-- the proven engine call, then to the default literal.
+local function _liveCreateChord()
+    if RfLiveBinding ~= nil and RfLiveBinding.getChord ~= nil then
+        local c = RfLiveBinding.getChord("MDM_CREATE_CONTRACT")
+        if c then return c end
+    end
+    if g_inputDisplayManager ~= nil and InputAction ~= nil and InputAction.MDM_CREATE_CONTRACT ~= nil then
+        local ok, help = pcall(function()
+            return g_inputDisplayManager:getControllerSymbolOverlays(InputAction.MDM_CREATE_CONTRACT, "", "", false)
+        end)
+        if ok and help and help.keys and #help.keys > 0 then
+            local parts = {}
+            for _, k in ipairs(help.keys) do parts[#parts + 1] = tostring(k) end
+            return table.concat(parts, "+")
+        end
+    end
+    -- [MDM-LB2] BUILD 19:58: an unbound action must READ unbound. Returning the
+    -- old "Right Shift+3" literal here is what put a fake default on screen for
+    -- every player who had rebound (or never bound) the action.
+    if RfLiveBinding ~= nil and RfLiveBinding.UNASSIGNED ~= nil then
+        return RfLiveBinding.UNASSIGNED
+    end
+    return "unassigned"
+end
+
+--- [MDM-LB2] Plain-text, boundary-checked literal swap (BUILD 19:58).
+---
+--- Deliberately NOT a gsub: Lua patterns have no word boundary, and the shipped
+--- German chord "Umschalt+F" ends in the exact characters of "alt+F". A pattern
+--- sweep survives that only by case, which is one locale edit away from eating
+--- the tail of a real word. string.find(..., plain) plus an explicit neighbour
+--- check cannot: a hit is replaced only when the character before it is not a
+--- letter and the character after it is not alphanumeric.
+local function _swapLiteral(t, literal, replacement)
+    if type(t) ~= "string" or literal == nil or literal == "" then return t end
+    local out, i = {}, 1
+    while true do
+        local sPos, ePos = string.find(t, literal, i, true)
+        if sPos == nil then break end
+        local before = (sPos > 1) and string.sub(t, sPos - 1, sPos - 1) or ""
+        local after  = (ePos < #t) and string.sub(t, ePos + 1, ePos + 1) or ""
+        local leftOk  = (before == "") or (string.match(before, "%a") == nil)
+        local rightOk = (after  == "") or (string.match(after,  "%w") == nil)
+        out[#out + 1] = string.sub(t, i, sPos - 1)
+        out[#out + 1] = (leftOk and rightOk) and replacement or string.sub(t, sPos, ePos)
+        i = ePos + 1
+    end
+    out[#out + 1] = string.sub(t, i)
+    return table.concat(out)
+end
+
+--- Rewrite every stale default chord in an element's text to the live binding.
+--- [MDM-LB2] The BUILD 22:36 pass only covered the then-current English pair
+--- ("Right Shift+3" and X). The English l10n has since moved to N, and the 25
+--- other locales still ship the older "Alt+F", so a rebound player saw a stale
+--- hint in every language but one. Longest forms are swapped first so "Press N"
+--- is consumed before a bare "N:" can be.
+local function _applyCreateChordToEl(el)
+    if el == nil or type(el.getText) ~= "function" then return end
+    local t = el:getText()
+    if type(t) ~= "string" then return end
+    local chord = _liveCreateChord()
+    t = _swapLiteral(t, "Right Shift+3", chord)
+    t = _swapLiteral(t, "Alt+F",         chord)
+    t = _swapLiteral(t, "[X]", "[" .. chord .. "]")
+    t = _swapLiteral(t, "[N]", "[" .. chord .. "]")
+    t = _swapLiteral(t, "Press X", "Press " .. chord)
+    t = _swapLiteral(t, "Press N", "Press " .. chord)
+    t = _swapLiteral(t, "X:", chord .. ":")
+    t = _swapLiteral(t, "N:", chord .. ":")
+    pcall(function() el:setText(t) end)
+end
 
 -- Commodity list sort fields
 local SORT_NAME   = "name"
@@ -196,7 +272,7 @@ function MDMMarketScreen.show()
         -- Lazy deep load: with the RF Esc door hosting, the deep screen may never have
         -- been built, so Open full Market silently did nothing (eyes-on FAIL 2026-08-07).
         -- Build it on first use instead of bailing.
-        local modDir = MDMMarketScreen._modDir or g_currentModDirectory
+        local modDir = MDMMarketScreen._modDir or (MarketDynamicsModDirectory or g_currentModDirectory)
         if modDir ~= nil then
             MDMLog.info("MarketScreen.show: deep screen missing, loading on demand")
             pcall(MDMMarketScreen._loadDeepScreenOnly, modDir)
@@ -275,6 +351,13 @@ function MDMMarketScreen:onGuiSetupFinished()
     self.tabLabelEvents    = self:getDescendantById("tabLabelEvents")
     self.tabLabelContracts = self:getDescendantById("tabLabelContracts")
 
+    -- BUILD 15:39 (PB-04): the invisible hit rects, resolved so the fallback
+    -- hit-test can check the control the engine actually dispatches, not just
+    -- the label drawn over it.
+    self.tabHitPrices      = self:getDescendantById("tabHitPrices")
+    self.tabHitEvents      = self:getDescendantById("tabHitEvents")
+    self.tabHitContracts   = self:getDescendantById("tabHitContracts")
+
     self.tabUnderlinePrices    = self:getDescendantById("tabUnderlinePrices")
     self.tabUnderlineEvents    = self:getDescendantById("tabUnderlineEvents")
     self.tabUnderlineContracts = self:getDescendantById("tabUnderlineContracts")
@@ -345,6 +428,9 @@ function MDMMarketScreen:onGuiSetupFinished()
     else
         _setTextSafe(self.noContractsText, "mdm_screen_no_contracts", "No contracts yet. Press X to create one.")
         _setTextSafe(self.newContractHint, "mdm_screen_new_contract_btn", "New Contract [X]")
+        -- [MDM-LB] rewrite the resolved default chord to the live binding.
+        _applyCreateChordToEl(self.noContractsText)
+        _applyCreateChordToEl(self.newContractHint)
         if self.newContractHint then self.newContractHint:setVisible(true) end
     end
 end
@@ -630,20 +716,30 @@ function MDMMarketScreen:mouseEvent(posX, posY, isDown, isUp, button, eventUsed)
     end
 
     if isDown and button == Input.MOUSE_BUTTON_LEFT then
+        -- BUILD 15:39 (PB-04). Both the visible label AND its co-located hit
+        -- Button are tested. The label rect is what the player aims at; the
+        -- Button rect is what the engine dispatches. They now describe the same
+        -- box in the XML, so either one landing is a real tab click, and a click
+        -- can no longer fall between them the way it did for Events/Contracts.
         local tabs = {
-            { el = self.tabLabelPrices,    cb = MDMMarketScreen.onClickTabPrices    },
-            { el = self.tabLabelEvents,    cb = MDMMarketScreen.onClickTabEvents    },
-            { el = self.tabLabelContracts, cb = MDMMarketScreen.onClickTabContracts },
+            { els = { self.tabLabelPrices,    self.tabHitPrices    }, name = "PRICES",
+              cb = MDMMarketScreen.onClickTabPrices    },
+            { els = { self.tabLabelEvents,    self.tabHitEvents    }, name = "EVENTS",
+              cb = MDMMarketScreen.onClickTabEvents    },
+            { els = { self.tabLabelContracts, self.tabHitContracts }, name = "CONTRACTS",
+              cb = MDMMarketScreen.onClickTabContracts },
         }
         for _, t in ipairs(tabs) do
-            if t.el then
-                local ap = t.el.absPosition
-                local as = t.el.absSize
-                if ap and as and
-                   posX >= ap[1] and posX <= ap[1] + as[1] and
-                   posY >= ap[2] and posY <= ap[2] + as[2] then
-                    t.cb(self)
-                    return true
+            for _, el in ipairs(t.els) do
+                if el then
+                    local ap = el.absPosition
+                    local as = el.absSize
+                    if ap and as and
+                       posX >= ap[1] and posX <= ap[1] + as[1] and
+                       posY >= ap[2] and posY <= ap[2] + as[2] then
+                        t.cb(self)
+                        return true
+                    end
                 end
             end
         end
@@ -737,6 +833,101 @@ function MDMMarketScreen:rebuildAllData()
     self:_buildContractData()
 end
 
+-- ---------------------------------------------------------------------------
+-- BUILD 15:39 (PB-07) - price and label display
+--
+-- Brian read this table and could not use it: two rows both said "Alfalfa", long
+-- names ran into the price column, and livestock priced per animal was printed
+-- as `$9578936 / 1,000L` because every row was multiplied by 1000 and given a
+-- litre suffix.
+--
+-- Formats follow George's ENGINE ruling of 2026-08-15, which is sourced from the
+-- I18N decompile rather than from the wiki (there is no I18N wiki page):
+--   formatNumber(number, precision, forcePrecision)
+--   formatMoney(number, precision, addCurrency, prefixCurrencySymbol)
+-- formatMoney does NOT forward forcePrecision, so `formatMoney(12, 2)` can print
+-- "12" and not "12.00". Forced two places therefore go through
+-- formatNumber(v, 2, true) plus the short currency symbol.
+--
+-- The animal test is `animalSystem:getSubTypeByFillTypeIndex`, also from that
+-- ruling - no invented flags, and milk / wool / eggs stay on litre pricing
+-- because they are produce, not livestock.
+--
+-- Only the DISPLAY changes. entry.current stays the per-litre engine number that
+-- contracts, the price hook and the graph samples all read.
+-- ---------------------------------------------------------------------------
+
+--- Short currency symbol, falling back to the bare number rather than to a
+--- hardcoded "$" (the old format was wrong in every non-dollar locale).
+local function currency()
+    if g_i18n ~= nil and type(g_i18n.getCurrencySymbol) == "function" then
+        local ok, sym = pcall(g_i18n.getCurrencySymbol, g_i18n, true)
+        if ok and type(sym) == "string" and sym ~= "" then return sym end
+    end
+    return ""
+end
+
+--- Grouped, forced-2dp money. Never `%.0f`.
+local function money2(value)
+    local n
+    if g_i18n ~= nil and type(g_i18n.formatNumber) == "function" then
+        local ok, s = pcall(g_i18n.formatNumber, g_i18n, value, 2, true)
+        if ok and type(s) == "string" then n = s end
+    end
+    if n == nil then n = string.format("%.2f", value or 0) end
+    local sym = currency()
+    if sym == "" then return n end
+    return sym .. n
+end
+
+--- Is this fill type sold as live animals rather than by the litre?
+--- Guarded by type checks: if the engine ever drops the accessor this returns
+--- false and the row keeps its existing litre formatting instead of throwing.
+function MDMMarketScreen:_isLivestock(fillTypeIndex)
+    local sys = g_currentMission ~= nil and g_currentMission.animalSystem or nil
+    if sys == nil or type(sys.getSubTypeByFillTypeIndex) ~= "function" then
+        return false
+    end
+    local ok, subType = pcall(sys.getSubTypeByFillTypeIndex, sys, fillTypeIndex)
+    return ok and subType ~= nil
+end
+
+--- The player-facing price for one commodity row.
+--- Litre rows: price per 1,000 L. Livestock rows: price per head, no * 1000 and
+--- no litre suffix - that multiplication is what produced Brian's `$9578936`.
+function MDMMarketScreen:_priceText(data)
+    if data == nil then return "" end
+    if data.isLivestock then
+        local per = MDMUtil and MDMUtil.getModText("mdm_screen_per_head")
+        if type(per) ~= "string" or per == "" then per = "/ head" end
+        return money2(data.current or 0) .. " " .. per
+    end
+    local per = MDMUtil and MDMUtil.getModText("mdm_screen_per_1000l")
+    if type(per) ~= "string" or per == "" then per = "/ 1,000L" end
+    return money2((data.current or 0) * 1000) .. " " .. per
+end
+
+--- Give every row a label a player can tell apart.
+---
+--- Two fill types can legitimately share a display title (`Alfalfa` the crop and
+--- `Alfalfa hay` the windrow both localise to "Alfalfa" on some maps). Where that
+--- happens the internal fill-type name is appended as a parenthetical hint - only
+--- for the rows that actually collide, so a unique row is never made noisier.
+local function disambiguate(list)
+    local seen = {}
+    for _, row in ipairs(list) do
+        local t = row.title or ""
+        seen[t] = (seen[t] or 0) + 1
+    end
+    for _, row in ipairs(list) do
+        if (seen[row.title or ""] or 0) > 1 and row.name ~= nil and row.name ~= "" then
+            -- "ALFALFA_HAY" reads worse than "alfalfa hay" next to a title.
+            local hint = string.lower(tostring(row.name)):gsub("_", " ")
+            row.title = string.format("%s (%s)", row.title, hint)
+        end
+    end
+end
+
 function MDMMarketScreen:_buildCommodityData()
     self.commodities = {}
 
@@ -760,13 +951,25 @@ function MDMMarketScreen:_buildCommodityData()
                 volatility = entry.volatilityFactor,
                 modifiers  = entry.modifiers,
                 hudOverlay = fillType.hudOverlayFilename,
+                -- Resolved once here rather than per draw frame.
+                isLivestock = self:_isLivestock(fillTypeIndex),
             })
         end
     end
 
+    disambiguate(self.commodities)
+
     local sortField = self.sortField
     local sortAsc   = self.sortAscending
     table.sort(self.commodities, function(a, b)
+        -- BUILD 15:39 (PB-07). Livestock is priced per head and crops per
+        -- 1,000 L, so interleaving them puts two incomparable units in one
+        -- column and invites exactly the misreading Brian reported. Livestock
+        -- sorts into its own contiguous block at the end, under whichever sort
+        -- the player picked; the ordering INSIDE each block is unchanged.
+        if (a.isLivestock == true) ~= (b.isLivestock == true) then
+            return b.isLivestock == true
+        end
         if sortField == SORT_PRICE then
             local ac, bc = a.current or 0, b.current or 0
             if sortAsc then return ac < bc else return ac > bc end
@@ -932,7 +1135,7 @@ function MDMMarketScreen:_populateCommodityCell(index, cell)
         nameEl:setText(data.title)
     end
     if priceEl then
-        priceEl:setText(string.format("$%.0f / 1,000L", data.current * 1000))
+        priceEl:setText(self:_priceText(data))
     end
     if changeEl then
         local sign = data.changePct >= 0 and "+" or ""
@@ -1017,7 +1220,9 @@ function MDMMarketScreen:_populateContractCell(index, cell)
         qtyEl:setText(string.format(fmt, data.quantity))
     end
     if priceEl then
-        priceEl:setText(string.format("$%.0f / 1,000L", data.lockedPrice * 1000))
+        -- BUILD 15:39 (PB-07): grouped, forced 2dp, locale currency. A contract
+        -- is always a litre quantity, so this row keeps the per-1,000L unit.
+        priceEl:setText(self:_priceText({ current = data.lockedPrice, isLivestock = false }))
     end
     if progressEl then
         local pct = 0
@@ -1082,13 +1287,15 @@ function MDMMarketScreen:refreshPricesDetail()
     if self.detailCurrentPrice then
         self.detailCurrentPrice:setText(
             g_i18n:getText("mdm_screen_current_price") .. ": " ..
-            string.format("$%.0f / 1,000L", crop.current * 1000)
+            self:_priceText(crop)
         )
     end
     if self.detailBasePrice then
         self.detailBasePrice:setText(
             g_i18n:getText("mdm_screen_base_price") .. ": " ..
-            string.format("$%.0f / 1,000L", crop.base * 1000)
+            -- Same unit as the row it came from, so a livestock selection never
+            -- shows per head in the table and per 1,000L in the detail card.
+            self:_priceText({ current = crop.base, isLivestock = crop.isLivestock })
         )
     end
     if self.detailChange then
@@ -1128,7 +1335,7 @@ end
 -- Wired at source() time. MarketScreen manages its own registration.
 -- ---------------------------------------------------------------------------
 
-local _modDir = g_currentModDirectory
+local _modDir = (MarketDynamicsModDirectory or g_currentModDirectory)
 local _pendingRegistration = false
 local _pendingModDir = nil
 
@@ -1204,6 +1411,8 @@ function MDMMarketScreen._performRegistration(modDir)
             if hint then hint:setVisible(false) end
         else
             _setById("noContractsText", "mdm_screen_no_contracts", "No contracts yet. Press X to create one.")
+            -- [MDM-LB] live chord on the resolved text.
+            pcall(function() _applyCreateChordToEl(scr:getDescendantById("noContractsText")) end)
             local hint = screen:getDescendantById("newContractHint")
             if hint then hint:setVisible(true) end
         end
@@ -1220,6 +1429,8 @@ function MDMMarketScreen._performRegistration(modDir)
         _setById("contractsColStatus",    "mdm_label_status",    "Status")
         if not BCIntegration.isEnabled() then
             _setById("newContractHint", "mdm_screen_new_contract_btn", "New Contract  [X]")
+            -- [MDM-LB] live chord on the resolved text.
+            pcall(function() _applyCreateChordToEl(scr:getDescendantById("newContractHint")) end)
         end
 
         _setById("detailCropName", "mdm_screen_select_crop", "Select a commodity")

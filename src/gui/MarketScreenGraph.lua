@@ -1,4 +1,4 @@
-MDMMarketScreenGraph = {}
+MDMMarketScreenGraph = MDMMarketScreenGraph or {}
 
 -- ---------------------------------------------------------------------------
 -- Constants
@@ -12,7 +12,7 @@ local COLOR_GRID      = {0.25, 0.25, 0.30, 0.40}
 local COLOR_LINE      = {0.20, 0.78, 0.85, 1.00}
 local COLOR_AREA      = {0.0, 0.0, 0.0, 0.0}
 local COLOR_DOT       = {1.00, 1.00, 1.00, 0.90}
-local COLOR_LABEL     = {0.80, 0.80, 0.80, 0.90}
+local COLOR_LABEL     = {0.92, 0.94, 0.96, 1.00}
 
 local GRID_LINES      = 6
 local LINE_THICKNESS  = 3
@@ -153,7 +153,12 @@ function MDMMarketScreenGraph.draw(fillTypeIndex, gx, gy, gw, gh)
     local ordered = _extractOrdered(buf)
     if #ordered < 2 then return end
 
-    MDMMarketScreenGraph._drawLineChart(ordered, gx, gy, gw, gh)
+    -- BUILD 15:39 (PB-07): name the series and its unit so the chart is
+    -- readable on its own instead of being an unlabelled line.
+    MDMMarketScreenGraph._drawLineChart(ordered, gx, gy, gw, gh, {
+        label   = MDMMarketScreenGraph._fillTypeTitle(fillTypeIndex),
+        perHead = MDMMarketScreenGraph._isLivestock(fillTypeIndex),
+    })
 end
 
 --- BUILD 23:43: the ONE price-trend decision tree, shared by the full Market screen and
@@ -200,7 +205,10 @@ function MDMMarketScreenGraph.drawPriceTrend(fillTypeIndex, gx, gy, gw, gh)
                     end
                 end
                 if #series >= 2 then
-                    MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
+                    MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh, {
+                        label   = MDMMarketScreenGraph._fillTypeTitle(fillTypeIndex),
+                        perHead = MDMMarketScreenGraph._isLivestock(fillTypeIndex),
+                    })
                     return "history"
                 end
             end
@@ -247,7 +255,13 @@ function MDMMarketScreenGraph.drawAggregatedMedian(gx, gy, gw, gh)
 
     if #agg < 2 then return end
 
-    MDMMarketScreenGraph._drawLineChart(agg, gx, gy, gw, gh)
+    -- The median across every tracked commodity is not one commodity, and
+    -- labelling it with a crop name would be a lie about what is plotted.
+    local medianLabel = MDMUtil and MDMUtil.getModText("mdm_screen_graph_median")
+    if type(medianLabel) ~= "string" or medianLabel == "" then
+        medianLabel = "All commodities (median)"
+    end
+    MDMMarketScreenGraph._drawLineChart(agg, gx, gy, gw, gh, { label = medianLabel })
 end
 
 -- ---------------------------------------------------------------------------
@@ -269,9 +283,92 @@ end
 -- Line chart renderer (core) — uses drawFilledRect + drawLine2D
 -- ---------------------------------------------------------------------------
 
-function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
+-- BUILD 15:39 (PB-07) - graph context.
+--
+-- The chart drew a line and five bare Y numbers. Brian could not tell which
+-- commodity it was, over what period, or in what unit, which makes the trend
+-- unreadable however correct the line is. These helpers add the missing frame:
+-- the selected commodity's name, the x-axis time window, and Y labels that agree
+-- with the table's units and 2dp.
+--
+-- Nothing here invents data. The label comes from the fill type the caller
+-- already resolved, and the window is described from the sample count that is
+-- actually plotted - never a fabricated date range or a padded flat point.
+
+local function graphCurrency()
+    if g_i18n ~= nil and type(g_i18n.getCurrencySymbol) == "function" then
+        local ok, sym = pcall(g_i18n.getCurrencySymbol, g_i18n, true)
+        if ok and type(sym) == "string" and sym ~= "" then return sym end
+    end
+    return ""
+end
+
+--- Grouped, forced-2dp axis money. Matches the table (George ENGINE 2026-08-15:
+--- formatMoney does not force trailing zeros, formatNumber with forcePrecision
+--- does).
+local function axisMoney(value)
+    local n
+    if g_i18n ~= nil and type(g_i18n.formatNumber) == "function" then
+        local ok, s = pcall(g_i18n.formatNumber, g_i18n, value, 2, true)
+        if ok and type(s) == "string" then n = s end
+    end
+    if n == nil then n = string.format("%.2f", value or 0) end
+    return graphCurrency() .. n
+end
+
+--- Short, upright axis money for large values: $12.3k, $1.2M. A long grouped
+--- number either overran the axis or (before this) got rotated 30 degrees, which
+--- is what made the notations unreadable in nitro's report (2026-08-19). Small
+--- values fall through to axisMoney's exact grouped 2dp so they still match the
+--- table.
+local function axisMoneyCompact(value)
+    local a = math.abs(value or 0)
+    local scaled, suffix
+    if a >= 1e6 then
+        scaled, suffix = (value or 0) / 1e6, "M"
+    elseif a >= 1e3 then
+        scaled, suffix = (value or 0) / 1e3, "k"
+    else
+        return axisMoney(value)
+    end
+    local s = string.format("%.1f", scaled)
+    s = s:gsub("%.0$", "")  -- 12.0 -> 12, but 1.5 stays 1.5
+    return graphCurrency() .. s .. suffix
+end
+
+--- Display title for a fill type index, or nil when it cannot be resolved.
+function MDMMarketScreenGraph._fillTypeTitle(fillTypeIndex)
+    if fillTypeIndex == nil or g_fillTypeManager == nil then return nil end
+    local ft = g_fillTypeManager:getFillTypeByIndex(fillTypeIndex)
+    if ft == nil then return nil end
+    return ft.title or ft.name
+end
+
+--- Is this index priced per head? Mirrors MarketScreen:_isLivestock so the graph
+--- and the table never disagree about the unit.
+function MDMMarketScreenGraph._isLivestock(fillTypeIndex)
+    local sys = g_currentMission ~= nil and g_currentMission.animalSystem or nil
+    if sys == nil or type(sys.getSubTypeByFillTypeIndex) ~= "function" then
+        return false
+    end
+    local ok, subType = pcall(sys.getSubTypeByFillTypeIndex, sys, fillTypeIndex)
+    return ok and subType ~= nil
+end
+
+---@param series number[] plotted values (per-litre engine numbers)
+---@param ctx table|nil { label, perHead, points, source }
+function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh, ctx)
     local n = #series
     if n < 2 then return end
+    ctx = ctx or {}
+
+    -- Reserve a strip at the top for the series label and one at the bottom for
+    -- the x-axis window, so neither can overlap the plotted line.
+    local titleH = gh * 0.11
+    local axisH  = gh * 0.09
+    local fullGx, fullGy, fullGw, fullGh = gx, gy, gw, gh
+    gy = gy + axisH
+    gh = math.max(gh - titleH - axisH, 0.001)
 
     -- Find min/max
     local minP = math.huge
@@ -290,7 +387,33 @@ function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
     local yMax = maxP + padding
     local yRange = yMax - yMin
 
-    -- Background
+    -- Y-axis label text at this graph's unit. Livestock is per head, so it is NOT
+    -- multiplied by 1000 (that multiplication on an animal row produced the
+    -- nonsense figures Brian reported, PB-07). Large values go compact (12.3k /
+    -- 1.2M) and upright instead of the old 30-degree rotation, which is what made
+    -- them unreadable (nitro's testing-wave report, 2026-08-19).
+    local function yLabel(price)
+        local shown = ctx.perHead and price or (price * 1000)
+        if math.abs(shown) >= 10000 then return axisMoneyCompact(shown) end
+        return axisMoney(shown)
+    end
+
+    -- Size a left gutter to the widest label so the numbers sit INSIDE the
+    -- rectangle the caller gave us. Rendering them left of gx overhangs the box,
+    -- which spilled the price labels out of the small RF-glance panel. The plot
+    -- (gridlines, line, dots, x-axis) shifts right by the gutter; the dark
+    -- background still fills the whole box, so the labels read on it.
+    local labelSize = math.max(gh * 0.030, 0.011)
+    local gutterW = 0
+    for i = 0, GRID_LINES do
+        local w = getTextWidth(labelSize, yLabel(yMin + (i / GRID_LINES) * yRange))
+        if w > gutterW then gutterW = w end
+    end
+    gutterW = math.min(gutterW + gw * 0.02, gw * 0.40)
+    local plotGx = gx + gutterW
+    local plotGw = math.max(gw - gutterW, 0.001)
+
+    -- Background (fills the whole box, gutter included)
     drawFilledRect(gx, gy, gw, gh, COLOR_BG[1], COLOR_BG[2], COLOR_BG[3], COLOR_BG[4])
 
     -- Grid lines + Y-axis labels
@@ -298,25 +421,13 @@ function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
     for i = 0, GRID_LINES do
         local frac = i / GRID_LINES
         local ly = gy + frac * gh
-        drawFilledRect(gx, ly, gw, gridLineH, COLOR_GRID[1], COLOR_GRID[2], COLOR_GRID[3], COLOR_GRID[4])
+        drawFilledRect(plotGx, ly, plotGw, gridLineH, COLOR_GRID[1], COLOR_GRID[2], COLOR_GRID[3], COLOR_GRID[4])
 
-        -- Y-axis label
-        local price = yMin + frac * yRange
+        -- Y-axis label, right-aligned just inside the plot so it stays in the box.
         setTextColor(COLOR_LABEL[1], COLOR_LABEL[2], COLOR_LABEL[3], COLOR_LABEL[4])
         setTextBold(false)
         setTextAlignment(RenderText.ALIGN_RIGHT)
-
-        local labelSize = math.max(gh * 0.020, 0.003)
-        local labelStr = string.format("$%.0f", price * 1000)
-        -- Rotate only when price integer part has 5+ digits (price*1000 >= 10000)
-        if price * 1000 >= 10000 then
-            local labelX = gx - 0.005
-            setTextRotation(math.rad(30), labelX, ly)
-            renderText(labelX, ly, labelSize, labelStr)
-            setTextRotation(0, 0, 0)
-        else
-            renderText(gx - 0.01, ly, labelSize, labelStr)
-        end
+        renderText(plotGx - gw * 0.008, ly, labelSize, yLabel(yMin + frac * yRange))
     end
     setTextAlignment(RenderText.ALIGN_LEFT)
 
@@ -324,13 +435,13 @@ function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
     local points = {}
     for i = 1, n do
         points[i] = {
-            x = gx + ((i - 1) / (n - 1)) * gw,
+            x = plotGx + ((i - 1) / (n - 1)) * plotGw,
             y = gy + ((series[i] - yMin) / yRange) * gh,
         }
     end
 
     -- Area fill: thin vertical bars from baseline to each point
-    local sliceW = math.max(gw / (n - 1), 0.001)
+    local sliceW = math.max(plotGw / (n - 1), 0.001)
     for i = 1, n do
         local barH = points[i].y - gy
         if barH > 0 then
@@ -352,4 +463,50 @@ function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh)
         _drawFilledCircle(points[i].x, points[i].y, dotR,
                         COLOR_DOT[1], COLOR_DOT[2], COLOR_DOT[3], COLOR_DOT[4])
     end
+
+    -- ── BUILD 15:39 (PB-07): the frame that makes the line readable ──────────
+    setTextColor(COLOR_LABEL[1], COLOR_LABEL[2], COLOR_LABEL[3], COLOR_LABEL[4])
+    setTextRotation(0, 0, 0)
+
+    -- Series label. With one series this IS the legend: it names exactly what
+    -- the line is and in which unit, which is what a legend is for.
+    local titleSize = math.max(fullGh * 0.055, 0.010)
+    local label = ctx.label
+    if label == nil or label == "" then
+        local fb = MDMUtil and MDMUtil.getModText("mdm_screen_price_trend")
+        label = (type(fb) == "string" and fb ~= "") and fb or "Price trend"
+    end
+    local unit
+    if ctx.perHead then
+        unit = MDMUtil and MDMUtil.getModText("mdm_screen_per_head")
+        if type(unit) ~= "string" or unit == "" then unit = "/ head" end
+    else
+        unit = MDMUtil and MDMUtil.getModText("mdm_screen_per_1000l")
+        if type(unit) ~= "string" or unit == "" then unit = "/ 1,000L" end
+    end
+    setTextBold(true)
+    setTextAlignment(RenderText.ALIGN_LEFT)
+    renderText(gx, fullGy + fullGh - titleH * 0.85,
+               titleSize, string.format("%s  (%s)", label, unit))
+    setTextBold(false)
+
+    -- X-axis window. Described from the samples actually plotted, never from an
+    -- invented date range: n points, oldest on the left, newest on the right.
+    local axisSize = math.max(fullGh * 0.042, 0.008)
+    local axisY    = fullGy + axisH * 0.15
+    local oldest = MDMUtil and MDMUtil.getModText("mdm_screen_graph_oldest")
+    if type(oldest) ~= "string" or oldest == "" then oldest = "oldest" end
+    local newest = MDMUtil and MDMUtil.getModText("mdm_screen_graph_newest")
+    if type(newest) ~= "string" or newest == "" then newest = "now" end
+
+    setTextAlignment(RenderText.ALIGN_LEFT)
+    renderText(plotGx, axisY, axisSize, oldest)
+    setTextAlignment(RenderText.ALIGN_RIGHT)
+    renderText(plotGx + plotGw, axisY, axisSize, newest)
+    setTextAlignment(RenderText.ALIGN_CENTER)
+    local span = MDMUtil and MDMUtil.getModText("mdm_screen_graph_span")
+    if type(span) ~= "string" or span == "" then span = "%d samples" end
+    local okSpan, spanTxt = pcall(string.format, span, n)
+    renderText(plotGx + plotGw * 0.5, axisY, axisSize, okSpan and spanTxt or tostring(n))
+    setTextAlignment(RenderText.ALIGN_LEFT)
 end

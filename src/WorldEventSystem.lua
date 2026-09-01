@@ -26,7 +26,7 @@
 --
 -- Author: tison (dev-1)
 
-WorldEventSystem = {}
+WorldEventSystem = WorldEventSystem or {}
 WorldEventSystem.__index = WorldEventSystem
 
 local CHECK_INTERVAL_MS = 5 * 60 * 1000   -- check for new events every 5 in-game minutes

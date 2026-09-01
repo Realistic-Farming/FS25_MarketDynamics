@@ -24,7 +24,7 @@
 -- Detection: g_modManager:getModByName("FS25_FuturesMission")
 -- Author: tison (dev-1)
 
-BCIntegration = {}
+BCIntegration = BCIntegration or {}
 
 -- ---------------------------------------------------------------------------
 -- Config

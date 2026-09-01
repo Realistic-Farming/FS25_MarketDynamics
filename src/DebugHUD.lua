@@ -7,7 +7,7 @@
 --
 -- Author: tison (dev-1)
 
-MDMDebugHUD = {}
+MDMDebugHUD = MDMDebugHUD or {}
 MDMDebugHUD.__index = MDMDebugHUD
 
 -- Layout

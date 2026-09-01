@@ -17,7 +17,7 @@
 --
 -- Author: tison (dev-1)
 
-FuturesMarket = {}
+FuturesMarket = FuturesMarket or {}
 FuturesMarket.__index = FuturesMarket
 
 -- Base penalty rate for defaulting on a contract (fraction of unfulfilled contract value).

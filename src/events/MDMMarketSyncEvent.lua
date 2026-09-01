@@ -1,7 +1,7 @@
 -- MDMMarketSyncEvent.lua
 -- Syncs prices and active world events from server to clients.
 
-MDMMarketSyncEvent = {}
+MDMMarketSyncEvent = MDMMarketSyncEvent or {}
 local MDMMarketSyncEvent_mt = Class(MDMMarketSyncEvent, Event)
 InitEventClass(MDMMarketSyncEvent, "MDMMarketSyncEvent")
 
@@ -9,14 +9,15 @@ function MDMMarketSyncEvent.emptyNew()
     return Event.new(MDMMarketSyncEvent_mt)
 end
 
-function MDMMarketSyncEvent.new(marketEngine, worldEvents)
+function MDMMarketSyncEvent.new(marketEngine, worldEvents, includeHistory)
     local self = MDMMarketSyncEvent.emptyNew()
     self.prices = {}
     if marketEngine then
         for index, entry in pairs(marketEngine.prices) do
             table.insert(self.prices, {
                 index = index,
-                volatilityFactor = entry.volatilityFactor
+                volatilityFactor = entry.volatilityFactor,
+                history = includeHistory and entry.history or {},
             })
         end
     end
@@ -51,7 +52,7 @@ end
 
 function MDMMarketSyncEvent.sendToClient(connection)
     if g_server ~= nil and connection ~= nil and g_MarketDynamics then
-        connection:sendEvent(MDMMarketSyncEvent.new(g_MarketDynamics.marketEngine, g_MarketDynamics.worldEvents))
+        connection:sendEvent(MDMMarketSyncEvent.new(g_MarketDynamics.marketEngine, g_MarketDynamics.worldEvents, true))
     end
 end
 
@@ -61,6 +62,12 @@ function MDMMarketSyncEvent:writeStream(streamId, connection)
     for _, p in ipairs(self.prices) do
         streamWriteInt32(streamId, p.index)
         streamWriteFloat32(streamId, p.volatilityFactor)
+        local hist = p.history or {}
+        streamWriteInt32(streamId, #hist)
+        for _, h in ipairs(hist) do
+            streamWriteFloat32(streamId, h.price or 0)
+            streamWriteFloat32(streamId, h.time or 0)
+        end
     end
 
     -- Write active events
@@ -77,9 +84,20 @@ function MDMMarketSyncEvent:readStream(streamId, connection)
     self.prices = {}
     local numPrices = streamReadInt32(streamId)
     for i = 1, numPrices do
+        local index = streamReadInt32(streamId)
+        local volatilityFactor = streamReadFloat32(streamId)
+        local numHist = streamReadInt32(streamId)
+        local history = {}
+        for j = 1, numHist do
+            history[j] = {
+                price = streamReadFloat32(streamId),
+                time  = streamReadFloat32(streamId),
+            }
+        end
         table.insert(self.prices, {
-            index = streamReadInt32(streamId),
-            volatilityFactor = streamReadFloat32(streamId)
+            index = index,
+            volatilityFactor = volatilityFactor,
+            history = history,
         })
     end
 
@@ -99,7 +117,7 @@ end
 -- Apply market prices + active world events to the local client. Extracted from :run so
 -- the NetworkSync bridge can reuse the EXACT same apply path (prices, event lifecycle,
 -- notifications, UI refresh) instead of re-implementing it. `prices` = array of
--- {index, volatilityFactor}; `activeEvents` = array of {id, endsAt, intensity, extraData}.
+-- {index, volatilityFactor, history?}; `activeEvents` = array of {id, endsAt, intensity, extraData}.
 function MDMMarketSyncEvent.applyState(prices, activeEvents)
     if not g_MarketDynamics then return end
 
@@ -108,41 +126,60 @@ function MDMMarketSyncEvent.applyState(prices, activeEvents)
             local entry = g_MarketDynamics.marketEngine.prices[p.index]
             if entry then
                 entry.volatilityFactor = p.volatilityFactor
+                if p.history and #p.history > 0 then
+                    entry.history = p.history
+                    if MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.seedFromHistory) == "function" then
+                        MDMMarketScreenGraph.seedFromHistory(p.index, p.history)
+                    end
+                end
                 g_MarketDynamics.marketEngine:_recalculate(p.index)
             end
         end
     end
 
     if g_MarketDynamics.worldEvents then
-        -- Detect new events by comparing against current active list
+        local incoming = {}
+        for _, e in ipairs(activeEvents) do
+            incoming[e.id] = e
+        end
+
         local oldActive = {}
         for id, _ in pairs(g_MarketDynamics.worldEvents.active) do
             oldActive[id] = true
         end
 
-        -- Clear old events
-        for id, _ in pairs(g_MarketDynamics.worldEvents.active) do
-            g_MarketDynamics.worldEvents:_expireEvent(id, true)
+        -- Only expire events that are no longer in the incoming set
+        for id, _ in pairs(oldActive) do
+            if not incoming[id] then
+                g_MarketDynamics.worldEvents:_expireEvent(id)
+            end
         end
 
-        -- Load new events
         local newEventNames = {}
         for _, e in ipairs(activeEvents) do
-            g_MarketDynamics.worldEvents:loadActiveEvent(e.id, e.endsAt, e.intensity, e.extraData)
-            if g_MarketDynamics.worldEvents.isInitialized and not oldActive[e.id] then
-                local desc = g_MarketDynamics.worldEvents.registry[e.id]
-                local name = MDMUtil.resolveEventName(desc or e.id, desc and desc.name, e.id)
-                table.insert(newEventNames, name)
+            if oldActive[e.id] then
+                -- Already active: update timing silently without re-firing callbacks
+                local active = g_MarketDynamics.worldEvents.active[e.id]
+                if active then
+                    active.endsAt = e.endsAt
+                    active.intensity = e.intensity
+                end
+            else
+                -- Genuinely new event: full lifecycle
+                g_MarketDynamics.worldEvents:loadActiveEvent(e.id, e.endsAt, e.intensity, e.extraData)
+                if g_MarketDynamics.worldEvents.isInitialized then
+                    local desc = g_MarketDynamics.worldEvents.registry[e.id]
+                    local name = MDMUtil.resolveEventName(desc or e.id, desc and desc.name, e.id)
+                    table.insert(newEventNames, name)
+                end
             end
         end
 
         g_MarketDynamics.worldEvents.isInitialized = true
 
-        -- Show notification if we have new events (clients only)
         if #newEventNames > 0 then
             local names = table.concat(newEventNames, ", ")
             g_MarketDynamics.pendingEventNotificationName = names
-            -- Add a short delay (e.g. 1s) to ensure we're not colliding with other sync dialogs
             addTimer(1000, "showEventNotification", g_MarketDynamics)
         end
     end

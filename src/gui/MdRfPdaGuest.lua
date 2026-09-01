@@ -9,10 +9,10 @@
 -- HARD VETO: never reintroduce addPageTab + raw stand-down product path.
 -- =========================================================
 
-MdRfPdaGuest = {}
+MdRfPdaGuest = MdRfPdaGuest or {}
 
-local MOD_DIR = g_currentModDirectory
-local MD_RF_MOD_NAME = g_currentModName
+local MOD_DIR = (MarketDynamicsModDirectory or g_currentModDirectory)
+local MD_RF_MOD_NAME = (MarketDynamicsModName or g_currentModName)
 local PANEL_ID = "marketDynamics"
 local PANEL_ORDER = 40
 local MAX_EVENT_ROWS = 6
@@ -505,7 +505,16 @@ local function paintDetail(container)
     setText(cropEl, fillTypeTitle(ft))
     setTextColor(cropEl, unpack(COLOR_LIME))
 
-    local priceLine = string.format("%s  ·  %s", formatMoney(price), formatSignedPct(pct))
+    -- PB-02. The selected-crop line reads the same as the row it came from. Before this it
+    -- printed the raw per-litre engine number through formatMoney, which is the same zero-
+    -- decimal, no-unit reading that made the table say "£0". MDMPriceFormat is the one place
+    -- that decides how a market price is written; the guard keeps the old string if the
+    -- helper file ever fails to load rather than blanking the line.
+    local priceText = formatMoney(price)
+    if MDMPriceFormat ~= nil then
+        priceText = MDMPriceFormat.price(ft, price)
+    end
+    local priceLine = string.format("%s  ·  %s", priceText, formatSignedPct(pct))
     setText(priceEl, priceLine)
     if pct > 0.5 then
         setTextColor(priceEl, unpack(COLOR_UP))
@@ -1111,11 +1120,24 @@ local function mdPublishHandles()
         if MDMMarketScreenGraph ~= nil then
             root["MDMMarketScreenGraph"] = MDMMarketScreenGraph
         end
+        -- BUILD 14:04 (Vera FAIL SUBMIT 10:16, George TASK 10:53): MDMPriceFormat joins the
+        -- publish list. It was the one cross-env class the host needed that was NOT here,
+        -- so on a Dairy-hosted door every mdResolve belt missed it live (Vera's gate:
+        -- via=mission is the belt that works, and this list is what feeds that belt) and
+        -- the Prices rows fell to the rounded fallback. Guarded like the graph: the row
+        -- cells only paint under a registered guest, and every register attempt runs this,
+        -- so a painted row implies a published formatter.
+        if MDMPriceFormat ~= nil then
+            root["MDMPriceFormat"] = MDMPriceFormat
+        end
     end
     if g_currentMission ~= nil then
         g_currentMission.MdRfPdaGuest = MdRfPdaGuest
         if MDMMarketScreenGraph ~= nil then
             g_currentMission.MDMMarketScreenGraph = MDMMarketScreenGraph
+        end
+        if MDMPriceFormat ~= nil then
+            g_currentMission.MDMPriceFormat = MDMPriceFormat
         end
     end
 end

@@ -13,7 +13,7 @@
 --
 -- Author: tison (dev-1)
 
-UPIntegration = {}
+UPIntegration = UPIntegration or {}
 
 -- ---------------------------------------------------------------------------
 -- Config

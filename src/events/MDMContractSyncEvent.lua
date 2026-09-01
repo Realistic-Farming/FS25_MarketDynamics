@@ -1,7 +1,7 @@
 -- MDMContractSyncEvent.lua
 -- Server-to-Client network event for syncing contract state.
 
-MDMContractSyncEvent = {}
+MDMContractSyncEvent = MDMContractSyncEvent or {}
 local MDMContractSyncEvent_mt = Class(MDMContractSyncEvent, Event)
 InitEventClass(MDMContractSyncEvent, "MDMContractSyncEvent")
 

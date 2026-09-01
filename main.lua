@@ -5,11 +5,13 @@
 -- Authors: TheCodingDad (tison) — core systems
 --          LeGrizzly             — GUI systems
 
-local modDirectory = g_currentModDirectory
-local modName      = g_currentModName
+local modDirectory = (MarketDynamicsModDirectory or g_currentModDirectory)
+local modName      = (MarketDynamicsModName or g_currentModName)
+
+source(modDirectory .. "src/integrations/OptionScalingResolver.lua")
 
 -- Menu icon global (resolved by XML imageFilename via hook below)
-g_MDMIconMenu = Utils.getFilename("images/menuIcon.dds", g_currentModDirectory)
+g_MDMIconMenu = Utils.getFilename("images/menuIcon.dds", (MarketDynamicsModDirectory or g_currentModDirectory))
 
 -- Resolve mod icon globals in XML imageFilename attributes (EmployeeManager pattern)
 local MDM_ICON_GLOBALS = {
@@ -197,6 +199,46 @@ hookMDMInput()
 -- Attach to game hooks
 Mission00.load                  = Utils.prependedFunction(Mission00.load,                  onLoad)
 Mission00.loadMission00Finished = Utils.appendedFunction(Mission00.loadMission00Finished,  onLoadFinished)
+
+-- ---------------------------------------------------------
+-- Realistic Farming Control Center: publish runnable delegates.
+--
+-- All three close the Control Center first, and the settings one has to:
+-- mdmSettingsActionCallback above refuses outright while any GUI or dialog is
+-- visible, so running it with the Control Center still up would silently do
+-- nothing. The other two open fullscreen surfaces of their own.
+-- ---------------------------------------------------------
+local function registerControlCenterActions()
+    local registry = g_currentMission ~= nil and g_currentMission.rfActionRegistry or nil
+    if registry == nil then return end
+
+    registry.registerAction({
+        action     = "MDM_MARKET_SCREEN",
+        button     = "Open",
+        order      = 1,
+        closeFirst = true,
+        run        = function() MDMMarketScreen.toggle() end,
+    })
+
+    registry.registerAction({
+        action     = "MDM_CREATE_CONTRACT",
+        button     = "Create",
+        order      = 2,
+        closeFirst = true,
+        run        = function() MDMMarketScreen.onGlobalCreateContract() end,
+    })
+
+    registry.registerAction({
+        action     = "MDM_OPEN_SETTINGS",
+        button     = "Open",
+        order      = 3,
+        closeFirst = true,
+        run        = function() if mdm ~= nil then mdm:toggleSettings() end end,
+    })
+end
+
+Mission00.loadMission00Finished = Utils.appendedFunction(
+    Mission00.loadMission00Finished, registerControlCenterActions)
 Mission00.onStartMission        = Utils.appendedFunction(Mission00.onStartMission,         onStartMission)
 FSBaseMission.update            = Utils.appendedFunction(FSBaseMission.update,             onUpdate)
 FSBaseMission.draw              = Utils.appendedFunction(FSBaseMission.draw,               onDraw)
