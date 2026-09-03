@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <modDesc descVersion="106">
     <author>TisonK &amp; LeGrizzly</author>
-    <version>1.3.1.8</version>
+    <version>1.3.1.9</version>
     <title>
         <en>Market Dynamics</en>
     </title>
@@ -72,6 +72,20 @@
         <action name="MDM_CREATE_CONTRACT" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false" />
         <action name="MDM_OPEN_SETTINGS" category="ONFOOT VEHICLE" axisType="HALF" ignoreComboMask="false" />
     </actions>
+
+    <inputBinding>
+        <!-- Right Shift suite modifier. All three actions are registered in
+             main.lua, so these defaults are live keys rather than reserved chords. -->
+        <actionBinding action="MDM_MARKET_SCREEN">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_rshift KEY_5" />
+        </actionBinding>
+        <actionBinding action="MDM_CREATE_CONTRACT">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_rshift KEY_3" />
+        </actionBinding>
+        <actionBinding action="MDM_OPEN_SETTINGS">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_rshift KEY_slash" />
+        </actionBinding>
+    </inputBinding>
 
     <!-- l10n definitions for input bindings (required for help display) -->
     <l10n filenamePrefix="translations/translation">
