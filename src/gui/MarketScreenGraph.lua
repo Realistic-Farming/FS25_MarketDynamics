@@ -468,27 +468,11 @@ function MDMMarketScreenGraph._drawLineChart(series, gx, gy, gw, gh, ctx)
     setTextColor(COLOR_LABEL[1], COLOR_LABEL[2], COLOR_LABEL[3], COLOR_LABEL[4])
     setTextRotation(0, 0, 0)
 
-    -- Series label. With one series this IS the legend: it names exactly what
-    -- the line is and in which unit, which is what a legend is for.
-    local titleSize = math.max(fullGh * 0.055, 0.010)
-    local label = ctx.label
-    if label == nil or label == "" then
-        local fb = MDMUtil and MDMUtil.getModText("mdm_screen_price_trend")
-        label = (type(fb) == "string" and fb ~= "") and fb or "Price trend"
-    end
-    local unit
-    if ctx.perHead then
-        unit = MDMUtil and MDMUtil.getModText("mdm_screen_per_head")
-        if type(unit) ~= "string" or unit == "" then unit = "/ head" end
-    else
-        unit = MDMUtil and MDMUtil.getModText("mdm_screen_per_1000l")
-        if type(unit) ~= "string" or unit == "" then unit = "/ 1,000L" end
-    end
-    setTextBold(true)
-    setTextAlignment(RenderText.ALIGN_LEFT)
-    renderText(gx, fullGy + fullGh - titleH * 0.85,
-               titleSize, string.format("%s  (%s)", label, unit))
-    setTextBold(false)
+    -- BUILD 12:05 (George CLOSED DESIGN 09:45): the in-plot series label (crop + unit at the top of
+    -- the plot) is gone. Both hosts already name the crop beside the chart: Esc mdDetailCommodity
+    -- (paintDetail) and the full Market detailCropName. The title strip stays reserved so the
+    -- plot math and the reserved air are exactly what they were; ctx.label / ctx.perHead are
+    -- still accepted and simply not drawn here.
 
     -- X-axis window. Described from the samples actually plotted, never from an
     -- invented date range: n points, oldest on the left, newest on the right.
