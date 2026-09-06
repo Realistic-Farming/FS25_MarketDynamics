@@ -247,8 +247,8 @@
         <text name="mdm_admin_settled"          text="Denne kontrakten er gjort opp. Bruk Slett for å fjerne den fra listen." />
             <text name="mdm_bc_dialog_suppressed" text="FS25_FuturesMission is active and handles contract creation. Use the Contracts page (ESC menu) to create futures contracts. Get it on GitHub: search FS25_FuturesMission by Mmtrx." />
 		<text name="md_rf_pda_module_title" text="[EN] Market Dynamics"/>
-		<text name="md_rf_pda_blurb" text="[EN] Pause Market glance: Prices, Events, Contracts. Top table stays; bottom swaps. Open full Market for the deep desk."/>
-		<text name="rf_pda_side_info_market_dynamics" text="[EN] Market Dynamics&#10;&#10;Pause Market glance with three pages: Prices, Events, Contracts.&#10;&#10;Top table = crops, prices, and swings. On Prices, pick a crop to drive the graph.&#10;&#10;Events page = what is hitting the market now, how strong, and how long left.&#10;&#10;Contracts page = your open deals (read-only). Manage them in full Market.&#10;&#10;Open full Market (SPACE) for the deep desk."/>
+		<text name="md_rf_pda_blurb" text="[EN] Prices, events and contracts at a glance: pick a crop above, act below."/>
+		<text name="rf_pda_side_info_market_dynamics" text="[EN] Market Dynamics&#10;&#10;Pause Market glance with three pages: Prices, Events, Contracts.&#10;&#10;Top table = crop icons, prices, and swings. On Prices, pick a crop to drive the graph. Graph under the table = price path for the crop you pick. A new crop's line appears once it has price history.&#10;&#10;Events page = what is hitting the market now on the left, the Event Settings summary and its dialog plate on the right.&#10;&#10;Contracts page = your open deals on the left, New Contract on the right for the crop you picked above.&#10;&#10;Open full Market (SPACE) for the deep desk."/>
 		<text name="md_rf_pda_page_prices" text="[EN] Prices"/>
 		<text name="md_rf_pda_page_events" text="[EN] Events"/>
 		<text name="md_rf_pda_page_contracts" text="[EN] Contracts"/>
@@ -323,5 +323,38 @@
         <text name="mdm_screen_graph_newest" text="nå" />
         <text name="mdm_screen_graph_span" text="%d målinger" />
         <text name="mdm_screen_graph_median" text="Alle varer (median)" />
+		<text name="md_rf_pda_page_event_settings" text="[EN] Event Settings"/>
+		<text name="md_rf_pda_on" text="[EN] On"/>
+		<text name="md_rf_pda_off" text="[EN] Off"/>
+		<text name="md_rf_pda_es_title" text="[EN] Event settings"/>
+		<text name="md_rf_pda_es_global" text="[EN] Market events: %s"/>
+		<text name="md_rf_pda_es_freq" text="[EN] Frequency: %s"/>
+		<text name="md_rf_pda_es_enabled" text="[EN] Events enabled: %d of %d"/>
+		<text name="md_rf_pda_es_active" text="[EN] Active now: %s"/>
+		<text name="md_rf_pda_es_active_none" text="[EN] none"/>
+		<text name="md_rf_pda_es_col_event" text="[EN] Event"/>
+		<text name="md_rf_pda_es_col_state" text="[EN] State"/>
+		<text name="md_rf_pda_es_row_on" text="[EN] on"/>
+		<text name="md_rf_pda_es_row_off" text="[EN] off"/>
+		<text name="md_rf_pda_es_row_active" text="[EN] active now"/>
+		<text name="md_rf_pda_es_more" text="[EN] and %d more in the dialog"/>
+		<text name="md_rf_pda_es_hint_admin" text="[EN] Read-only here. Event settings... opens the full dialog: global on/off, frequency, per-event rules and fill types."/>
+		<text name="md_rf_pda_es_hint_host_only" text="[EN] Host only: the server host or an admin changes market events. This page stays read-only for everyone else."/>
+		<text name="md_rf_pda_es_open_btn" text="[EN] Event settings..."/>
+		<text name="md_rf_pda_nc_title" text="[EN] New contract"/>
+		<text name="md_rf_pda_nc_pick_crop" text="[EN] Pick a crop in the table above"/>
+		<text name="md_rf_pda_nc_price" text="[EN] Locked price %s (%s vs base)"/>
+		<text name="md_rf_pda_nc_qty" text="[EN] Quantity (L)"/>
+		<text name="md_rf_pda_nc_window" text="[EN] Deliver in"/>
+		<text name="md_rf_pda_nc_total" text="[EN] Total %s for %s L, deliver in %d %s"/>
+		<text name="md_rf_pda_nc_confirm" text="[EN] Confirm contract"/>
+		<text name="md_rf_pda_nc_full" text="[EN] Full form..."/>
+		<text name="md_rf_pda_nc_sent" text="[EN] Contract request sent: %s, %s L. It shows on the left when the server confirms."/>
+		<text name="md_rf_pda_nc_no_market" text="[EN] Futures market unavailable."/>
+		<text name="md_rf_pda_nc_no_farm" text="[EN] No farm to contract for."/>
+		<text name="md_rf_pda_nc_bc_active" text="[EN] FS25_FuturesMission is active and owns contract creation; this card is off."/>
+		<text name="md_rf_pda_nc_total_label" text="[EN] Total"/>
+		<text name="md_rf_pda_nc_total_for" text="[EN] for %s L"/>
+		<text name="md_rf_pda_nc_window_unit" text="[EN] Deliver in (%s)"/>
 </texts>
 </l10n>

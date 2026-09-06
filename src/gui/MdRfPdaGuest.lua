@@ -15,12 +15,35 @@ local MOD_DIR = (MarketDynamicsModDirectory or g_currentModDirectory)
 local MD_RF_MOD_NAME = (MarketDynamicsModName or g_currentModName)
 local PANEL_ID = "marketDynamics"
 local PANEL_ORDER = 40
-local MAX_EVENT_ROWS = 6
+-- BUILD 16:42: eight fixed rows in the 550px left Events card (24px pitch, George measured).
+local MAX_EVENT_ROWS = 8
 local MAX_CONTRACT_ROWS = 5
 
 local PAGE_PRICES = 1
 local PAGE_EVENTS = 2
 local PAGE_CONTRACTS = 3
+-- BUILD 16:42 (George CLOSED DESIGN 16:25): three pages. The Event Settings summary and its dialog
+-- plate are the right card of the Events page; the 800x800 dialog is never inlined.
+-- New Contract card presets: the same buttons MDMContractDialog offers (dlgQty*, dlgDel*).
+local NC_QTY_PRESETS = { 500, 1000, 5000, 10000, 25000, 50000 }
+local NC_DAY_PRESETS = { 30, 60, 90, 120 }
+-- BUILD 15:34 (George CLOSED DESIGN 15:20): the quantity / day plates and Confirm paint as vanilla
+-- ButtonOverlay key chips, the CsRfPdaGuest pivot-remote pattern. The Button's own text stays "",
+-- so no SPACE glyph can ever sit on a label; the chip is drawn in the card's draw wrap.
+local NC_CHIP_IDS = {
+    "mdNcQty500", "mdNcQty1000", "mdNcQty5000", "mdNcQty10000", "mdNcQty25000", "mdNcQty50000",
+    "mdNcDays30", "mdNcDays60", "mdNcDays90", "mdNcDays120",
+    "mdNewContractBtn",
+}
+-- BUILD 20:36: the Event settings plate (mdEsSummaryCard on the Events page) paints the same way.
+local ES_CHIP_IDS = { "mdEventSettingsBtn" }
+-- Vanilla wideButton chip tints (guiProfiles: icon = colorMainHighlight, icon background =
+-- colorGreenDark), the same numbers CsRfPdaGuest.lua uses so both cards read as one family.
+local NC_CHIP_TEXT = { 0.22323, 0.40724, 0.00368 }
+local NC_CHIP_BG   = { 0.00913, 0.01033, 0.00651 }
+-- Gated: zero green, so "locked" never reads as "live but faint".
+local NC_CHIP_GATED_TEXT = { 0.62, 0.64, 0.66 }
+local NC_CHIP_GATED_BG   = { 0.06, 0.06, 0.065 }
 
 local COLOR_UP = {0.30, 0.80, 0.35, 1}
 local COLOR_DOWN = {0.90, 0.25, 0.20, 1}
@@ -48,6 +71,11 @@ local _suppressSelectionCallback = false
 local _commoditySig = nil
 local _lastEventsSig = nil
 local _lastContractsSig = nil
+-- BUILD 10:47: New Contract card state (Esc subset of MDMContractDialog: quantity + window +
+-- confirm for the crop picked in the top table) and its one feedback line.
+local _ncQty = 5000
+local _ncDays = 30
+local _ncFeedback = nil
 -- One-time ring seeds from MarketEngine history (fillTypeIndex → true). Never invent samples.
 local _historySeeded = {}
 -- Set by MarketScreen when deep-only load skipped Esc rail inject (prefer never stand-down mutate).
@@ -128,6 +156,12 @@ local function setVis(el, visible)
         el:setVisible(visible)
     end
 end
+
+-- BUILD 20:36 (George CLOSED DESIGN 19:03, live crash 18:59:25 x1192): the engine's own text
+-- colour setter, captured BEFORE the element helper below shadows the name. The chip draw wrap
+-- resets the global render colour with this one; calling the helper with a number threw
+-- "attempt to index number with 'setTextColor'" every frame and killed the Market page draw.
+local engineSetTextColor = setTextColor
 
 local function setTextColor(el, r, g, b, a)
     if el ~= nil and type(el.setTextColor) == "function" then
@@ -350,7 +384,7 @@ end
 
 local function paintSideInfo(container)
     local body = tr("rf_pda_side_info_market_dynamics",
-        "Market Dynamics\n\nPause Market glance with three pages: Prices, Events, Contracts.\n\nTop table = crop icons, prices, and swings. On Prices, pick a crop to drive the graph. Graph under the table = price path for the crop you pick. A new crop's line appears once it has price history.\n\nEvents page = what is hitting the market now.\n\nContracts page = your open deals (read-only). Manage them in full Market.\n\nOpen full Market (SPACE) for the deep desk.")
+        "Market Dynamics\n\nPause Market glance with three pages: Prices, Events, Contracts.\n\nTop table = crop icons, prices, and swings. On Prices, pick a crop to drive the graph. Graph under the table = price path for the crop you pick. A new crop's line appears once it has price history.\n\nEvents page = what is hitting the market now on the left, the Event Settings summary and its dialog plate on the right.\n\nContracts page = your open deals on the left, New Contract on the right for the crop you picked above.")
     -- Nest under mdSubnavShell (WC twin). Never force Soil rfSideInfoShell on MDM.
     setVis(findDescendant(container, "rfSideInfoShell"), false)
     local shell = findDescendant(container, "mdSideInfoShell")
@@ -363,15 +397,9 @@ local function paintSideInfo(container)
     setText(bodyEl, body)
 end
 
-local function paintOpenMarketButtons(container)
-    local label = tr("md_rf_pda_open_market", "Open full Market")
-    for _, id in ipairs({ "mdOpenMarketBtn", "mdOpenMarketBtnEvents", "mdOpenMarketBtnContracts" }) do
-        local btn = findDescendant(container, id)
-        if btn ~= nil and btn.setText then
-            btn:setText(label)
-        end
-    end
-end
+-- BUILD 12:05 (George CLOSED DESIGN 09:45): the Esc full-Market door is gone. Prices, Events and
+-- Contracts are the whole Market on this page; the standalone Market screen keeps its keybind
+-- and the Control Center toggle.
 
 local function paintTableHeaders(container)
     -- Shared deep Market keys + Missing-reject (tr); EN Crop/Price/Change locked.
@@ -798,10 +826,396 @@ local function paintContractsBand(container)
     end
     local moreEl = findDescendant(container, "mdCtMore")
     if n > MAX_CONTRACT_ROWS then
-        setText(moreEl, string.format(tr("md_rf_pda_contracts_more", "and %d more in full Market"), n - MAX_CONTRACT_ROWS))
+        setText(moreEl, string.format(tr("md_rf_pda_contracts_more", "and %d more open deals not shown here"), n - MAX_CONTRACT_ROWS))
     else
         setText(moreEl, "")
     end
+end
+
+-- =========================================================
+-- BUILD 10:47 (George CLOSED DESIGN 10:37): page D Event Settings + New Contract card.
+-- Everything below is fixed Text / Button elements in the 432px strip: no SmoothList, no
+-- reloadData, no dialog inlined. Gates are the same ones full Market uses.
+-- =========================================================
+
+--- Same gate as MarketScreen:onEventSettingsClick / MDMEventSettingsDialog:onOpen.
+local function isEventAdmin()
+    if g_currentMission == nil then
+        return false
+    end
+    local isServer = false
+    if type(g_currentMission.getIsServer) == "function" then
+        isServer = g_currentMission:getIsServer() == true
+    end
+    return isServer or g_currentMission.isAdmin == true or g_currentMission.isMasterUser == true
+end
+
+--- Same gate as MarketScreen:openContractDialog: BetterContracts owns the futures flow.
+local function bcOwnsContracts()
+    return BCIntegration ~= nil and type(BCIntegration.isEnabled) == "function" and BCIntegration.isEnabled() == true
+end
+
+local function fmtInt(n)
+    n = math.floor((tonumber(n) or 0) + 0.5)
+    local s = tostring(n)
+    local rev = s:reverse():gsub("(%d%d%d)", "%1,")
+    local out = rev:reverse()
+    if out:sub(1, 1) == "," then
+        out = out:sub(2)
+    end
+    return out
+end
+
+--- The crop the New Contract card contracts for: the top-table pick, priced by the engine
+--- entry the full Market screen uses (entry.current is the locked price there too).
+local function ncSelectedCrop()
+    local mdm = getMdm()
+    local engine = mdm and mdm.marketEngine
+    local ft = _selectedFillType
+    if ft == nil or engine == nil or engine.prices == nil then
+        return nil
+    end
+    local entry = engine.prices[ft]
+    if entry == nil or entry.current == nil then
+        return nil
+    end
+    return { fillTypeIndex = ft, title = fillTypeTitle(ft), current = entry.current, base = entry.base }
+end
+
+--- Store the chip state on the element and blank its TextElement label: the label and the
+--- chip must never draw at once (CsRfPdaGuest setPivotBtn). No "dead" state here: the card
+--- always has a market behind it; BetterContracts / no futures market is gated grey.
+local function setNcBtn(container, id, label, enabled, latched)
+    local el = findDescendant(container, id)
+    if el == nil then return end
+    if el.setVisible then el:setVisible(true) end
+    if el.setText then el:setText("") end
+    el.rfNcChipLabel = label
+    el.rfNcChipEnabled = enabled and true or false
+    el.rfNcChipLatched = latched and true or false
+    if type(el.setDisabled) == "function" then
+        el:setDisabled(not enabled)
+    end
+end
+
+--- Paint one plate as a vanilla key chip, centred in its hit box (CsRfPdaGuest renderPivotChip).
+local function renderNcChip(el, overlay)
+    local label = el.rfNcChipLabel
+    if label == nil or label == "" then return end
+    if el.absPosition == nil or el.absSize == nil then return end
+    if el.visible == false then return end
+    -- Chip height rides the hit box: 0.72 of the 32px row lands on the vanilla 30px icon feel.
+    local height = el.absSize[2] * 0.72
+    if height <= 0 then return end
+    local enabled = el.rfNcChipEnabled
+    local t, b, ta, ba
+    if enabled and el.rfNcChipLatched then
+        -- LATCHED (the selected quantity / window): true invert, dark text on lime fill.
+        t, b, ta, ba = NC_CHIP_BG, NC_CHIP_TEXT, 1.0, 1.0
+    elseif enabled then
+        t, b, ta, ba = NC_CHIP_TEXT, NC_CHIP_BG, 1.0, 1.0
+    else
+        -- GATED: legible, nothing green.
+        t, b, ta, ba = NC_CHIP_GATED_TEXT, NC_CHIP_GATED_BG, 0.45, 0.55
+    end
+    overlay:setColor(t[1], t[2], t[3], ta, b[1], b[2], b[3], ba)
+    -- getButtonWidth hugs the label. The overlay is SHARED with the rest of the game UI, so
+    -- never setMinWidth here. The chip sits centred in the XML box; clicks route on the box.
+    local width = overlay:getButtonWidth(label, height)
+    local x = el.absPosition[1] + (el.absSize[1] - width) * 0.5
+    local y = el.absPosition[2] + (el.absSize[2] - height) * 0.5
+    overlay:renderButton(label, x, y, height, true)
+end
+
+--- Wrap the New Contract card's draw once so the chips repaint every frame while the card is
+--- visible. The light tick only refreshes labels and enable state; nothing is re-wrapped.
+local function wireChipPaint(container, cardId, ids, flag)
+    local card = findDescendant(container, cardId)
+    if card == nil or card[flag] then return end
+    card[flag] = true
+    local prevDraw = card.draw
+    function card:draw(...)
+        if prevDraw ~= nil then prevDraw(self, ...) end
+        local idm = g_inputDisplayManager
+        if idm == nil or type(idm.getKeyboardKeyOverlay) ~= "function" then return end
+        local overlay = idm:getKeyboardKeyOverlay()
+        if overlay == nil or type(overlay.renderButton) ~= "function" then return end
+        for _, id in ipairs(ids) do
+            local el = findDescendant(self, id) or findDescendant(container, id)
+            if el ~= nil then
+                pcall(renderNcChip, el, overlay)
+            end
+        end
+        -- renderButton leaves global text state set; this draws outside the vanilla order,
+        -- so put the defaults back. BUILD 20:36: the colour reset is the ENGINE global
+        -- (captured as engineSetTextColor above), never the element helper.
+        setTextBold(false)
+        setTextAlignment(RenderText.ALIGN_LEFT)
+        setTextVerticalAlignment(RenderText.VERTICAL_ALIGN_BASELINE)
+        if type(engineSetTextColor) == "function" then
+            engineSetTextColor(1, 1, 1, 1)
+        end
+    end
+end
+
+local function wireNcChipPaint(container)
+    wireChipPaint(container, "mdNewContractCard", NC_CHIP_IDS, "_rfNcChipWired")
+end
+
+local function wireEsChipPaint(container)
+    wireChipPaint(container, "mdEsSummaryCard", ES_CHIP_IDS, "_rfEsChipWired")
+end
+
+local function paintNewContractCard(container)
+    setText(findDescendant(container, "mdNewContractTitle"), tr("md_rf_pda_nc_title", "New contract"))
+    local crop = ncSelectedCrop()
+    local cropEl = findDescendant(container, "mdNcCrop")
+    local priceEl = findDescendant(container, "mdNcPrice")
+    if crop == nil then
+        setText(cropEl, tr("md_rf_pda_nc_pick_crop", "Pick a crop in the table above"))
+        setTextColor(cropEl, unpack(COLOR_FLAT))
+        setText(priceEl, "")
+    else
+        setText(cropEl, crop.title)
+        setTextColor(cropEl, unpack(COLOR_LIME))
+        local priceText = formatMoney(crop.current)
+        if MDMPriceFormat ~= nil and type(MDMPriceFormat.price) == "function" then
+            priceText = MDMPriceFormat.price(crop.fillTypeIndex, crop.current)
+        end
+        local pct = 0
+        if crop.base ~= nil and crop.base > 0 then
+            pct = ((crop.current - crop.base) / crop.base) * 100
+        end
+        setText(priceEl, string.format(tr("md_rf_pda_nc_price", "Locked price %s (%s vs base)"), priceText, formatSignedPct(pct)))
+    end
+    setText(findDescendant(container, "mdNcQtyLabel"), tr("md_rf_pda_nc_qty", "Quantity (L)"))
+    local mdm = getMdm()
+    -- BUILD 15:34: the chips gate together. Futures market present and BetterContracts not owning
+    -- contracts = live chips; otherwise every chip paints grey and is disabled, so a gated click
+    -- never reaches onNcQty / onNewContract. The selected quantity and window are latched;
+    -- Confirm also needs a picked crop and is never latched.
+    local chipsLive = mdm ~= nil and mdm.futuresMarket ~= nil and not bcOwnsContracts()
+    for _, q in ipairs(NC_QTY_PRESETS) do
+        setNcBtn(container, "mdNcQty" .. q, fmtInt(q), chipsLive, q == _ncQty)
+    end
+    local isRealDays = mdm ~= nil and mdm.settings ~= nil and mdm.settings.useRealDays == true
+    local unit = isRealDays and tr("mdm_unit_real_days", "Real Days") or tr("mdm_unit_game_days", "In-Game Days")
+    -- The unit rides the Deliver in label (full card width in the XML) so it never sits on the
+    -- 120 plate; mdNcDaysUnit stays in the XML for the id binding and is kept empty.
+    setText(findDescendant(container, "mdNcDaysLabel"), string.format(tr("md_rf_pda_nc_window_unit", "Deliver in (%s)"), unit))
+    for _, d in ipairs(NC_DAY_PRESETS) do
+        setNcBtn(container, "mdNcDays" .. d, tostring(d), chipsLive, d == _ncDays)
+    end
+    setText(findDescendant(container, "mdNcDaysUnit"), "")
+    -- BUILD 11:42: the total is six adjacent Text nodes so only the money and the days number
+    -- paint yellow (RF_ProductCell); a Giants TextElement is one colour.
+    local money = ""
+    if crop ~= nil then
+        local total = crop.current * _ncQty
+        money = formatMoney(total)
+        if MDMPriceFormat ~= nil and type(MDMPriceFormat.money) == "function" then
+            money = MDMPriceFormat.money(total)
+        end
+    end
+    setText(findDescendant(container, "mdNcSumLabel"), crop ~= nil and tr("md_rf_pda_nc_total_label", "Total") or "")
+    setText(findDescendant(container, "mdNcSumMoney"), money)
+    setText(findDescendant(container, "mdNcSumFor"), crop ~= nil and string.format(tr("md_rf_pda_nc_total_for", "for %s L"), fmtInt(_ncQty)) or "")
+    setText(findDescendant(container, "mdNcSumWinLabel"), tr("md_rf_pda_nc_window", "Deliver in"))
+    setText(findDescendant(container, "mdNcSumDays"), tostring(_ncDays))
+    setText(findDescendant(container, "mdNcSumUnit"), unit)
+    local hint = _ncFeedback
+    if hint == nil then
+        if bcOwnsContracts() then
+            hint = tr("md_rf_pda_nc_bc_active", "FS25_FuturesMission is active and owns contract creation; this card is off.")
+        elseif mdm == nil or mdm.futuresMarket == nil then
+            hint = tr("md_rf_pda_nc_no_market", "Futures market unavailable.")
+        else
+            hint = tr("mdm_default_penalty_hint", "Default penalty: 15% on unfulfilled qty")
+        end
+    end
+    setText(findDescendant(container, "mdNcHint"), hint)
+    setNcBtn(container, "mdNewContractBtn", tr("md_rf_pda_nc_confirm", "Confirm contract"), chipsLive and crop ~= nil, false)
+end
+
+local function paintEventSettingsBand(container)
+    clearPricesBandGhosts(container)
+    local mdm = getMdm()
+    local s = mdm and mdm.settings or nil
+    local we = mdm and mdm.worldEvents or nil
+    -- BUILD 16:42: the right card names itself (no Event Settings tab any more).
+    setText(findDescendant(container, "mdEventSettingsTitle"), tr("md_rf_pda_es_title", "Event settings"))
+    local onOff = (s ~= nil and s.eventsEnabled ~= false) and tr("md_rf_pda_on", "On") or tr("md_rf_pda_off", "Off")
+    setText(findDescendant(container, "mdEsGlobal"), string.format(tr("md_rf_pda_es_global", "Market events: %s"), onOff))
+    -- Same thresholds as MDMEventSettingsDialog:_refreshGlobal (0.4 / 1.0 / 2.0).
+    local freq = (s ~= nil and tonumber(s.eventFrequency)) or 1.0
+    local freqLabel
+    if math.abs(freq - 0.4) < 0.05 then
+        freqLabel = tr("mdm_freq_rare", "Rare")
+    elseif math.abs(freq - 1.0) < 0.05 then
+        freqLabel = tr("mdm_freq_normal", "Normal")
+    else
+        freqLabel = tr("mdm_freq_frequent", "Frequent")
+    end
+    setText(findDescendant(container, "mdEsFreq"), string.format(tr("md_rf_pda_es_freq", "Frequency: %s"), freqLabel))
+    local rows = {}
+    local disabled = (s ~= nil and s.disabledEvents) or {}
+    local active = (we ~= nil and we.active) or {}
+    if we ~= nil and type(we.registry) == "table" then
+        for id, ev in pairs(we.registry) do
+            local name = nil
+            if MDMUtil ~= nil and type(MDMUtil.resolveEventName) == "function" then
+                local ok, n = pcall(MDMUtil.resolveEventName, ev)
+                if ok and type(n) == "string" and n ~= "" then
+                    name = n
+                end
+            end
+            if name == nil then
+                name = tostring((type(ev) == "table" and ev.name) or id)
+            end
+            table.insert(rows, { id = id, name = name, disabled = disabled[id] == true, active = active[id] ~= nil })
+        end
+        table.sort(rows, function(a, b) return a.name < b.name end)
+    end
+    local total, enabledCount, activeNames = #rows, 0, {}
+    for _, r in ipairs(rows) do
+        if not r.disabled then
+            enabledCount = enabledCount + 1
+        end
+        if r.active then
+            table.insert(activeNames, r.name)
+        end
+    end
+    setText(findDescendant(container, "mdEsEnabled"), string.format(tr("md_rf_pda_es_enabled", "Events enabled: %d of %d"), enabledCount, total))
+    local activeText = (#activeNames > 0) and table.concat(activeNames, ", ") or tr("md_rf_pda_es_active_none", "none")
+    setText(findDescendant(container, "mdEsActive"), string.format(tr("md_rf_pda_es_active", "Active now: %s"), activeText))
+    -- BUILD 16:42: the per-event EVENT / STATE list does not fit the 550px card (George measured);
+    -- it lives in the dialog behind the plate. The summary lines above carry the counts.
+    local hintEl = findDescendant(container, "mdEsHint")
+    if isEventAdmin() then
+        setText(hintEl, tr("md_rf_pda_es_hint_admin", "Read-only here. Event settings... opens the full dialog: global on/off, frequency, per-event rules and fill types."))
+    else
+        setText(hintEl, tr("md_rf_pda_es_hint_host_only", "Host only: the server host or an admin changes market events. This page stays read-only for everyone else."))
+    end
+    -- BUILD 20:36: the plate paints as an overlay chip (idle = lime text on dark, gated grey when
+    -- the player is not host / admin / master), never a white text link. Button text stays "".
+    setNcBtn(container, "mdEventSettingsBtn", tr("md_rf_pda_es_open_btn", "Event settings..."), isEventAdmin(), false)
+end
+
+--- The one request path: MDMContractRequestEvent ACTION_CREATE with the same params
+--- MarketScreen:_onContractConfirmed sends. delivDays arrives already converted for
+--- real-days mode (MDMContractDialog:onConfirmClick does that before its callback; the
+--- compact card does the same conversion in onNewContract).
+local function ncSendRequest(crop, qty, delivDays, isRealDays, ts)
+    local mdm = getMdm()
+    if mdm == nil or mdm.futuresMarket == nil then
+        return false, tr("md_rf_pda_nc_no_market", "Futures market unavailable.")
+    end
+    if MDMContractRequestEvent == nil or type(MDMContractRequestEvent.sendToServer) ~= "function" then
+        return false, tr("md_rf_pda_nc_no_market", "Futures market unavailable.")
+    end
+    local fid = farmId()
+    if fid == nil or fid == 0 then
+        return false, tr("md_rf_pda_nc_no_farm", "No farm to contract for.")
+    end
+    local now = 0
+    if MDMUtil ~= nil and type(MDMUtil.getGameTime) == "function" then
+        now = MDMUtil.getGameTime() or 0
+    end
+    local deliveryTimeMs = now + (delivDays * 24 * 60 * 60000)
+    MDMContractRequestEvent.sendToServer(MDMContractRequestEvent.ACTION_CREATE, {
+        farmId           = fid,
+        fillTypeIndex    = crop.fillTypeIndex,
+        fillTypeName     = crop.title,
+        quantity         = qty,
+        lockedPrice      = crop.current,
+        deliveryTimeMs   = deliveryTimeMs,
+        isRealDays       = isRealDays or false,
+        createdTimeScale = ts or 1,
+    })
+    print(string.format("[MarketDynamics] Esc New Contract: request sent %s %dL @ %.4f/L deliver in %d days (realDays=%s)",
+        tostring(crop.title), qty, crop.current or 0, delivDays, tostring(isRealDays)))
+    return true
+end
+
+local function ncBlockedByBc(container)
+    if not bcOwnsContracts() then
+        return false
+    end
+    local msg = tr("mdm_bc_dialog_suppressed",
+        "FS25_FuturesMission is active and handles contract creation. Use the Contracts page (ESC menu) to create futures contracts.")
+    if InfoDialog ~= nil and type(InfoDialog.show) == "function" then
+        pcall(InfoDialog.show, msg)
+    end
+    _ncFeedback = msg
+    paintNewContractCard(container)
+    return true
+end
+
+function MdRfPdaGuest.onNcQty(container, element)
+    local id = element ~= nil and element.id or nil
+    local q = id ~= nil and tonumber(string.match(tostring(id), "^mdNcQty(%d+)$")) or nil
+    if q == nil then
+        return
+    end
+    _ncQty = q
+    _ncFeedback = nil
+    paintNewContractCard(container)
+end
+
+function MdRfPdaGuest.onNcDays(container, element)
+    local id = element ~= nil and element.id or nil
+    local d = id ~= nil and tonumber(string.match(tostring(id), "^mdNcDays(%d+)$")) or nil
+    if d == nil then
+        return
+    end
+    _ncDays = d
+    _ncFeedback = nil
+    paintNewContractCard(container)
+end
+
+--- Compact confirm: crop from the top table, quantity + window from the chips. The only
+--- create path on Esc since BUILD 11:42 (Full form dropped); the 920x850 dialog stays full Market only.
+function MdRfPdaGuest.onNewContract(container)
+    if ncBlockedByBc(container) then
+        return
+    end
+    local crop = ncSelectedCrop()
+    if crop == nil then
+        _ncFeedback = tr("md_rf_pda_nc_pick_crop", "Pick a crop in the table above")
+        paintNewContractCard(container)
+        return
+    end
+    local mdm = getMdm()
+    local isRealDays = mdm ~= nil and mdm.settings ~= nil and mdm.settings.useRealDays == true
+    local ts = (g_currentMission ~= nil and g_currentMission.timeScale) or 1
+    local delivDays = _ncDays
+    if isRealDays then
+        -- 1 real day = timeScale game days (MDMContractDialog:onConfirmClick).
+        delivDays = delivDays * ts
+    end
+    local ok, why = ncSendRequest(crop, _ncQty, delivDays, isRealDays, ts)
+    if ok then
+        _ncFeedback = string.format(tr("md_rf_pda_nc_sent", "Contract request sent: %s, %s L. It shows on the left when the server confirms."),
+            crop.title, fmtInt(_ncQty))
+    else
+        _ncFeedback = why
+    end
+    paintNewContractCard(container)
+end
+
+--- Page D button. Non-admins get the host-only hint, never the dialog (George #3).
+function MdRfPdaGuest.onEventSettings(container)
+    if not isEventAdmin() then
+        setText(findDescendant(container, "mdEsHint"),
+            tr("md_rf_pda_es_hint_host_only", "Host only: the server host or an admin changes market events. This page stays read-only for everyone else."))
+        return
+    end
+    if MDMDialogLoader == nil or type(MDMDialogLoader.show) ~= "function" then
+        return
+    end
+    MDMDialogLoader.show("MDMEventSettingsDialog", "setData", {
+        onClose = function() end,
+    })
 end
 
 local function paintBottomByPage(container)
@@ -814,9 +1228,12 @@ local function paintBottomByPage(container)
             area:updateAbsolutePosition()
         end
     elseif idx == PAGE_EVENTS then
+        -- BUILD 16:42: the Events page is two cards; the right one is the Event Settings summary.
         paintEventsBand(container)
+        paintEventSettingsBand(container)
     else
         paintContractsBand(container)
+        paintNewContractCard(container)
     end
 end
 
@@ -834,7 +1251,10 @@ function MdRfPdaGuest.onShow(container, lightOnly)
 
     paintSideInfo(container)
     paintTableHeaders(container)
-    paintOpenMarketButtons(container)
+    -- BUILD 15:34: idempotent (guard flag on the card element); the chips then repaint each frame.
+    wireNcChipPaint(container)
+    -- BUILD 20:36: the Event settings plate on the Events card paints the same way.
+    wireEsChipPaint(container)
 
     local page = getHostPage()
     if page ~= nil then
@@ -925,8 +1345,11 @@ function MdRfPdaGuest.onLightTick(container)
         paintGraphHints(container)
     elseif currentPageIndex() == PAGE_EVENTS then
         paintEventsBand(container)
+        paintEventSettingsBand(container)
     else
         paintContractsBand(container)
+        -- Price and window can move between ticks; the summary line follows them.
+        paintNewContractCard(container)
     end
 end
 
@@ -934,6 +1357,7 @@ function MdRfPdaGuest.onHide()
     _commoditySig = nil
     _lastEventsSig = nil
     _lastContractsSig = nil
+    _ncFeedback = nil
 end
 
 function MdRfPdaGuest.getSelectedFillType()
@@ -967,13 +1391,6 @@ end
 -- Retired movers MTO path (kept as no-op safe hook).
 function MdRfPdaGuest.onMoverChanged(_container)
     return
-end
-
-function MdRfPdaGuest.onOpenFullMarket()
-    print("[MarketDynamics] onOpenFullMarket entered")
-    if MDMMarketScreen ~= nil and type(MDMMarketScreen.show) == "function" then
-        MDMMarketScreen.show()
-    end
 end
 
 --- Stand down legacy Esc rail if it was injected; prefer never-injected path.
@@ -1175,8 +1592,8 @@ function MdRfPdaGuest.tryRegister()
         local ok = registerFn(host, {
             id = PANEL_ID,
             title = tr("md_rf_pda_module_title", "Market Dynamics"),
-            blurb = tr("md_rf_pda_blurb",
-                "Pause Market glance: Prices, Events, Contracts. Top table stays; bottom swaps. Open full Market for the deep desk."),
+            -- BUILD 16:24: one line under the hero title; the long teach is paintSideInfo.
+            blurb = tr("md_rf_pda_blurb", "Prices, events and contracts at a glance: pick a crop above, act below."),
             order = PANEL_ORDER,
             isAvailable = function()
                 return getMdm() ~= nil
@@ -1190,7 +1607,7 @@ function MdRfPdaGuest.tryRegister()
             selectCommodityIndex = MdRfPdaGuest.selectCommodityIndex,
             onHide = MdRfPdaGuest.onHide,
             onMoverChanged = MdRfPdaGuest.onMoverChanged,
-            onOpenFullMarket = MdRfPdaGuest.onOpenFullMarket,
+            -- BUILD 12:05: the open-full-market handler is gone with the Esc full-Market door.
         })
         if ok then
             _registered = true
@@ -1223,4 +1640,7 @@ function MdRfPdaGuest.reset()
     _commoditySig = nil
     _lastEventsSig = nil
     _lastContractsSig = nil
+    _ncQty = 5000
+    _ncDays = 30
+    _ncFeedback = nil
 end
