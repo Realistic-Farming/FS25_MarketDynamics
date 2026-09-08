@@ -40,11 +40,13 @@ function MarketSerializer:save(coordinator)
     end
 
     -- Schema version stamp
-    xmlFile:setString("marketDynamics#version", "2")
+    xmlFile:setString("marketDynamics#version", "3")
     
     -- Store absolute game time at save (v2.1+) to prevent immediate expiration on reload.
     -- Stored as string to prevent 32-bit float parsing truncation bugs in C++ engine.
     xmlFile:setString("marketDynamics#lastGameTime", tostring(MDMUtil.getGameTime()))
+    -- Canonical monotonic time at save (v3, RSF-F203). Same string convention.
+    xmlFile:setString("marketDynamics#lastMonotonicTime", tostring(MDMUtil.getMonotonicTime()))
 
     -- ── Futures contracts ────────────────────────────────────────────────
     local contracts = coordinator.futuresMarket and coordinator.futuresMarket.contracts or {}
@@ -78,6 +80,10 @@ function MarketSerializer:save(coordinator)
             xmlFile:setInt  (base .. "#index",  index)
             xmlFile:setFloat(base .. "#current", entry.current)
             xmlFile:setFloat(base .. "#volatilityFactor", entry.volatilityFactor or 1)
+            -- v3: private monotonic history-day cursor (endpoint-day admission).
+            if entry.lastHistoryDay then
+                xmlFile:setInt(base .. "#lastHistoryDay", entry.lastHistoryDay)
+            end
             
             -- Save history
             if entry.history and #entry.history > 0 then
@@ -99,6 +105,11 @@ function MarketSerializer:save(coordinator)
             local base = "marketDynamics.events.event(" .. j .. ")"
             xmlFile:setString(base .. "#id",          id)
             xmlFile:setString(base .. "#lastFiredAt", tostring(event.lastFiredAt))
+            -- v3: canonical monotonic firing time. Never-fired stays a missing
+            -- record (no zero sentinel).
+            if event.lastFiredMonotonicMs then
+                xmlFile:setString(base .. "#lastFiredMonotonicMs", tostring(event.lastFiredMonotonicMs))
+            end
             j = j + 1
         end
 
@@ -108,6 +119,10 @@ function MarketSerializer:save(coordinator)
             local base = "marketDynamics.activeEvents.event(" .. a .. ")"
             xmlFile:setString(base .. "#id",        id)
             xmlFile:setString(base .. "#endsAt",    tostring(active.endsAt))
+            -- v3: canonical monotonic deadline.
+            if active.endsAtMonotonicMs then
+                xmlFile:setString(base .. "#endsAtMonotonicMs", tostring(active.endsAtMonotonicMs))
+            end
             xmlFile:setFloat (base .. "#intensity", active.intensity)
             -- Persist per-event extra state (e.g. which crops were affected)
             local desc = coordinator.worldEvents.registry[id]
@@ -221,6 +236,9 @@ function MarketSerializer:load(coordinator)
     if coordinator then
         local gtStr = xmlFile:getString("marketDynamics#lastGameTime")
         coordinator.lastSavedGameTime = gtStr and tonumber(gtStr) or (xmlFile:getFloat("marketDynamics#lastGameTime") or 0)
+        -- v3: canonical monotonic time at save.
+        local mtStr = xmlFile:getString("marketDynamics#lastMonotonicTime")
+        coordinator.lastSavedMonotonicTime = mtStr and tonumber(mtStr) or nil
     end
 
     -- ── Restore futures contracts ─────────────────────────────────────────
@@ -287,6 +305,9 @@ function MarketSerializer:load(coordinator)
                 if entry then
                     entry.current    = xmlFile:getFloat(base .. "#current") or entry.current
                     entry.volatilityFactor = xmlFile:getFloat(base .. "#volatilityFactor") or entry.volatilityFactor
+                    -- v3: private monotonic history-day cursor.
+                    local lhd = xmlFile:getInt(base .. "#lastHistoryDay")
+                    if lhd then entry.lastHistoryDay = lhd end
                     
                     -- Restore history
                     entry.history = {}
@@ -312,6 +333,8 @@ function MarketSerializer:load(coordinator)
     end
 
     -- ── Restore event cooldowns ───────────────────────────────────────────
+    local legacyNow = MDMUtil.getGameTime()
+    local monoNow   = MDMUtil.getMonotonicTime()
     local j = 0
     while true do
         local base  = "marketDynamics.events.event(" .. j .. ")"
@@ -322,7 +345,17 @@ function MarketSerializer:load(coordinator)
         local lastFired = lfStr and tonumber(lfStr) or (xmlFile:getFloat(base .. "#lastFiredAt") or -math.huge)
         
         if evId and coordinator.worldEvents and coordinator.worldEvents.registry[evId] then
-            coordinator.worldEvents.registry[evId].lastFiredAt = lastFired
+            local event = coordinator.worldEvents.registry[evId]
+            event.lastFiredAt = lastFired
+            -- v3 canonical firing time; v2 migration derives it from the public
+            -- field at the current clock offset. Never-fired (-math.huge) stays
+            -- a missing record.
+            local lfmStr = xmlFile:getString(base .. "#lastFiredMonotonicMs")
+            if lfmStr then
+                event.lastFiredMonotonicMs = tonumber(lfmStr)
+            elseif lastFired and lastFired > -math.huge / 2 then
+                event.lastFiredMonotonicMs = monoNow + (lastFired - legacyNow)
+            end
         end
         j = j + 1
     end
@@ -340,7 +373,12 @@ function MarketSerializer:load(coordinator)
                 local endsAt    = endsAtStr and tonumber(endsAtStr) or (xmlFile:getFloat(base .. "#endsAt") or 0)
                 local intensity = xmlFile:getFloat (base .. "#intensity")
                 local extraData = xmlFile:getString(base .. "#extraData") or ""
-                coordinator.worldEvents:loadActiveEvent(evId, endsAt, intensity, extraData)
+                -- v3 canonical deadline; v2 migration derives it from the public
+                -- field at the current clock offset (preserves remaining time).
+                local endsAtMonoStr = xmlFile:getString(base .. "#endsAtMonotonicMs")
+                local endsAtMonotonicMs = endsAtMonoStr and tonumber(endsAtMonoStr)
+                    or (monoNow + (endsAt - legacyNow))
+                coordinator.worldEvents:loadActiveEvent(evId, endsAt, intensity, extraData, endsAtMonotonicMs)
             end
             a = a + 1
         end
@@ -464,8 +502,9 @@ end
 
 function MarketSerializer:toTable(coordinator)
     local out = {
-        version      = 2,
+        version      = 3,
         lastGameTime = MDMUtil.getGameTime(),
+        lastMonotonicTime = MDMUtil.getMonotonicTime(),
     }
 
     -- Futures contracts (array; each carries its own id)
@@ -507,6 +546,7 @@ function MarketSerializer:toTable(coordinator)
                 index             = index,
                 current           = entry.current,
                 volatilityFactor  = entry.volatilityFactor or 1,
+                lastHistoryDay    = entry.lastHistoryDay,
                 history           = history,
             }
         end
@@ -514,13 +554,15 @@ function MarketSerializer:toTable(coordinator)
     end
     out.prices = prices
 
-    -- World-event cooldowns (array of { id, lastFiredAt-as-string })
+    -- World-event cooldowns (array of { id, lastFiredAt-as-string,
+-- lastFiredMonotonicMs-as-string-or-nil }). Never-fired stays a missing record.
     local cooldowns = {}
     if coordinator.worldEvents and coordinator.worldEvents.registry then
         for id, event in pairs(coordinator.worldEvents.registry) do
             cooldowns[#cooldowns + 1] = {
-                id          = id,
-                lastFiredAt = tostring(event.lastFiredAt),
+                id                    = id,
+                lastFiredAt           = tostring(event.lastFiredAt),
+                lastFiredMonotonicMs  = event.lastFiredMonotonicMs and tostring(event.lastFiredMonotonicMs) or nil,
             }
         end
     end
@@ -576,6 +618,7 @@ function MarketSerializer:applyTable(coordinator, data)
                 if entry then
                     entry.current    = p.current or entry.current
                     entry.volatilityFactor = p.volatilityFactor or entry.volatilityFactor
+                    if p.lastHistoryDay then entry.lastHistoryDay = p.lastHistoryDay end
                     entry.history    = {}
                     if type(p.history) == "table" then
                         for _, h in ipairs(p.history) do
@@ -597,16 +640,77 @@ function MarketSerializer:applyTable(coordinator, data)
     if data.lastGameTime then
         coordinator.lastSavedGameTime = tonumber(data.lastGameTime) or coordinator.lastSavedGameTime
     end
+    -- v3 canonical monotonic time at save.
+    if data.lastMonotonicTime then
+        coordinator.lastSavedMonotonicTime = tonumber(data.lastMonotonicTime) or nil
+    end
 
     -- Event cooldowns: overwrite by id (only for events still in the registry).
+    -- v2 data migrates the canonical firing time from the public field at the
+    -- current clock offset; never-fired stays a missing record.
     if coordinator.worldEvents and coordinator.worldEvents.registry
         and type(data.eventCooldowns) == "table" then
+        local legacyNow = MDMUtil.getGameTime()
+        local monoNow   = MDMUtil.getMonotonicTime()
         for _, e in ipairs(data.eventCooldowns) do
             if e.id and coordinator.worldEvents.registry[e.id] then
-                coordinator.worldEvents.registry[e.id].lastFiredAt = tonumber(e.lastFiredAt) or -math.huge
+                local event = coordinator.worldEvents.registry[e.id]
+                event.lastFiredAt = tonumber(e.lastFiredAt) or -math.huge
+                if e.lastFiredMonotonicMs then
+                    event.lastFiredMonotonicMs = tonumber(e.lastFiredMonotonicMs)
+                elseif event.lastFiredAt and event.lastFiredAt > -math.huge / 2 then
+                    event.lastFiredMonotonicMs = monoNow + (event.lastFiredAt - legacyNow)
+                end
             end
         end
     end
 
     return true
+end
+
+-- =========================================================
+-- Snapshot selection & restore finalization (v3, RSF-F203)
+-- =========================================================
+-- selectMarketSnapshot picks the freshest complete market bundle between the
+-- optional StateLedger block and the own-XML snapshot:
+--   * a valid v3 ledger selects its COMPLETE snapshot (prices + calendar
+--     cursor travel together; its included empty active-events set is not
+--     patched from the own XML);
+--   * an invalid v3 ledger falls back to a valid own v3 snapshot;
+--   * a legacy v2 ledger keeps its price state but gets NO guessed calendar
+--     cursor (first anchoring happens at the next observation) and replays
+--     active events only when the own snapshot's lastGameTime matches;
+--   * otherwise the own snapshot (or an empty bundle) is the fallback.
+-- Returns the selected snapshot table and a source label.
+
+function MarketSerializer:selectMarketSnapshot(ledger, own)
+    if ledger and ledger.version == 3 and ledger.valid then
+        return ledger, "ledger3"
+    end
+    if own and own.version == 3 and own.valid then
+        return own, "own3"
+    end
+    if ledger and ledger.version == 2 then
+        return {
+            prices       = ledger.prices,
+            calendar     = nil,
+            activeEvents = (own and own.lastGameTime == ledger.lastGameTime) and own.activeEvents or {},
+        }, "legacy"
+    end
+    return own or { activeEvents = {} }, "fallback"
+end
+
+-- Anchor the coordinator's calendar cursors to the current monotonic time so
+-- the first quote step after a restore fires at the next farming-hour boundary
+-- (always within one hour) instead of replaying unobserved hours from a stale
+-- or missing cursor. History rows already restored are preserved; the next
+-- endpoint-day snapshot appends on the first newly observed day.
+function MarketSerializer:finalizeRestore(coordinator)
+    if not coordinator then return end
+    local monoNow = MDMUtil.getMonotonicTime()
+    coordinator.lastObservedMs = monoNow
+    coordinator.processedHour  = math.floor(monoNow / 3600000)
+    coordinator.refreshDay     = math.floor(monoNow / 86400000)
+    coordinator.lastHistoryDay = math.floor(monoNow / 86400000)
+    MDMLog.info("MarketSerializer: restore finalized — next quote step within the current farming hour")
 end

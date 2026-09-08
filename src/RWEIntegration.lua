@@ -38,7 +38,7 @@ function MDMExternalIntegration.new(engine)
     self.lastActiveEvent = nil
     -- CropStress state
     self.cropStressManager = nil
-    self.csDailyTimer = 0
+    self.lastCsCheckMonotonicDay = nil
     self.lastCsModifierFactor = nil
     return self
 end
@@ -61,18 +61,42 @@ end
 -- Called every frame from MarketDynamics:update(dt).
 function MDMExternalIntegration:update(dt)
     self:_updateRWE()
-    self:_updateCropStress(dt)
+    self:_updateCropStress()
 end
 
 -- ── RWE ──────────────────────────────────────────────────────────────────────
 
+-- Reconcile RWE price modifiers with the RWE manager's active event.
+-- Reacts to event changes (remove old, apply new) and periodically re-applies
+-- the current event's modifier when it is missing from the engine (e.g. after
+-- a restore or a client-side drift). addModifier/removeModifierById request
+-- final quote publication on every successful mutation.
 function MDMExternalIntegration:_updateRWE()
     if not self.rweManager then return end
     local state = self.rweManager.EVENT_STATE
     if not state then return end
 
     local currentEvent = state.activeEvent
-    if currentEvent == self.lastActiveEvent then return end
+    if currentEvent == self.lastActiveEvent then
+        -- Periodic reconcile: ensure the current event's modifier is present.
+        if currentEvent and EVENT_PRICE_EFFECTS[currentEvent] then
+            local modId = RWE_MODIFIER_PREFIX .. currentEvent
+            local missing = false
+            for fillTypeIndex in pairs(self.engine.prices) do
+                if not self:_hasModifier(fillTypeIndex, modId) then
+                    missing = true
+                    break
+                end
+            end
+            if missing then
+                for fillTypeIndex in pairs(self.engine.prices) do
+                    self.engine:addModifier({ id = modId, fillTypeIndex = fillTypeIndex, factor = EVENT_PRICE_EFFECTS[currentEvent] })
+                end
+                MDMLog.info("MDMExternalIntegration: re-applied missing RWE modifier for '" .. currentEvent .. "'")
+            end
+        end
+        return
+    end
 
     -- Clear modifiers from the previous event
     if self.lastActiveEvent and EVENT_PRICE_EFFECTS[self.lastActiveEvent] then
@@ -102,12 +126,15 @@ end
 
 -- ── CropStress ───────────────────────────────────────────────────────────────
 
-function MDMExternalIntegration:_updateCropStress(dt)
+-- Check CropStress supply pressure once per newly crossed farming day
+-- (canonical monotonic day, RSF-F203). A time jump crosses days without
+-- replaying intermediate checks; the current day's state is evaluated once.
+function MDMExternalIntegration:_updateCropStress()
     if not self.cropStressManager then return end
 
-    self.csDailyTimer = self.csDailyTimer + dt
-    if self.csDailyTimer < CS_DAILY_INTERVAL_MS then return end
-    self.csDailyTimer = 0
+    local monoDay = MDMUtil.getMonotonicDay()
+    if monoDay == self.lastCsCheckMonotonicDay then return end
+    self.lastCsCheckMonotonicDay = monoDay
 
     -- Count fields and how many are under critical stress
     local modifier = self.cropStressManager.stressModifier
@@ -178,6 +205,16 @@ function MDMExternalIntegration:_countPrices()
     local n = 0
     for _ in pairs(self.engine.prices) do n = n + 1 end
     return n
+end
+
+-- True if the engine's modifier stack for fillTypeIndex contains modId.
+function MDMExternalIntegration:_hasModifier(fillTypeIndex, modId)
+    local entry = self.engine.prices[fillTypeIndex]
+    if not entry then return false end
+    for _, mod in ipairs(entry.modifiers) do
+        if mod.id == modId then return true end
+    end
+    return false
 end
 
 -- Backward-compatible alias (was MDMRWEIntegration before crop stress was added)

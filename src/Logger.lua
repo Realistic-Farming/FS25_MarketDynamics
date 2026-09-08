@@ -134,6 +134,35 @@ function MDMUtil.getGameTime()
     return (currentDay - 1) * 86400000 + dayTime
 end
 
+-- Canonical monotonic clock (RSF-F203 calendar block contract).
+--
+-- All economic timestamps on the calendar path use
+--   (currentMonotonicDay - 1) * 86400000 + dayTime
+-- as their base. currentMonotonicDay and currentDay advance together in the
+-- native Environment:updateTimeValues, so this equals getGameTime() in normal
+-- operation; the two are kept as separate reads so the economic clock is never
+-- confused with the legacy public-display epoch. The native getMonotonicHour()
+-- helper uses an UNshifted day origin (currentMonotonicDay * 24 + ...) and must
+-- not be used for whole-hour keys — see the MD-15 brief.
+function MDMUtil.getMonotonicTime()
+    local env = g_currentMission and g_currentMission.environment
+    if not env then return 0 end
+    local monotonicDay = env.currentMonotonicDay or env.currentDay or 1
+    local dayTime      = env.dayTime or 0
+    return (monotonicDay - 1) * 86400000 + dayTime
+end
+
+-- Whole-hour key: floor(monotonicNow / 3600000). Accepts an explicit value or
+-- reads the live canonical clock.
+function MDMUtil.getMonotonicHour(monotonicNow)
+    return math.floor((monotonicNow or MDMUtil.getMonotonicTime()) / 3600000)
+end
+
+-- Whole-day key: floor(monotonicNow / 86400000).
+function MDMUtil.getMonotonicDay(monotonicNow)
+    return math.floor((monotonicNow or MDMUtil.getMonotonicTime()) / 86400000)
+end
+
 -- Days/month (period length) scaling.
 --
 -- World event timing (roll interval, cooldowns, durations) is balanced around
