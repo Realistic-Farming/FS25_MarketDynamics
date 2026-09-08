@@ -37,6 +37,10 @@ local NC_CHIP_IDS = {
 }
 -- BUILD 20:36: the Event settings plate (mdEsSummaryCard on the Events page) paints the same way.
 local ES_CHIP_IDS = { "mdEventSettingsBtn" }
+-- BUILD 17:21 (George CLOSED DESIGN 14:00): ONE Cancel chip on the open-contracts card, never one
+-- per row. Its own card id and its own wired flag: wireChipPaint stores the flag ON THE CARD, so
+-- reusing the New Contract card's flag would leave this card unwired.
+local CT_CHIP_IDS = { "mdCancelBtn" }
 -- Vanilla wideButton chip tints (guiProfiles: icon = colorMainHighlight, icon background =
 -- colorGreenDark), the same numbers CsRfPdaGuest.lua uses so both cards read as one family.
 local NC_CHIP_TEXT = { 0.22323, 0.40724, 0.00368 }
@@ -71,11 +75,20 @@ local _suppressSelectionCallback = false
 local _commoditySig = nil
 local _lastEventsSig = nil
 local _lastContractsSig = nil
+-- BUILD 17:21: the picked open deal, held by CONTRACT ID. FuturesMarket:getContractsForFarm walks
+-- pairs(self.contracts), so the returned order is not stable between the 2s repaints and a row index
+-- would silently drift onto another deal. _ctRowIds maps the row the player can see (1..5) to the id
+-- painted there on the last pass, and is rebuilt by every paint.
+local _selectedContractId = nil
+local _ctRowIds = {}
 -- BUILD 10:47: New Contract card state (Esc subset of MDMContractDialog: quantity + window +
 -- confirm for the crop picked in the top table) and its one feedback line.
 local _ncQty = 5000
 local _ncDays = 30
 local _ncFeedback = nil
+-- BUILD 17:21: the list paintContractsBand last painted, and the one Cancel feedback line.
+local _lastOpenContracts = {}
+local _ctFeedback = nil
 -- One-time ring seeds from MarketEngine history (fillTypeIndex → true). Never invent samples.
 local _historySeeded = {}
 -- Set by MarketScreen when deep-only load skipped Esc rail inject (prefer never stand-down mutate).
@@ -751,6 +764,20 @@ local function contractsSignature(list)
     return table.concat(parts, "|")
 end
 
+--- The open deal the player picked, re-resolved from the freshly painted list (never a stale row
+--- index). Returns the contract table, or nil when the pick is gone or is no longer cancellable.
+local function selectedContract(open)
+    if _selectedContractId == nil then
+        return nil
+    end
+    for _, c in ipairs(open or {}) do
+        if c.id == _selectedContractId then
+            return c
+        end
+    end
+    return nil
+end
+
 local function paintContractsBand(container)
     clearPricesBandGhosts(container)
     local mdm = getMdm()
@@ -771,7 +798,14 @@ local function paintContractsBand(container)
     if #open == 0 then
         open = list
     end
+    _lastOpenContracts = open
     _lastContractsSig = contractsSignature(open)
+    -- The row -> id map is rebuilt every paint, and a pick that has left the list (filled,
+    -- defaulted, cancelled elsewhere) is dropped here rather than acted on later.
+    _ctRowIds = {}
+    if selectedContract(open) == nil then
+        _selectedContractId = nil
+    end
 
     local n = #open
     local title = findDescendant(container, "mdContractsTitle")
@@ -793,6 +827,10 @@ local function paintContractsBand(container)
             setVis(findDescendant(container, "mdCtRow" .. i .. "Status"), false)
         end
         setText(findDescendant(container, "mdCtMore"), "")
+        for i = 1, MAX_CONTRACT_ROWS do
+            setVis(findDescendant(container, "mdCtRow" .. i), false)
+        end
+        _selectedContractId = nil
         return
     end
 
@@ -816,12 +854,20 @@ local function paintContractsBand(container)
             local locked = tonumber(c.lockedPrice) or 0
             setText(priceEl, string.format("%s / 1,000L", formatMoney(locked * 1000)))
             setText(statusEl, contractStatusLabel(c))
-            setTextColor(cropEl, unpack(COLOR_LIME))
+            -- BUILD 17:21: lime is now the PICK, not every row, so the highlight can be seen.
+            _ctRowIds[i] = c.id
+            if c.id ~= nil and c.id == _selectedContractId then
+                setTextColor(cropEl, unpack(COLOR_LIME))
+            else
+                setTextColor(cropEl, unpack(COLOR_FLAT))
+            end
+            setVis(findDescendant(container, "mdCtRow" .. i), true)
         else
             setVis(cropEl, false)
             setVis(qtyEl, false)
             setVis(priceEl, false)
             setVis(statusEl, false)
+            setVis(findDescendant(container, "mdCtRow" .. i), false)
         end
     end
     local moreEl = findDescendant(container, "mdCtMore")
@@ -851,6 +897,13 @@ local function isEventAdmin()
 end
 
 --- Same gate as MarketScreen:openContractDialog: BetterContracts owns the futures flow.
+--- True when this session runs the simulation itself (single player or a listen host), so a request
+--- has already been executed inline by the time the page repaints.
+local function isServerSession()
+    return g_currentMission ~= nil and type(g_currentMission.getIsServer) == "function"
+        and g_currentMission:getIsServer() == true
+end
+
 local function bcOwnsContracts()
     return BCIntegration ~= nil and type(BCIntegration.isEnabled) == "function" and BCIntegration.isEnabled() == true
 end
@@ -964,6 +1017,39 @@ end
 
 local function wireEsChipPaint(container)
     wireChipPaint(container, "mdEsSummaryCard", ES_CHIP_IDS, "_rfEsChipWired")
+end
+
+local function wireCtChipPaint(container)
+    wireChipPaint(container, "mdContractsOpenCard", CT_CHIP_IDS, "_rfCtChipWired")
+end
+
+--- The Cancel chip and the two lines around it. Painted after paintContractsBand on every full show
+--- and every light tick, so the chip follows the pick and the list. Gated (grey, disabled) until an
+--- ACTIVE deal is picked; hidden outright while BetterContracts owns the futures flow, the same
+--- silent stand-down MarketScreen:onContractRowClick makes.
+local function paintContractsCancelChip(container)
+    local btn = findDescendant(container, "mdCancelBtn")
+    local pickEl = findDescendant(container, "mdCtSelected")
+    local hintEl = findDescendant(container, "mdCancelHint")
+    if bcOwnsContracts() then
+        setVis(btn, false)
+        setText(pickEl, "")
+        setText(hintEl, tr("md_rf_pda_ct_bc", "BetterContracts is handling contracts. Cancel lives in its own screen."))
+        return
+    end
+    wireCtChipPaint(container)
+    local c = selectedContract(_lastOpenContracts)
+    local active = c ~= nil and (c.status or "active") == "active"
+    if c == nil then
+        setText(pickEl, tr("md_rf_pda_ct_pick", "Click a deal above to pick it."))
+    else
+        setText(pickEl, string.format(tr("md_rf_pda_ct_picked", "Picked: %s, %s L"),
+            tostring(c.fillTypeName or fillTypeTitle(c.fillTypeIndex) or "?"),
+            fmtInt(tonumber(c.quantity) or 0)))
+    end
+    setNcBtn(container, "mdCancelBtn", tr("md_rf_pda_ct_cancel", "Cancel deal"), active, false)
+    setText(hintEl, _ctFeedback or tr("md_rf_pda_ct_hint",
+        "Cancelling defaults the deal. Unfulfilled quantity is charged the default penalty."))
 end
 
 local function paintNewContractCard(container)
@@ -1195,8 +1281,17 @@ function MdRfPdaGuest.onNewContract(container)
     end
     local ok, why = ncSendRequest(crop, _ncQty, delivDays, isRealDays, ts)
     if ok then
-        _ncFeedback = string.format(tr("md_rf_pda_nc_sent", "Contract request sent: %s, %s L. It shows on the left when the server confirms."),
-            crop.title, fmtInt(_ncQty))
+        -- BUILD 19:15 (George CLOSED DESIGN 18:55 item 3): on a session that IS the server the create
+        -- has already run inline, and the open-deals list on the left is repainted from the live
+        -- contract table on this same pass, so there is nothing left to wait for. A dedicated client
+        -- keeps the waiting wording, because for it that is still true.
+        if isServerSession() then
+            _ncFeedback = string.format(tr("md_rf_pda_nc_opened", "Contract opened: %s, %s L."),
+                crop.title, fmtInt(_ncQty))
+        else
+            _ncFeedback = string.format(tr("md_rf_pda_nc_sent", "Contract request sent: %s, %s L. It shows on the left when the server confirms."),
+                crop.title, fmtInt(_ncQty))
+        end
     else
         _ncFeedback = why
     end
@@ -1233,6 +1328,7 @@ local function paintBottomByPage(container)
         paintEventSettingsBand(container)
     else
         paintContractsBand(container)
+        paintContractsCancelChip(container)
         paintNewContractCard(container)
     end
 end
@@ -1348,6 +1444,7 @@ function MdRfPdaGuest.onLightTick(container)
         paintEventSettingsBand(container)
     else
         paintContractsBand(container)
+        paintContractsCancelChip(container)
         -- Price and window can move between ticks; the summary line follows them.
         paintNewContractCard(container)
     end
@@ -1358,6 +1455,81 @@ function MdRfPdaGuest.onHide()
     _lastEventsSig = nil
     _lastContractsSig = nil
     _ncFeedback = nil
+    _selectedContractId = nil
+    _ctRowIds = {}
+    _lastOpenContracts = {}
+    _ctFeedback = nil
+end
+
+--- Row hit on the contracts card. The engine hands the clicked Button to the host callback and the
+--- host forwards it; the row number is read off the element id (mdCtRow3), then resolved through the
+--- row map the last paint built, so the pick is stored as a contract ID.
+---@param container table|nil
+---@param element table|nil
+function MdRfPdaGuest.onContractRow(container, element)
+    if bcOwnsContracts() then
+        return
+    end
+    local id = element ~= nil and element.id or nil
+    local row = id ~= nil and tonumber(string.match(tostring(id), "^mdCtRow(%d+)$")) or nil
+    if row == nil then
+        return
+    end
+    local contractId = _ctRowIds[row]
+    if contractId == nil then
+        return
+    end
+    _selectedContractId = contractId
+    _ctFeedback = nil
+    paintContractsBand(container)
+    paintContractsCancelChip(container)
+end
+
+--- The Cancel chip. Sends ACTION_PLAYER_FORFEIT for the picked deal, never ACTION_ADMIN_CANCEL:
+--- the zero-penalty admin path stays on the full Market admin dialog, which runs its own security
+--- check. On a host or single player sendToServer runs the action inline with no authorization
+--- pass at all, so every gate the chip needs is right here.
+---@param container table|nil
+function MdRfPdaGuest.onCancelContract(container)
+    if bcOwnsContracts() then
+        return
+    end
+    local c = selectedContract(_lastOpenContracts)
+    if c == nil then
+        _ctFeedback = tr("md_rf_pda_ct_pick", "Click a deal above to pick it.")
+        paintContractsCancelChip(container)
+        return
+    end
+    if (c.status or "active") ~= "active" then
+        _ctFeedback = tr("md_rf_pda_ct_not_open", "That deal is already settled.")
+        paintContractsCancelChip(container)
+        return
+    end
+    if c.id == nil or MDMContractRequestEvent == nil
+        or type(MDMContractRequestEvent.sendToServer) ~= "function" then
+        _ctFeedback = tr("md_rf_pda_ct_unavailable", "Contract service is not available right now.")
+        paintContractsCancelChip(container)
+        return
+    end
+    local ok = pcall(MDMContractRequestEvent.sendToServer,
+        MDMContractRequestEvent.ACTION_PLAYER_FORFEIT, { contractId = c.id })
+    if ok then
+        -- BUILD 19:15 (George CLOSED DESIGN 18:55 item 3): on a session that IS the server - single
+        -- player or a listen host - sendToServer runs the forfeit inline, and the repaint below
+        -- re-reads the contract list, so the deal is already gone by the time the player reads this.
+        -- Saying "when the server confirms" there is simply wrong. A dedicated client still waits.
+        local fillName = tostring(c.fillTypeName or fillTypeTitle(c.fillTypeIndex) or "?")
+        if isServerSession() then
+            _ctFeedback = string.format(tr("md_rf_pda_ct_cancelled", "Cancelled: %s. Leave-early fee charged."), fillName)
+        else
+            _ctFeedback = string.format(tr("md_rf_pda_ct_sent", "Cancel sent for %s. The list updates when the server confirms."), fillName)
+        end
+        _selectedContractId = nil
+    else
+        _ctFeedback = tr("md_rf_pda_ct_failed", "Cancel could not be sent.")
+    end
+    paintContractsBand(container)
+    paintContractsCancelChip(container)
 end
 
 function MdRfPdaGuest.getSelectedFillType()
@@ -1559,6 +1731,15 @@ local function mdPublishHandles()
     end
 end
 
+--- BUILD 19:15: the Esc Help footer asks whichever module is showing to open its own guide, so
+--- every companion ships and owns its own help instead of borrowing Soil's.
+---@param container table|nil
+function MdRfPdaGuest.onOpenHelp(container)
+    if MdGuideDialog ~= nil and type(MdGuideDialog.show) == "function" then
+        MdGuideDialog.show()
+    end
+end
+
 function MdRfPdaGuest.tryRegister()
     mdPublishHandles()
     if RfEscBootstrap ~= nil then
@@ -1569,6 +1750,12 @@ function MdRfPdaGuest.tryRegister()
                 profilesXml = MOD_DIR .. "xml/gui/rfEscProfiles.xml",
                 iconPath = "textures/ui/menuIcon.dds",
             })
+            -- BUILD 19:15 (George CLOSED DESIGN 18:55 item 5): load this mod's Field Guide at the
+            -- same moment the door itself loads. A GUI loaded from a mod directory later, once the
+            -- mod's own file system context has closed, fails to open.
+            if MdGuideDialog ~= nil and type(MdGuideDialog.register) == "function" then
+                pcall(MdGuideDialog.register, MOD_DIR)
+            end
             if not doorOk then
                 print("[MDM] MdRfPdaGuest: WARNING ensureDoor failed (will retry)")
             end
@@ -1607,6 +1794,7 @@ function MdRfPdaGuest.tryRegister()
             selectCommodityIndex = MdRfPdaGuest.selectCommodityIndex,
             onHide = MdRfPdaGuest.onHide,
             onMoverChanged = MdRfPdaGuest.onMoverChanged,
+            onOpenHelp = MdRfPdaGuest.onOpenHelp,
             -- BUILD 12:05: the open-full-market handler is gone with the Esc full-Market door.
         })
         if ok then
@@ -1643,4 +1831,8 @@ function MdRfPdaGuest.reset()
     _ncQty = 5000
     _ncDays = 30
     _ncFeedback = nil
+    _selectedContractId = nil
+    _ctRowIds = {}
+    _lastOpenContracts = {}
+    _ctFeedback = nil
 end

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!--
+    Market Field Guide - Field Guide
+    5 tabs. Content is built in Lua and swapped per tab (one column pair).
+    Chrome copied from SoilGuideDialog so every Realistic Farming guide reads the same.
+    Controller: MdGuideDialog
+-->
+<GUI onOpen="onOpen" onClose="onClose" onCreate="onCreate">
+  <GuiElement profile="newLayer"/>
+  <Bitmap profile="dialogFullscreenBg" id="dialogBg"/>
+
+  <GuiElement profile="mdGuide_bg" id="dialogElement">
+
+    <ThreePartBitmap profile="fs25_dialogBgMiddle"/>
+    <ThreePartBitmap profile="fs25_dialogBgTop"/>
+    <ThreePartBitmap profile="fs25_dialogBgBottom"/>
+
+    <GuiElement profile="fs25_dialogContentContainer">
+
+      <Text profile="fs25_dialogTitle" id="mdGuide_title" text="Market Field Guide" position="0px -28px"/>
+
+      <BoxLayout profile="mdGuide_tabRow" position="0px -66px">
+        <Button profile="mdGuide_tab" id="mdGuide_tab1" text="Overview" onClick="onClickTab1"/>
+        <Button profile="mdGuide_tab" id="mdGuide_tab2" text="How Prices Move" onClick="onClickTab2"/>
+        <Button profile="mdGuide_tab" id="mdGuide_tab3" text="Market Events" onClick="onClickTab3"/>
+        <Button profile="mdGuide_tab" id="mdGuide_tab4" text="Futures Contracts" onClick="onClickTab4"/>
+        <Button profile="mdGuide_tab" id="mdGuide_tab5" text="Settings and FAQ" onClick="onClickTab5"/>
+      </BoxLayout>
+
+      <Text profile="mdGuide_subtitle" id="mdGuide_subtitle" text="" position="0px -110px"/>
+
+      <GuiElement profile="mdGuide_colPanel" position="-253px -138px">
+        <Bitmap profile="mdGuide_colBg" position="0px 0px"/>
+        <BoxLayout profile="mdGuide_col" id="mdGuide_col1" position="0px -8px"/>
+      </GuiElement>
+
+      <GuiElement profile="mdGuide_colPanel" position="253px -138px">
+        <Bitmap profile="mdGuide_colBgAlt" position="0px 0px"/>
+        <BoxLayout profile="mdGuide_col" id="mdGuide_col2" position="0px -8px"/>
+      </GuiElement>
+
+    </GuiElement>
+
+    <BoxLayout profile="fs25_dialogButtonBox">
+      <Button profile="buttonOK" text="Close" onClick="onClickClose"/>
+    </BoxLayout>
+
+  </GuiElement>
+
+  <GUIProfiles>
+
+    <Profile name="mdGuide_bg" extends="fs25_dialogBg">
+      <size value="1120px 930px"/>
+    </Profile>
+
+    <Profile name="mdGuide_tabRow" extends="emptyPanel" with="anchorTopCenter">
+      <size value="960px 38px"/>
+      <flowDirection value="horizontal"/>
+      <elementSpacing value="10px"/>
+    </Profile>
+
+    <!-- The guide tabs and Close stay buttonOK: dialog chrome, not Esc overlay chips. -->
+    <Profile name="mdGuide_tab" extends="buttonOK">
+      <size value="174px 36px"/>
+      <textSize value="11px"/>
+      <textUpperCase value="true"/>
+    </Profile>
+
+    <Profile name="mdGuide_subtitle" extends="fs25_textDefault" with="anchorTopCenter">
+      <size value="960px 22px"/>
+      <textSize value="11px"/>
+      <textColor value="0.85 0.75 0.30 0.90"/>
+      <textAlignment value="center"/>
+    </Profile>
+
+    <Profile name="mdGuide_colPanel" extends="emptyPanel" with="anchorTopCenter">
+      <size value="510px 630px"/>
+    </Profile>
+    <Profile name="mdGuide_colBg" extends="baseReference" with="anchorTopCenter">
+      <size value="510px 630px"/>
+      <imageColor value="0.08 0.08 0.12 0.90"/>
+    </Profile>
+    <Profile name="mdGuide_colBgAlt" extends="baseReference" with="anchorTopCenter">
+      <size value="510px 630px"/>
+      <imageColor value="0.06 0.10 0.14 0.90"/>
+    </Profile>
+
+    <Profile name="mdGuide_col" extends="emptyPanel" with="anchorTopCenter">
+      <size value="494px 614px"/>
+      <flowDirection value="vertical"/>
+      <useFullVisibility value="false"/>
+      <alignmentX value="left"/>
+      <elementSpacing value="3px"/>
+    </Profile>
+
+    <Profile name="mdGuide_colHeader" extends="fs25_textDefault" with="anchorTopLeft">
+      <size value="472px 22px"/>
+      <textSize value="15px"/>
+      <textBold value="true"/>
+      <textUpperCase value="true"/>
+      <textColor value="1 0.8 0.2 1"/>
+      <textAlignment value="left"/>
+    </Profile>
+    <Profile name="mdGuide_colBody" extends="fs25_textDefault" with="anchorTopLeft">
+      <size value="472px 19px"/>
+      <textSize value="14px"/>
+      <textColor value="1 1 1 1"/>
+      <textAlignment value="left"/>
+    </Profile>
+    <Profile name="mdGuide_colSpacer" extends="fs25_textDefault" with="anchorTopLeft">
+      <size value="472px 10px"/>
+      <textSize value="8px"/>
+      <textColor value="0.0 0.0 0.0 0.0"/>
+    </Profile>
+
+  </GUIProfiles>
+</GUI>
