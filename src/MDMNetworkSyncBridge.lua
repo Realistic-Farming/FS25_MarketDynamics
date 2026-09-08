@@ -162,14 +162,17 @@ end
 
 -- ── State-sync serialization (server->client full snapshot) ───────────────────
 -- Flatten the whole syncable state into one typed array. Length-prefixed sub-lists so
--- NetworkSync's flat, type-tagged array round-trips: contractCount, then 12 fields per
--- contract (mirroring MDMContractSyncEvent:writeContract); priceCount, then 3+2*histLen
--- per price (index, volatilityFactor, histCount, then price+time pairs);
--- eventCount, then 4 per active event.
+-- NetworkSync's flat, type-tagged array round-trips: wire mark, contractCount, then 12
+-- fields per contract (mirroring MDMContractSyncEvent:writeContract); priceCount, then
+-- 5+2*histLen per price (index, baseText, currentText, volatilityFactor, histCount, then
+-- price+time pairs); eventCount, then 4 per active event (id, endsAtText, intensity,
+-- extraData). base/current/endsAt travel as %.17g decimal strings (MDM-CALENDAR/1).
 local function buildStateArray()
     local arr = {}
     local mdm = g_MarketDynamics
     local fm  = mdm ~= nil and mdm.futuresMarket or nil
+
+    arr[#arr + 1] = MDMMarketSyncEvent.WIRE_MARK
 
     local contracts = (fm ~= nil and fm.contracts) or {}
     local cCount = 0
@@ -200,6 +203,8 @@ local function buildStateArray()
     arr[#arr + 1] = #prices
     for _, p in ipairs(prices) do
         arr[#arr + 1] = p.index or 0
+        arr[#arr + 1] = string.format("%.17g", p.base or 0)
+        arr[#arr + 1] = string.format("%.17g", p.current or 0)
         arr[#arr + 1] = p.volatilityFactor or 1
         local hist = p.history or {}
         arr[#arr + 1] = #hist
@@ -211,7 +216,7 @@ local function buildStateArray()
     arr[#arr + 1] = #events
     for _, e in ipairs(events) do
         arr[#arr + 1] = tostring(e.id or "")
-        arr[#arr + 1] = e.endsAt or 0
+        arr[#arr + 1] = string.format("%.17g", e.endsAt or 0)
         arr[#arr + 1] = e.intensity or 0
         arr[#arr + 1] = tostring(e.extraData or "")
     end
@@ -224,6 +229,12 @@ end
 local function applyStateArray(arr)
     if type(arr) ~= "table" then return end
     local i = 1
+
+    local mark = arr[i]; i = i + 1
+    if mark ~= MDMMarketSyncEvent.WIRE_MARK then
+        MDMLog.error("MDMNetworkSyncBridge: state array rejected — wire mark mismatch (got '" .. tostring(mark) .. "')")
+        return
+    end
 
     local cCount = tonumber(arr[i]) or 0; i = i + 1
     local contracts = {}
@@ -249,21 +260,23 @@ local function applyStateArray(arr)
     local prices = {}
     for _ = 1, pCount do
         local pIndex = arr[i]
-        local pVol   = arr[i + 1]
-        local hCount = tonumber(arr[i + 2]) or 0
-        i = i + 3
+        local pBase  = tonumber(arr[i + 1])
+        local pCurr  = tonumber(arr[i + 2])
+        local pVol   = arr[i + 3]
+        local hCount = tonumber(arr[i + 4]) or 0
+        i = i + 5
         local history = {}
         for _ = 1, hCount do
             history[#history + 1] = { price = arr[i], time = arr[i + 1] }
             i = i + 2
         end
-        prices[#prices + 1] = { index = pIndex, volatilityFactor = pVol, history = history }
+        prices[#prices + 1] = { index = pIndex, base = pBase, current = pCurr, volatilityFactor = pVol, history = history }
     end
 
     local eCount = tonumber(arr[i]) or 0; i = i + 1
     local events = {}
     for _ = 1, eCount do
-        events[#events + 1] = { id = arr[i], endsAt = arr[i + 1], intensity = arr[i + 2], extraData = arr[i + 3] }
+        events[#events + 1] = { id = arr[i], endsAt = tonumber(arr[i + 1]), intensity = arr[i + 2], extraData = arr[i + 3] }
         i = i + 4
     end
 

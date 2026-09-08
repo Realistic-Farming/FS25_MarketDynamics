@@ -1,9 +1,17 @@
 -- MDMMarketSyncEvent.lua
 -- Syncs prices and active world events from server to clients.
+--
+-- Wire format: MDM-CALENDAR/1 (RSF-F203). The server's authoritative base and
+-- current quote travel as %.17g decimal strings (sector digits) so the client
+-- keeps the exact received quote instead of a float32-truncated recomposition;
+-- active-event deadlines travel the same way so a large monotonic expiry
+-- round-trips exactly.
 
 MDMMarketSyncEvent = MDMMarketSyncEvent or {}
 local MDMMarketSyncEvent_mt = Class(MDMMarketSyncEvent, Event)
 InitEventClass(MDMMarketSyncEvent, "MDMMarketSyncEvent")
+
+MDMMarketSyncEvent.WIRE_MARK = "MDM-CALENDAR/1"
 
 function MDMMarketSyncEvent.emptyNew()
     return Event.new(MDMMarketSyncEvent_mt)
@@ -16,6 +24,8 @@ function MDMMarketSyncEvent.new(marketEngine, worldEvents, includeHistory)
         for index, entry in pairs(marketEngine.prices) do
             table.insert(self.prices, {
                 index = index,
+                base = entry.base,
+                current = entry.current,
                 volatilityFactor = entry.volatilityFactor,
                 history = includeHistory and entry.history or {},
             })
@@ -57,10 +67,15 @@ function MDMMarketSyncEvent.sendToClient(connection)
 end
 
 function MDMMarketSyncEvent:writeStream(streamId, connection)
+    -- Wire mark: receivers reject streams without it (single-version deployment).
+    streamWriteString(streamId, MDMMarketSyncEvent.WIRE_MARK)
+
     -- Write prices
     streamWriteInt32(streamId, #self.prices)
     for _, p in ipairs(self.prices) do
         streamWriteInt32(streamId, p.index)
+        streamWriteString(streamId, string.format("%.17g", p.base or 0))
+        streamWriteString(streamId, string.format("%.17g", p.current or 0))
         streamWriteFloat32(streamId, p.volatilityFactor)
         local hist = p.history or {}
         streamWriteInt32(streamId, #hist)
@@ -74,17 +89,25 @@ function MDMMarketSyncEvent:writeStream(streamId, connection)
     streamWriteInt32(streamId, #self.activeEvents)
     for _, e in ipairs(self.activeEvents) do
         streamWriteString(streamId, e.id)
-        streamWriteFloat32(streamId, e.endsAt)
+        streamWriteString(streamId, string.format("%.17g", e.endsAt or 0))
         streamWriteFloat32(streamId, e.intensity)
         streamWriteString(streamId, e.extraData)
     end
 end
 
 function MDMMarketSyncEvent:readStream(streamId, connection)
+    local mark = streamReadString(streamId)
+    if mark ~= MDMMarketSyncEvent.WIRE_MARK then
+        MDMLog.error("MDMMarketSyncEvent: stream rejected — wire mark mismatch (got '" .. tostring(mark) .. "')")
+        return
+    end
+
     self.prices = {}
     local numPrices = streamReadInt32(streamId)
     for i = 1, numPrices do
         local index = streamReadInt32(streamId)
+        local baseText = streamReadString(streamId)
+        local currentText = streamReadString(streamId)
         local volatilityFactor = streamReadFloat32(streamId)
         local numHist = streamReadInt32(streamId)
         local history = {}
@@ -96,6 +119,8 @@ function MDMMarketSyncEvent:readStream(streamId, connection)
         end
         table.insert(self.prices, {
             index = index,
+            base = tonumber(baseText),
+            current = tonumber(currentText),
             volatilityFactor = volatilityFactor,
             history = history,
         })
@@ -106,7 +131,7 @@ function MDMMarketSyncEvent:readStream(streamId, connection)
     for i = 1, numEvents do
         table.insert(self.activeEvents, {
             id = streamReadString(streamId),
-            endsAt = streamReadFloat32(streamId),
+            endsAt = tonumber(streamReadString(streamId)),
             intensity = streamReadFloat32(streamId),
             extraData = streamReadString(streamId)
         })
@@ -117,7 +142,8 @@ end
 -- Apply market prices + active world events to the local client. Extracted from :run so
 -- the NetworkSync bridge can reuse the EXACT same apply path (prices, event lifecycle,
 -- notifications, UI refresh) instead of re-implementing it. `prices` = array of
--- {index, volatilityFactor, history?}; `activeEvents` = array of {id, endsAt, intensity, extraData}.
+-- {index, base, current, volatilityFactor, history?}; `activeEvents` = array of
+-- {id, endsAt, intensity, extraData}.
 function MDMMarketSyncEvent.applyState(prices, activeEvents)
     if not g_MarketDynamics then return end
 
@@ -125,6 +151,12 @@ function MDMMarketSyncEvent.applyState(prices, activeEvents)
         for _, p in ipairs(prices) do
             local entry = g_MarketDynamics.marketEngine.prices[p.index]
             if entry then
+                -- The received server quote is authoritative: base and current
+                -- travel together and win over any local display recomposition
+                -- (RSF-F203). _recalculate on a pure client returns the retained
+                -- quote unchanged.
+                if p.base ~= nil then entry.base = p.base end
+                if p.current ~= nil then entry.current = p.current end
                 entry.volatilityFactor = p.volatilityFactor
                 if p.history and #p.history > 0 then
                     entry.history = p.history

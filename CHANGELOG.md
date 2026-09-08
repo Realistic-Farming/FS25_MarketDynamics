@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Calendar-paced quotes (MD-15 / RSF-F203).** Economic work is now admitted from the canonical monotonic clock instead of raw-dt timer accumulation: one quote step per crossed whole farming hour, one seasonal base refresh and one endpoint-day history sample per new farming day, one world-event roll per accumulated opportunity interval, and absolute canonical expiry for events and BC supply spikes. Serializer v3 persists the canonical fields (with v2 migration); the `MDM-CALENDAR/1` wire format carries the server's exact base/current quote as decimal strings so clients keep the received quote instead of a float32-truncated recomposition. TimeGuard ticks drive the calendar when present, with native environment messages and per-frame polling as fallbacks.
 - **Control Center actions** (suite Control Center, requires SettingsHub): `MDM_MARKET_SCREEN`, `MDM_CREATE_CONTRACT`, `MDM_OPEN_SETTINGS`.
 - **Playtest fixes:** MarketScreen + graph, MdPriceFormat, RF PDA guest page and Esc profiles, modDesc alignment.
 
