@@ -1557,7 +1557,11 @@ function MDMMarketScreen.onGlobalCreateContract()
 end
 
 local function _onUpdate(mission, dt)
-    MDMMarketScreenGraph.update(dt)
+    -- BUILD 20:39 (RSF-F205): this wrapper no longer samples. MarketDynamics:update warms the
+    -- price-trend ring beside the engine tick and is the only owner of that 20 second clock; this
+    -- call added to the same accumulator, so a page that was open advanced the trend twice as fast
+    -- as one that was not. Opening or closing a page must not move the sample clock at all.
+    -- Deferred registration and the RF PDA join below are unrelated and stay.
     MDMMarketScreen._attemptDeferredRegister(dt)
     -- Esc RF Module join + legacy rail stand-down (idempotent; early-outs when done).
     if MdRfPdaGuest ~= nil and type(MdRfPdaGuest.tryRegister) == "function" then

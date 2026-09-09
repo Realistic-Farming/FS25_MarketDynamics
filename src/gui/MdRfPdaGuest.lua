@@ -1835,4 +1835,10 @@ function MdRfPdaGuest.reset()
     _ctRowIds = {}
     _lastOpenContracts = {}
     _ctFeedback = nil
+    -- BUILD 20:39 (RSF-F205): the seed cache is a transient like the rest. Left standing, a second
+    -- mission would believe it had already seeded rings that reset cleared, and those commodities
+    -- would wait out the full runtime warm-up with a history they could have used. Note this is
+    -- reset, not onHide, which ends with the same four lines: closing the page mid-mission must
+    -- not force a re-seed.
+    _historySeeded = {}
 end

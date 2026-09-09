@@ -24,6 +24,16 @@ local LINE_THICKNESS  = 3
 local _buffers     = {}
 local _sampleTimer = 0
 
+-- BUILD 20:39 (RSF-F205): prepared NUMBERS only, and only while they are still the same numbers.
+-- Each ring carries its own ordered array on buf.ordered; this holds the aggregate median, which
+-- consumes every ring and so is dropped whenever any of them moves.
+--   nil   = not computed yet
+--   false = computed, and there is nothing worth drawing
+--   table = the prepared series
+-- None of it is market truth: it is never persisted, never published, and it holds no label,
+-- currency, unit, bound or viewport, all of which stay live inputs to the painter.
+local _aggCache = nil
+
 -- ---------------------------------------------------------------------------
 -- Public API
 -- ---------------------------------------------------------------------------
@@ -31,6 +41,7 @@ local _sampleTimer = 0
 function MDMMarketScreenGraph.reset()
     _buffers     = {}
     _sampleTimer = 0
+    _aggCache    = nil
 end
 
 function MDMMarketScreenGraph.update(dt)
@@ -41,6 +52,12 @@ function MDMMarketScreenGraph.update(dt)
     -- belongs inside this function, ahead of the sample timer, so no buffer is created and
     -- no "seeded buffer" line is written while the machine is still compiling.
     if not (g_currentMission ~= nil and g_currentMission.isMissionStarted == true) then return end
+
+    -- BUILD 20:39 (RSF-F205 item 2): F204 publishes _marketStateReady on this same mod. Only an
+    -- EXPLICIT false holds the sampler off; an absent flag keeps the incumbent behaviour, because
+    -- this repair has to stand on its own rather than depend on a readiness API that may not be
+    -- there. No new API is invented here.
+    if g_MarketDynamics._marketStateReady == false then return end
 
     _sampleTimer = _sampleTimer + dt
     if _sampleTimer < SAMPLE_INTERVAL_MS then return end
@@ -65,6 +82,10 @@ function MDMMarketScreenGraph.update(dt)
         if buf.count < MAX_SAMPLES then
             buf.count = buf.count + 1
         end
+        -- This ring moved, by append or by wrap, so its prepared array and the aggregate that
+        -- consumed it are both stale. This is the mutation door, so this is where they go.
+        buf.ordered = nil
+        _aggCache = nil
     end
 end
 
@@ -109,6 +130,10 @@ function MDMMarketScreenGraph.seedFromHistory(fillTypeIndex, history)
         end
     end
     _buffers[fillTypeIndex] = buf
+    -- A SUCCESSFUL seed replaced this ring, so the aggregate that read the old one is stale. The
+    -- fresh buffer carries no prepared array of its own yet. Every no-op return above this line
+    -- invalidates nothing, which is the point: a seed that did not seed changes no numbers.
+    _aggCache = nil
     return buf.count >= 2
 end
 
@@ -142,6 +167,20 @@ local function _extractOrdered(buf)
     return ordered
 end
 
+--- BUILD 20:39 (RSF-F205 item 3): the ordered array for one ring, built once and kept until that
+--- ring's own samples move. The builder above is unchanged and still does the real work; this only
+--- decides whether it needs to run. Callers must treat the result as read-only, which the painter
+--- already does: it reads series[i] and writes only its own points table.
+local function _orderedFor(buf)
+    if buf == nil then return nil end
+    if buf.ordered ~= nil then
+        return buf.ordered
+    end
+    local ordered = _extractOrdered(buf)
+    buf.ordered = ordered
+    return ordered
+end
+
 -- ---------------------------------------------------------------------------
 -- Draw line chart for a single commodity
 -- ---------------------------------------------------------------------------
@@ -150,8 +189,8 @@ function MDMMarketScreenGraph.draw(fillTypeIndex, gx, gy, gw, gh)
     local buf = _buffers[fillTypeIndex]
     if not buf or buf.count < 2 then return end
 
-    local ordered = _extractOrdered(buf)
-    if #ordered < 2 then return end
+    local ordered = _orderedFor(buf)
+    if ordered == nil or #ordered < 2 then return end
 
     -- BUILD 15:39 (PB-07): name the series and its unit so the chart is
     -- readable on its own instead of being an unlabelled line.
@@ -222,18 +261,33 @@ end
 -- Aggregated median fallback (when no commodity selected)
 -- ---------------------------------------------------------------------------
 
-function MDMMarketScreenGraph.drawAggregatedMedian(gx, gy, gw, gh)
+--- BUILD 20:39 (RSF-F205 item 4): the median series, kept until any participating ring changes.
+--- The arithmetic below is the incumbent's, unchanged and deliberately so: left-aligned over the
+--- uneven series, column i taking every existing arr[i], the middle value for an odd count and the
+--- mean of the middle two for an even one. It is NOT reinterpreted as a time-aligned index; that
+--- would be a different chart wearing the same name. A result of "nothing to draw" is cached too,
+--- as false, so an empty market does not rebuild every frame either.
+local function _aggregatedSeries()
+    if _aggCache ~= nil then
+        return _aggCache or nil
+    end
+
     local arrays = {}
     local maxCount = 0
     for _, buf in pairs(_buffers) do
         if buf and buf.count and buf.count > 0 then
-            local ordered = _extractOrdered(buf)
-            arrays[#arrays + 1] = ordered
-            if #ordered > maxCount then maxCount = #ordered end
+            local ordered = _orderedFor(buf)
+            if ordered ~= nil then
+                arrays[#arrays + 1] = ordered
+                if #ordered > maxCount then maxCount = #ordered end
+            end
         end
     end
 
-    if #arrays == 0 or maxCount < 2 then return end
+    if #arrays == 0 or maxCount < 2 then
+        _aggCache = false
+        return nil
+    end
 
     local agg = {}
     for i = 1, maxCount do
@@ -253,7 +307,17 @@ function MDMMarketScreenGraph.drawAggregatedMedian(gx, gy, gw, gh)
         end
     end
 
-    if #agg < 2 then return end
+    if #agg < 2 then
+        _aggCache = false
+        return nil
+    end
+    _aggCache = agg
+    return agg
+end
+
+function MDMMarketScreenGraph.drawAggregatedMedian(gx, gy, gw, gh)
+    local agg = _aggregatedSeries()
+    if agg == nil then return end
 
     -- The median across every tracked commodity is not one commodity, and
     -- labelling it with a crop name would be a lie about what is plotted.
