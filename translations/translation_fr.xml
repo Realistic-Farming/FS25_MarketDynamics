@@ -189,6 +189,8 @@
         <text name="mdm_evt_ft_duplicate" text="Déjà présent dans la liste : "/>
         <text name="mdm_evt_ft_added" text="Ajouté — les changements seront appliqués lors du prochain déclenchement : "/>
         <text name="mdm_evt_ft_title_suffix" text=" — Types de remplissage personnalisés"/>
+		<text name="mdm_set_experimental" text="[EN] Experimental Systems"/>
+		<text name="mdm_desc_experimental" text="[EN] Enable experimental (not yet released) systems at your own risk. A change takes effect at the next mission start."/>
 
         <!-- Input action display names -->
         <text name="input_MDM_MARKET_SCREEN" text="MDM : Ouvrir la bourse" />

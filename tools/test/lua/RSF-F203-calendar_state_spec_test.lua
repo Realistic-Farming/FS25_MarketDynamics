@@ -8,10 +8,13 @@ local sourceMarketSyncEvent = MDMMarketSyncEvent
 -- A: actual supplied production interfaces expose the split and local recomposition.
 do
     local engine = { prices={ [1]={ base=100, current=144, volatilityFactor=1.2, history={} } }, volatilityScale=1 }
-    local coordinator = { marketEngine=engine, futuresMarket={ contracts={} },
+    local coordinator = { marketEngine=engine, futuresMarket={ contracts={} }, economicModel="calendar",
         worldEvents={ registry={ sample={ lastFiredAt=123 } }, active={ sample={ endsAt=200000, intensity=.5 } } } }
     local data = MarketSerializer:toTable(coordinator)
-    T.eq("A1 current serializer uses durable version three", data.version, 3)
+    T.eq("A1 selected calendar session uses durable version three", data.version, 3)
+    coordinator.economicModel = "incumbent"
+    T.eq("A1b selected incumbent session uses durable version two", MarketSerializer:toTable(coordinator).version, 2)
+    coordinator.economicModel = "calendar"
     T.eq("A2 current durable snapshot omits active events", data.activeEvents, nil)
     T.eq("A3 current durable snapshot omits calendar admission", data.calendar, nil)
     T.eq("A4 current durable snapshot carries the factor", data.prices[1].volatilityFactor, 1.2)

@@ -15,7 +15,7 @@
 --
 -- Public API (called externally):
 --   init()                                 — snapshot base prices from economy
---   update(dt)                             — advance intraday/daily timers
+--   update(dt)                             - incumbent path only: advance intraday/daily timers
 --   refreshBasePrices()                    — sync base prices with vanilla seasonal curves
 --   addModifier(modifier)                  — push an event modifier onto the stack
 --   removeModifierById(fillTypeIndex, id)  — pop a modifier by id
@@ -104,15 +104,35 @@ function MarketEngine:refreshBasePrices(isInitial)
     end
 end
 
--- Retired raw-dt timer path (MD-15 / RSF-F203). The coordinator no longer calls
--- this: economic work is admitted from the canonical monotonic clock via
--- applyHourlyMovement / appendDailyHistory / refreshBasePrices. Kept as an inert
--- no-op so any stale caller cannot reintroduce raw-dt accumulation.
+-- Incumbent economic path: raw-dt intraday/daily timers. The coordinator calls
+-- this only when the session latched the incumbent model (the LOCKED default,
+-- MD-15 brief section 2 / RSF-F203 "Paired activation"). The calendar model
+-- never calls it: its work is admitted from the canonical monotonic clock via
+-- applyHourlyMovement / appendDailyHistory / refreshBasePrices. One selected
+-- path per session; retiring these timers is the later stable-cutover work.
+-- dt is in-game milliseconds (from FSBaseMission.update).
 function MarketEngine:update(dt)
     if g_server == nil then return end
-    if not MarketEngine._rawDtPathWarned then
-        MarketEngine._rawDtPathWarned = true
-        MDMLog.warn("MarketEngine:update(dt) is retired — calendar admission drives prices (MD-15)")
+
+    self.intradayTimer = self.intradayTimer + dt
+    self.dailyTimer    = self.dailyTimer    + dt
+    local changed = false
+
+    if self.intradayTimer >= INTRADAY_INTERVAL_MS then
+        self.intradayTimer = 0
+        self:_applyIntradayVolatility()
+        changed = true
+    end
+
+    if self.dailyTimer >= DAILY_INTERVAL_MS then
+        self.dailyTimer = 0
+        self:_applyDailyShift()
+        self:refreshBasePrices(false) -- Sync with seasonal changes daily
+        changed = true
+    end
+
+    if changed and MDMMarketSyncEvent then
+        MDMMarketSyncEvent.sendToClients()
     end
 end
 

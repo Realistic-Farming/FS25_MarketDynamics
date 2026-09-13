@@ -1,10 +1,12 @@
 --!load: src/MarketEngine.lua
 -- MD-15 / RSF-F203: calendar paced quote specification.
 --
--- Group A witnesses the repaired MarketEngine against its real source: the
--- raw-dt timer path is retired (update(dt) is inert, no timer accumulation, no
--- tick firing) and the calendar methods (applyHourlyMovement / appendDailyHistory)
--- are the only drivers. Groups B and C are reference contracts for the repair.
+-- Group A witnesses the real MarketEngine: the raw-dt timer path (update(dt))
+-- is the incumbent model, kept while the calendar model is LOCKED and called
+-- only by an incumbent session (see MD-15-session_latch_spec_test.lua for the
+-- selection); the calendar methods (applyHourlyMovement / appendDailyHistory)
+-- are the calendar model's only drivers. Groups B and C are reference
+-- contracts for the repair.
 -- They model pure arithmetic/admission only; no game, network, save-file,
 -- rendering, or performance behavior is proved here.
 
@@ -27,10 +29,10 @@ local function freshEngine()
   return e
 end
 
--- Group A: post-repair source witness. The raw-dt timer path is retired: the
--- coordinator drives economic work from the canonical monotonic clock, so
--- MarketEngine:update(dt) is inert and no raw-dt accumulation or tick firing
--- survives. The calendar methods are the only drivers.
+-- Group A: source witness. MarketEngine:update(dt) is the incumbent raw-dt
+-- path (LOCKED default); it is server guarded and, when an incumbent session
+-- calls it, fires one intraday tick per raw minute and one daily shift per
+-- raw day. The calendar model never calls it; its methods are witnessed below.
 do
   local e = freshEngine()
   g_server = nil
@@ -40,11 +42,12 @@ do
 
   g_server = {}
   e:update(60000)
-  T.eq("A4 raw dt no longer fires intraday ticks", e._intradayCalls, 0)
-  T.eq("A5 raw dt no longer accumulates in the timer", e.intradayTimer, 0)
+  T.eq("A4 incumbent: one raw minute fires one intraday tick", e._intradayCalls, 1)
+  T.eq("A5 incumbent: the intraday timer resets after the tick", e.intradayTimer, 0)
   e:update(86400000)
-  T.eq("A6 a full raw day no longer fires daily ticks", e._dailyCalls, 0)
-  T.eq("A7 raw dt no longer emits syncs", MDMMarketSyncEvent.sends, 0)
+  T.eq("A6 incumbent: a full raw day fires the daily shift", e._dailyCalls, 1)
+  T.eq("A7 incumbent: a fired tick publishes through the sync event", MDMMarketSyncEvent.sends, 2)
+  MDMMarketSyncEvent.sends = 0
 
   -- Calendar admission drives: one crossed hour = one quote step.
   local c = freshEngine()

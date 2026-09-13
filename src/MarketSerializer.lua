@@ -9,6 +9,14 @@ MarketSerializer = MarketSerializer or {}
 
 local SAVE_PATH_TEMPLATE = "%sFS25_MarketDynamics.xml"
 
+-- Save shape follows the session's latched economic model (RSF-F203 :137):
+-- the selected calendar path writes the version-3 calendar/event snapshot;
+-- the incumbent writes its normal legacy (version-2) state and never a stale
+-- v3 cursor/deadline bundle. A missing latch (nil model) is the incumbent.
+local function writesCalendarState(coordinator)
+    return coordinator ~= nil and coordinator.economicModel == "calendar"
+end
+
 -- Save all market state.
 function MarketSerializer:save(coordinator)
     if not g_currentMission or not g_currentMission.missionInfo then
@@ -39,14 +47,19 @@ function MarketSerializer:save(coordinator)
         return
     end
 
-    -- Schema version stamp
-    xmlFile:setString("marketDynamics#version", "3")
-    
+    local calendar = writesCalendarState(coordinator)
+
+    -- Schema version stamp: 3 for the selected calendar path, 2 (legacy) for
+    -- the incumbent.
+    xmlFile:setString("marketDynamics#version", calendar and "3" or "2")
+
     -- Store absolute game time at save (v2.1+) to prevent immediate expiration on reload.
     -- Stored as string to prevent 32-bit float parsing truncation bugs in C++ engine.
     xmlFile:setString("marketDynamics#lastGameTime", tostring(MDMUtil.getGameTime()))
     -- Canonical monotonic time at save (v3, RSF-F203). Same string convention.
-    xmlFile:setString("marketDynamics#lastMonotonicTime", tostring(MDMUtil.getMonotonicTime()))
+    if calendar then
+        xmlFile:setString("marketDynamics#lastMonotonicTime", tostring(MDMUtil.getMonotonicTime()))
+    end
 
     -- ── Futures contracts ────────────────────────────────────────────────
     local contracts = coordinator.futuresMarket and coordinator.futuresMarket.contracts or {}
@@ -81,7 +94,7 @@ function MarketSerializer:save(coordinator)
             xmlFile:setFloat(base .. "#current", entry.current)
             xmlFile:setFloat(base .. "#volatilityFactor", entry.volatilityFactor or 1)
             -- v3: private monotonic history-day cursor (endpoint-day admission).
-            if entry.lastHistoryDay then
+            if calendar and entry.lastHistoryDay then
                 xmlFile:setInt(base .. "#lastHistoryDay", entry.lastHistoryDay)
             end
             
@@ -107,7 +120,7 @@ function MarketSerializer:save(coordinator)
             xmlFile:setString(base .. "#lastFiredAt", tostring(event.lastFiredAt))
             -- v3: canonical monotonic firing time. Never-fired stays a missing
             -- record (no zero sentinel).
-            if event.lastFiredMonotonicMs then
+            if calendar and event.lastFiredMonotonicMs then
                 xmlFile:setString(base .. "#lastFiredMonotonicMs", tostring(event.lastFiredMonotonicMs))
             end
             j = j + 1
@@ -120,7 +133,7 @@ function MarketSerializer:save(coordinator)
             xmlFile:setString(base .. "#id",        id)
             xmlFile:setString(base .. "#endsAt",    tostring(active.endsAt))
             -- v3: canonical monotonic deadline.
-            if active.endsAtMonotonicMs then
+            if calendar and active.endsAtMonotonicMs then
                 xmlFile:setString(base .. "#endsAtMonotonicMs", tostring(active.endsAtMonotonicMs))
             end
             xmlFile:setFloat (base .. "#intensity", active.intensity)
@@ -501,10 +514,11 @@ end
 -- so it is carried as a string and parsed back.
 
 function MarketSerializer:toTable(coordinator)
+    local calendar = writesCalendarState(coordinator)
     local out = {
-        version      = 3,
+        version      = calendar and 3 or 2,
         lastGameTime = MDMUtil.getGameTime(),
-        lastMonotonicTime = MDMUtil.getMonotonicTime(),
+        lastMonotonicTime = calendar and MDMUtil.getMonotonicTime() or nil,
     }
 
     -- Futures contracts (array; each carries its own id)
@@ -546,7 +560,7 @@ function MarketSerializer:toTable(coordinator)
                 index             = index,
                 current           = entry.current,
                 volatilityFactor  = entry.volatilityFactor or 1,
-                lastHistoryDay    = entry.lastHistoryDay,
+                lastHistoryDay    = calendar and entry.lastHistoryDay or nil,
                 history           = history,
             }
         end
@@ -562,7 +576,7 @@ function MarketSerializer:toTable(coordinator)
             cooldowns[#cooldowns + 1] = {
                 id                    = id,
                 lastFiredAt           = tostring(event.lastFiredAt),
-                lastFiredMonotonicMs  = event.lastFiredMonotonicMs and tostring(event.lastFiredMonotonicMs) or nil,
+                lastFiredMonotonicMs  = (calendar and event.lastFiredMonotonicMs) and tostring(event.lastFiredMonotonicMs) or nil,
             }
         end
     end
@@ -713,4 +727,56 @@ function MarketSerializer:finalizeRestore(coordinator)
     coordinator.refreshDay     = math.floor(monoNow / 86400000)
     coordinator.lastHistoryDay = math.floor(monoNow / 86400000)
     MDMLog.info("MarketSerializer: restore finalized — next quote step within the current farming hour")
+end
+
+-- Incumbent selected after load (RSF-F203 :137), possibly from a v3 save:
+-- project the canonical event dates into the legacy public fields at the
+-- current clock offset, then drop the live calendar cursors and canonical
+-- deadlines so the incumbent timers own subsequent progress and the next save
+-- carries no stale v3 bundle. Draws no quote and fires no event.
+function MarketSerializer:projectIncumbentRestore(coordinator)
+    if not coordinator then return end
+    local legacyNow = MDMUtil.getGameTime()
+    local monoNow   = MDMUtil.getMonotonicTime()
+    local offset    = legacyNow - monoNow
+
+    local we = coordinator.worldEvents
+    if we then
+        if we.active then
+            for _, active in pairs(we.active) do
+                if active.endsAtMonotonicMs then
+                    active.endsAt = active.endsAtMonotonicMs + offset
+                    active.endsAtMonotonicMs = nil
+                end
+            end
+        end
+        if we.registry then
+            for _, event in pairs(we.registry) do
+                if event.lastFiredMonotonicMs then
+                    event.lastFiredAt = event.lastFiredMonotonicMs + offset
+                    event.lastFiredMonotonicMs = nil
+                end
+                event.cooldownUntilMonotonicMs = nil
+            end
+        end
+        we.timer = 0
+    end
+
+    local engine = coordinator.marketEngine
+    if engine then
+        if engine.prices then
+            for _, entry in pairs(engine.prices) do
+                entry.lastHistoryDay = nil
+            end
+        end
+        engine.intradayTimer = 0
+        engine.dailyTimer    = 0
+    end
+
+    coordinator.lastObservedMs = nil
+    coordinator.processedHour  = nil
+    coordinator.refreshDay     = nil
+    coordinator.lastHistoryDay = nil
+    coordinator.lastSavedMonotonicTime = nil
+    MDMLog.info("MarketSerializer: incumbent restore, canonical dates projected to legacy fields, calendar cursor dropped")
 end
