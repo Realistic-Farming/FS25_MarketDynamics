@@ -38,7 +38,8 @@ function MDMExternalIntegration.new(engine)
     self.lastActiveEvent = nil
     -- CropStress state
     self.cropStressManager = nil
-    self.lastCsCheckMonotonicDay = nil
+    self.csDailyTimer = 0                 -- incumbent path: raw-dt day accumulator
+    self.lastCsCheckMonotonicDay = nil    -- calendar path: monotonic day cursor
     self.lastCsModifierFactor = nil
     return self
 end
@@ -58,10 +59,16 @@ function MDMExternalIntegration:detect()
     end
 end
 
--- Called every frame from MarketDynamics:update(dt).
-function MDMExternalIntegration:update(dt)
+-- Called every frame from MarketDynamics:update(dt). economicModel is the
+-- session's latched model ("incumbent" | "calendar"); nil (pure client, or a
+-- missing latch) takes the incumbent clock, matching the LOCKED default.
+function MDMExternalIntegration:update(dt, economicModel)
     self:_updateRWE()
-    self:_updateCropStress()
+    if economicModel == "calendar" then
+        self:_updateCropStressCalendar()
+    else
+        self:_updateCropStressIncumbent(dt)
+    end
 end
 
 -- ── RWE ──────────────────────────────────────────────────────────────────────
@@ -126,16 +133,35 @@ end
 
 -- ── CropStress ───────────────────────────────────────────────────────────────
 
--- Check CropStress supply pressure once per newly crossed farming day
--- (canonical monotonic day, RSF-F203). A time jump crosses days without
--- replaying intermediate checks; the current day's state is evaluated once.
-function MDMExternalIntegration:_updateCropStress()
+-- Incumbent path: check CropStress supply pressure once per accumulated
+-- in-game day of raw dt (pre-MD-15 behaviour, kept while the calendar model
+-- is LOCKED).
+function MDMExternalIntegration:_updateCropStressIncumbent(dt)
+    if not self.cropStressManager then return end
+
+    self.csDailyTimer = self.csDailyTimer + (dt or 0)
+    if self.csDailyTimer < CS_DAILY_INTERVAL_MS then return end
+    self.csDailyTimer = 0
+
+    self:_evaluateCropStress()
+end
+
+-- Calendar path: check CropStress supply pressure once per newly crossed
+-- farming day (canonical monotonic day, RSF-F203). A time jump crosses days
+-- without replaying intermediate checks; the current day's state is evaluated
+-- once.
+function MDMExternalIntegration:_updateCropStressCalendar()
     if not self.cropStressManager then return end
 
     local monoDay = MDMUtil.getMonotonicDay()
     if monoDay == self.lastCsCheckMonotonicDay then return end
     self.lastCsCheckMonotonicDay = monoDay
 
+    self:_evaluateCropStress()
+end
+
+-- Shared evaluation: count critical fields and apply/lift the CS modifier.
+function MDMExternalIntegration:_evaluateCropStress()
     -- Count fields and how many are under critical stress
     local modifier = self.cropStressManager.stressModifier
     if not modifier or not modifier.fieldStress then return end

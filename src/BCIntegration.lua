@@ -73,17 +73,38 @@ function BCIntegration.init(marketEngine, futuresMarket)
     BCIntegration._installHook()
 end
 
--- Called from MarketDynamics:update(dt) every frame.
--- Removes supply-spike modifiers that have expired. Expiry uses the canonical
--- monotonic clock (RSF-F203): a time jump cannot extend or shorten the spike.
+-- Called from MarketDynamics:update(dt) every frame on the selected CALENDAR
+-- path. Removes supply-spike modifiers that have expired. Expiry uses the
+-- canonical monotonic clock (RSF-F203): a time jump cannot extend or shorten
+-- the spike.
 function BCIntegration.update()
     if not BCIntegration.isEnabled() or not _marketEngine then return end
 
     local monoNow = MDMUtil.getMonotonicTime()
+    BCIntegration._expirePending(function(pending)
+        return monoNow >= pending.expiresAtMonotonicMs
+    end)
+end
+
+-- Called from MarketDynamics:update(dt) every frame on the INCUMBENT path
+-- (LOCKED default). Expiry uses the raw mission time recorded at completion,
+-- the pre-MD-15 behaviour, so the incumbent session runs exactly one clock.
+function BCIntegration.updateIncumbent()
+    if not BCIntegration.isEnabled() or not _marketEngine then return end
+
+    local now = g_currentMission and g_currentMission.time or 0
+    BCIntegration._expirePending(function(pending)
+        return now >= pending.expiresAt
+    end)
+end
+
+-- Remove every pending spike for which isDue(pending) holds, through the
+-- common stack method (which requests publication), consuming the row once.
+function BCIntegration._expirePending(isDue)
     local i = #_pendingRemovals
     while i >= 1 do
         local pending = _pendingRemovals[i]
-        if monoNow >= pending.expiresAtMonotonicMs then
+        if isDue(pending) then
             _marketEngine:removeModifierById(pending.fillTypeIndex, pending.modId)
             MDMLog.info("BCIntegration: supply spike expired for fillType " .. pending.fillTypeIndex)
             table.remove(_pendingRemovals, i)
@@ -277,10 +298,13 @@ function BCIntegration._onMissionFinish(mission, finishState)
         "BCIntegration: supply spike applied to %s (-%d pct for 1h)",
         name, math.floor((1 - SUPPLY_SPIKE_FACTOR) * 100)))
 
+    -- Both deadlines are recorded; the session's selected path reads exactly
+    -- one of them (updateIncumbent: mission time; update: canonical clock).
+    local missionNow = g_currentMission and g_currentMission.time or 0
     table.insert(_pendingRemovals, {
         fillTypeIndex         = fillTypeIndex,
         modId                 = modId,
-        expiresAt             = monoNow + SUPPLY_SPIKE_DURATION,  -- legacy public projection
-        expiresAtMonotonicMs  = monoNow + SUPPLY_SPIKE_DURATION,
+        expiresAt             = missionNow + SUPPLY_SPIKE_DURATION,  -- incumbent: raw mission time
+        expiresAtMonotonicMs  = monoNow + SUPPLY_SPIKE_DURATION,     -- calendar: canonical clock
     })
 end

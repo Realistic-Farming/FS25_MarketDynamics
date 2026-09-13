@@ -114,7 +114,7 @@ local SETTING_DEFS = {
     debugMode              = { label = "mdm_set_debug_mode",       desc = "mdm_desc_debug_mode",       type = "bool" },
     experimentalSystems    = { label = "mdm_set_experimental",     desc = "mdm_desc_experimental",     type = "bool",
                                labelText = "Experimental Systems",
-                               descText  = "Enable experimental (not yet released) systems at your own risk" },
+                               descText  = "Enable experimental (not yet released) systems at your own risk. A change takes effect at the next mission start." },
 }
 
 -- ── Category definitions ───────────────────────────────────

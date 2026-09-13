@@ -299,6 +299,8 @@
         <text name="mdm_desc_contract_hud"       text="Show a persistent progress tracker for active futures contracts." />
         <text name="mdm_set_debug_mode"          text="Debug Mode" />
         <text name="mdm_desc_debug_mode"         text="Enable developer logging and additional debug information." />
+        <text name="mdm_set_experimental"        text="Experimental Systems" />
+        <text name="mdm_desc_experimental"       text="Enable experimental (not yet released) systems at your own risk. A change takes effect at the next mission start." />
 
         <!-- Multi-option Labels -->
         <text name="mdm_freq_rare"               text="Rare" />
