@@ -1,17 +1,23 @@
 -- MDMMarketSyncEvent.lua
 -- Syncs prices and active world events from server to clients.
 --
--- Wire format: MDM-CALENDAR/1 (RSF-F203). The server's authoritative base and
--- current quote travel as %.17g decimal strings (sector digits) so the client
--- keeps the exact received quote instead of a float32-truncated recomposition;
--- active-event deadlines travel the same way so a large monotonic expiry
--- round-trips exactly.
+-- Direct stream format: STREAM_MARK "MDM-CALENDAR/2" (RSF-F204), the history
+-- inclusion bool right after the mark, then the counted regions. The NetworkSync
+-- array keeps WIRE_MARK "MDM-CALENDAR/1"; its layout did not change. In both,
+-- the server's authoritative base and current quote travel as %.17g decimal
+-- strings (RSF-F203) so the client keeps the exact received quote instead of a
+-- float32-truncated recomposition; active-event deadlines travel the same way
+-- so a large monotonic expiry round-trips exactly.
 
 MDMMarketSyncEvent = MDMMarketSyncEvent or {}
 local MDMMarketSyncEvent_mt = Class(MDMMarketSyncEvent, Event)
 InitEventClass(MDMMarketSyncEvent, "MDMMarketSyncEvent")
 
 MDMMarketSyncEvent.WIRE_MARK = "MDM-CALENDAR/1"
+-- Direct-event stream mark (RSF-F204). The stream layout gained the history
+-- inclusion boolean, so the direct envelope carries its own mark. WIRE_MARK
+-- stays on the NetworkSync array, whose layout did not change; do not merge them.
+MDMMarketSyncEvent.STREAM_MARK = "MDM-CALENDAR/2"
 
 function MDMMarketSyncEvent.emptyNew()
     return Event.new(MDMMarketSyncEvent_mt)
@@ -19,6 +25,9 @@ end
 
 function MDMMarketSyncEvent.new(marketEngine, worldEvents, includeHistory)
     local self = MDMMarketSyncEvent.emptyNew()
+    -- Equals the constructor argument, never derived from history length:
+    -- included-empty and omitted are distinct facts on the wire (RSF-F204).
+    self.historyIncluded = (includeHistory == true)
     self.prices = {}
     if marketEngine then
         for index, entry in pairs(marketEngine.prices) do
@@ -49,14 +58,17 @@ function MDMMarketSyncEvent.new(marketEngine, worldEvents, includeHistory)
     return self
 end
 
-function MDMMarketSyncEvent.sendToClients()
+-- includeHistory: true on any send that can change history (the coalesced
+-- MarketEngine tick and publishMarketState). Deltas that never touch history
+-- may omit it. When in doubt, include (RSF-F204).
+function MDMMarketSyncEvent.sendToClients(includeHistory)
     -- When NetworkSync is active it carries the full state; mark it dirty instead of
     -- broadcasting the own event.
     if MDMNetworkSyncBridge ~= nil and MDMNetworkSyncBridge.markStateDirty() then
         return
     end
     if g_server ~= nil and g_MarketDynamics then
-        g_server:broadcastEvent(MDMMarketSyncEvent.new(g_MarketDynamics.marketEngine, g_MarketDynamics.worldEvents))
+        g_server:broadcastEvent(MDMMarketSyncEvent.new(g_MarketDynamics.marketEngine, g_MarketDynamics.worldEvents, includeHistory))
     end
 end
 
@@ -67,8 +79,10 @@ function MDMMarketSyncEvent.sendToClient(connection)
 end
 
 function MDMMarketSyncEvent:writeStream(streamId, connection)
-    -- Wire mark: receivers reject streams without it (single-version deployment).
-    streamWriteString(streamId, MDMMarketSyncEvent.WIRE_MARK)
+    -- Stream mark: receivers reject streams without it (single-version deployment).
+    streamWriteString(streamId, MDMMarketSyncEvent.STREAM_MARK)
+    -- Event-level inclusion fact, outside every counted region.
+    streamWriteBool(streamId, self.historyIncluded == true)
 
     -- Write prices
     streamWriteInt32(streamId, #self.prices)
@@ -97,10 +111,11 @@ end
 
 function MDMMarketSyncEvent:readStream(streamId, connection)
     local mark = streamReadString(streamId)
-    if mark ~= MDMMarketSyncEvent.WIRE_MARK then
-        MDMLog.error("MDMMarketSyncEvent: stream rejected — wire mark mismatch (got '" .. tostring(mark) .. "')")
+    if mark ~= MDMMarketSyncEvent.STREAM_MARK then
+        MDMLog.error("MDMMarketSyncEvent: stream rejected, stream mark mismatch (got '" .. tostring(mark) .. "')")
         return
     end
+    self.historyIncluded = streamReadBool(streamId)
 
     self.prices = {}
     local numPrices = streamReadInt32(streamId)
@@ -143,8 +158,11 @@ end
 -- the NetworkSync bridge can reuse the EXACT same apply path (prices, event lifecycle,
 -- notifications, UI refresh) instead of re-implementing it. `prices` = array of
 -- {index, base, current, volatilityFactor, history?}; `activeEvents` = array of
--- {id, endsAt, intensity, extraData}.
-function MDMMarketSyncEvent.applyState(prices, activeEvents)
+-- {id, endsAt, intensity, extraData}. `historyIncluded` is the explicit inclusion
+-- fact: true means the payload is authoritative for history (nonempty replaces,
+-- empty clears); nil or false means history was omitted and the retained
+-- samples are preserved. Presence is never inferred from length (RSF-F204).
+function MDMMarketSyncEvent.applyState(prices, activeEvents, historyIncluded)
     if not g_MarketDynamics then return end
 
     if g_MarketDynamics.marketEngine then
@@ -158,10 +176,15 @@ function MDMMarketSyncEvent.applyState(prices, activeEvents)
                 if p.base ~= nil then entry.base = p.base end
                 if p.current ~= nil then entry.current = p.current end
                 entry.volatilityFactor = p.volatilityFactor
-                if p.history and #p.history > 0 then
-                    entry.history = p.history
-                    if MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.seedFromHistory) == "function" then
-                        MDMMarketScreenGraph.seedFromHistory(p.index, p.history)
+                if historyIncluded == true then
+                    -- Copy: the incoming array must not alias client state.
+                    local history = {}
+                    for j, h in ipairs(p.history or {}) do
+                        history[j] = { price = h.price, time = h.time }
+                    end
+                    entry.history = history
+                    if #history > 0 and MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.seedFromHistory) == "function" then
+                        MDMMarketScreenGraph.seedFromHistory(p.index, history)
                     end
                 end
                 g_MarketDynamics.marketEngine:_recalculate(p.index)
@@ -216,6 +239,12 @@ function MDMMarketSyncEvent.applyState(prices, activeEvents)
         end
     end
 
+    -- A complete snapshot (history included) is the first point at which a
+    -- client holds the server's market state; F205's sampler waits on this.
+    if historyIncluded == true then
+        g_MarketDynamics._marketStateReady = true
+    end
+
     -- Refresh UI
     if g_gui and g_gui.currentGuiName == "InGameMenu" then
         local inGameMenu = g_gui.screenControllers[InGameMenu] or g_inGameMenu
@@ -232,5 +261,5 @@ end
 
 function MDMMarketSyncEvent:run(connection)
     if not connection:getIsServer() then return end -- only clients process this
-    MDMMarketSyncEvent.applyState(self.prices, self.activeEvents)
+    MDMMarketSyncEvent.applyState(self.prices, self.activeEvents, self.historyIncluded)
 end

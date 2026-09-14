@@ -196,7 +196,8 @@ local function buildStateArray()
     -- Market prices + active events: reuse MDMMarketSyncEvent.new's capture exactly.
     local prices, events = {}, {}
     if mdm ~= nil then
-        local snap = MDMMarketSyncEvent.new(mdm.marketEngine, mdm.worldEvents)
+        -- Full capture: authoritative for history, so include it (RSF-F204).
+        local snap = MDMMarketSyncEvent.new(mdm.marketEngine, mdm.worldEvents, true)
         prices = snap.prices or {}
         events = snap.activeEvents or {}
     end
@@ -281,7 +282,8 @@ local function applyStateArray(arr)
     end
 
     MDMContractSyncEvent.execute(MDMContractSyncEvent.SYNC_FULL, contracts)
-    MDMMarketSyncEvent.applyState(prices, events)
+    -- The array is a full capture: empty history legitimately means empty.
+    MDMMarketSyncEvent.applyState(prices, events, true)
 end
 
 -- Server: mark the state module dirty so NetworkSync resyncs the full snapshot at its next

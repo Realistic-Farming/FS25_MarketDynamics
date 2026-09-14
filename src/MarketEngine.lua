@@ -132,7 +132,9 @@ function MarketEngine:update(dt)
     end
 
     if changed and MDMMarketSyncEvent then
-        MDMMarketSyncEvent.sendToClients()
+        -- Coalesced intraday+daily send: it can carry a new daily sample, so
+        -- history is always included (RSF-F204).
+        MDMMarketSyncEvent.sendToClients(true)
     end
 end
 
