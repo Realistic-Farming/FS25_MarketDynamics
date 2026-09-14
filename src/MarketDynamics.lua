@@ -29,6 +29,10 @@ function MarketDynamics.new(modDir, modName)
     self.modName  = modName
     self.isActive = false
     self._loadPhase = true
+    -- Transient, never saved: true once this side holds a complete market
+    -- state (server: after restore; client: after its first full snapshot).
+    -- Read by the F205 graph sampler (RSF-F204).
+    self._marketStateReady = false
 
     -- Player-configurable settings (persisted by MarketSerializer, edited via SettingsUI)
     -- Add new settings here and wire them in MarketSerializer + SettingsUI.
@@ -235,6 +239,7 @@ function MarketDynamics:onStartMission(mission)
             -- (RSF-F203 :137).
             self.serializer:projectIncumbentRestore(self)
         end
+        self._marketStateReady = true
         MDMLog.info("MarketDynamics: savegame data loaded")
     else
         -- When NetworkSync is active it delivers the full state to joining clients, so the
@@ -467,7 +472,9 @@ end
 function MarketDynamics:publishMarketState()
     if g_server == nil then return end
     if MDMMarketSyncEvent ~= nil then
-        MDMMarketSyncEvent.sendToClients()
+        -- Calendar path publisher, fired after a day may have been appended:
+        -- history is always included (RSF-F204).
+        MDMMarketSyncEvent.sendToClients(true)
     end
 end
 
@@ -588,6 +595,7 @@ end
 
 function MarketDynamics:delete()
     self.isActive = false
+    self._marketStateReady = false
     -- Unsubscribe the latched calendar source.
     if self.calendarSource == "timeguard" and g_timeGuard ~= nil
         and type(g_timeGuard.unsubscribeTick) == "function" then
