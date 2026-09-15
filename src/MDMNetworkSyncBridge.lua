@@ -243,7 +243,7 @@ local function applyStateArray(arr)
         contracts[#contracts + 1] = {
             id                = arr[i],
             farmId            = arr[i + 1],
-            fillTypeIndex     = arr[i + 2],
+            fillTypeIndex     = (arr[i + 2] ~= 0) and arr[i + 2] or nil,   -- D7: a wire 0 is an unresolved contract (nil), as the event path reads it
             fillTypeName      = arr[i + 3],
             quantity          = arr[i + 4],
             lockedPrice       = arr[i + 5],
