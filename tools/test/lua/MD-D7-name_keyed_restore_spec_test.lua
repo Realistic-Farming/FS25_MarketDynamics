@@ -1,4 +1,4 @@
---!load: src/MarketSerializer.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/MDMHUD.lua
+--!load: src/MarketSerializer.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/MDMHUD.lua, src/events/MDMContractSyncEvent.lua
 -- D7 (2026-09-15): saved prices and futures contracts are restored by fill
 -- type NAME, not by the raw fill type index, because the index shifts with the
 -- selected mod set. Runs the real MarketSerializer toTable/applyTable (the
@@ -129,6 +129,17 @@ do
     T.eq("D10 HUD fill type lookup is nil for an unresolved contract", MDMHUD.contractFillType(c), nil)
     T.eq("D11 the HUD title still has the saved name", c.fillTypeName:upper(), "GOLD")
     T.eq("D12 a resolved contract still yields its fill type", MDMHUD.contractFillType({ fillTypeIndex = 5 }).index, 5)
+    -- The contract sync event carries an unresolved contract: nil in, 0 on the wire, nil out, name kept.
+    local s = _sfMockStream()
+    local ev = MDMContractSyncEvent.emptyNew()
+    local okW, errW = pcall(function() ev:writeContract(s, { id = 2, farmId = 1, fillTypeIndex = nil, fillTypeName = "GOLD", quantity = 1, lockedPrice = 1, deliveryTime = 9000, deliveryStartTime = 0, delivered = 0, valueReceived = 0, status = "active" }) end)
+    T.ok("D13 writing an unresolved contract raises no error: " .. tostring(errW), okW)
+    local back = ev:readContract(s)
+    T.eq("D14 the index reads back as nil", back.fillTypeIndex, nil)
+    T.eq("D15 the name survives the wire", back.fillTypeName, "GOLD")
+    local s2 = _sfMockStream()
+    ev:writeContract(s2, { id = 3, farmId = 1, fillTypeIndex = 5, fillTypeName = "WHEAT", quantity = 1, lockedPrice = 1, deliveryTime = 9000, deliveryStartTime = 0, delivered = 0, valueReceived = 0, status = "active" })
+    T.eq("D16 a resolved index round-trips unchanged", ev:readContract(s2).fillTypeIndex, 5)
 end
 
 -- (E) The own XML: save writes the name, load restores by it.
