@@ -57,8 +57,11 @@ end
 function MDMContractSyncEvent:writeContract(streamId, c)
     streamWriteInt32(streamId, c.id)
     streamWriteInt32(streamId, c.farmId)
-    streamWriteInt32(streamId, c.fillTypeIndex)
-    streamWriteString(streamId, c.fillTypeName)
+    -- D7: an unresolved contract (its product is not registered in this
+    -- session) carries no index; 0 is never a valid fill type (UNKNOWN is 1),
+    -- so 0 is the wire form of nil, as the NetworkSync bridge already writes.
+    streamWriteInt32(streamId, c.fillTypeIndex or 0)
+    streamWriteString(streamId, c.fillTypeName or "")
     streamWriteFloat32(streamId, c.quantity)
     streamWriteFloat32(streamId, c.lockedPrice)
     -- Time values are sent as Int32 seconds, not Float64. streamWriteFloat64 is
@@ -96,7 +99,7 @@ function MDMContractSyncEvent:readContract(streamId)
     return {
         id = streamReadInt32(streamId),
         farmId = streamReadInt32(streamId),
-        fillTypeIndex = streamReadInt32(streamId),
+        fillTypeIndex = (function(v) if v == 0 then return nil end return v end)(streamReadInt32(streamId)),
         fillTypeName = streamReadString(streamId),
         quantity = streamReadFloat32(streamId),
         lockedPrice = streamReadFloat32(streamId),
