@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Control Center actions** (suite Control Center, requires SettingsHub): `MDM_MARKET_SCREEN`, `MDM_CREATE_CONTRACT`, `MDM_OPEN_SETTINGS`.
 - **Playtest fixes:** MarketScreen + graph, MdPriceFormat, RF PDA guest page and Esc profiles, modDesc alignment.
 
+### Fixed
+- **Saved prices and futures contracts follow the product name, not the raw fill type index (D7).** Adding or removing a mod that registers fill types shifts every later index; a save restored by index alone put a price history or a contract on the wrong product. The save and the StateLedger block now carry each fill type name and restore by it; a legacy save without names is restored by index once and the log says so.
+
 ---
 
 ## [1.3.0.0] - 2026-08-04

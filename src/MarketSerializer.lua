@@ -17,6 +17,51 @@ local function writesCalendarState(coordinator)
     return coordinator ~= nil and coordinator.economicModel == "calendar"
 end
 
+-- ── Name-keyed fill type identity (D7, 2026-09-15) ──────────────────────
+-- A raw fill type index is only stable while the selected mod set is stable:
+-- adding or removing a mod that registers fill types shifts every later index,
+-- so a price row or contract keyed by index alone lands on the wrong product.
+-- Saves therefore carry the fill type NAME beside the index and restore by the
+-- name (FillTypeManager:getFillTypeIndexByName, fillTypes/FillTypeManager.lua:305;
+-- getFillTypeNameByIndex :292). A legacy save without names keeps the index
+-- behaviour and says so in the log.
+local function nameOfIndex(index)
+    if g_fillTypeManager ~= nil and g_fillTypeManager.getFillTypeNameByIndex ~= nil then
+        return g_fillTypeManager:getFillTypeNameByIndex(index)
+    end
+    return nil
+end
+
+local function indexOfName(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    if g_fillTypeManager ~= nil and g_fillTypeManager.getFillTypeIndexByName ~= nil then
+        return g_fillTypeManager:getFillTypeIndexByName(name)
+    end
+    return nil
+end
+
+--- Resolve a saved fill type to the current registry.
+--- Returns index (nil when the row must be skipped) and how:
+---   "name"    resolved by the saved name; the index may have moved
+---   "legacy"  no saved name (a pre-D7 save): the saved index is used
+---   "unknown" the saved name is not registered in this session
+local function resolveSavedFillType(savedName, savedIndex)
+    if type(savedName) == "string" and savedName ~= "" then
+        local index = indexOfName(savedName)
+        if index ~= nil then return index, "name" end
+        return nil, "unknown"
+    end
+    return savedIndex, "legacy"
+end
+MarketSerializer.resolveSavedFillType = resolveSavedFillType
+MarketSerializer.nameOfIndex = nameOfIndex
+
+local function logLegacy(where, priceRows, contracts)
+    if priceRows > 0 or contracts > 0 then
+        MDMLog.warn(string.format("MarketSerializer (%s): legacy save without fill type names; %d price row(s) and %d contract(s) restored by raw index. The next save writes names.", where, priceRows, contracts))
+    end
+end
+
 -- Save all market state.
 function MarketSerializer:save(coordinator)
     if not g_currentMission or not g_currentMission.missionInfo then
@@ -91,6 +136,8 @@ function MarketSerializer:save(coordinator)
         for index, entry in pairs(coordinator.marketEngine.prices) do
             local base = "marketDynamics.prices.price(" .. k .. ")"
             xmlFile:setInt  (base .. "#index",  index)
+            local ftName = nameOfIndex(index)
+            if ftName ~= nil then xmlFile:setString(base .. "#fillTypeName", ftName) end
             xmlFile:setFloat(base .. "#current", entry.current)
             xmlFile:setFloat(base .. "#volatilityFactor", entry.volatilityFactor or 1)
             -- v3: private monotonic history-day cursor (endpoint-day admission).
@@ -254,6 +301,8 @@ function MarketSerializer:load(coordinator)
         coordinator.lastSavedMonotonicTime = mtStr and tonumber(mtStr) or nil
     end
 
+    local legacyPriceRows, legacyContracts = 0, 0
+
     -- ── Restore futures contracts ─────────────────────────────────────────
     local i = 0
     while true do
@@ -276,11 +325,24 @@ function MarketSerializer:load(coordinator)
                 if oldId then upDealId = tostring(oldId) end
             end
 
+            local savedIndex = xmlFile:getInt(base .. "#fillTypeIndex")
+            local savedName  = xmlFile:getString(base .. "#fillTypeName")
+            local ftIndex, how = resolveSavedFillType(savedName, savedIndex)
+            if how == "unknown" then
+                -- The contract is the player's money: keep it on the saved index
+                -- and say so rather than drop it.
+                MDMLog.warn(string.format("MarketSerializer: contract %d names fill type '%s' which is not registered in this session; keeping saved index %s", id, tostring(savedName), tostring(savedIndex)))
+                ftIndex = savedIndex
+            elseif how == "legacy" then
+                legacyContracts = legacyContracts + 1
+            elseif ftIndex ~= savedIndex then
+                MDMLog.info(string.format("MarketSerializer: contract %d fill type '%s' moved from index %s to %s", id, savedName, tostring(savedIndex), tostring(ftIndex)))
+            end
             local contract = {
                 id                = id,
                 farmId            = xmlFile:getInt   (base .. "#farmId"),
-                fillTypeIndex     = xmlFile:getInt   (base .. "#fillTypeIndex"),
-                fillTypeName      = xmlFile:getString(base .. "#fillTypeName"),
+                fillTypeIndex     = ftIndex,
+                fillTypeName      = savedName or nameOfIndex(ftIndex),
                 quantity          = xmlFile:getFloat (base .. "#quantity"),
                 lockedPrice       = xmlFile:getFloat (base .. "#lockedPrice"),
                 deliveryTime      = deliveryTime,
@@ -312,7 +374,16 @@ function MarketSerializer:load(coordinator)
             local base = "marketDynamics.prices.price(" .. k .. ")"
             if not xmlFile:hasProperty(base) then break end
 
-            local index = xmlFile:getInt(base .. "#index")
+            local savedIndex = xmlFile:getInt(base .. "#index")
+            local savedName  = xmlFile:getString(base .. "#fillTypeName")
+            local index, how = resolveSavedFillType(savedName, savedIndex)
+            if how == "unknown" then
+                MDMLog.warn(string.format("MarketSerializer: price row for fill type '%s' (saved index %s) is not registered in this session; row skipped", tostring(savedName), tostring(savedIndex)))
+            elseif how == "legacy" then
+                legacyPriceRows = legacyPriceRows + 1
+            elseif index ~= savedIndex then
+                MDMLog.info(string.format("MarketSerializer: price row '%s' moved from index %s to %s", savedName, tostring(savedIndex), tostring(index)))
+            end
             if index then
                 local entry = coordinator.marketEngine.prices[index]
                 if entry then
@@ -344,6 +415,7 @@ function MarketSerializer:load(coordinator)
             k = k + 1
         end
     end
+    logLegacy("xml", legacyPriceRows, legacyContracts)
 
     -- ── Restore event cooldowns ───────────────────────────────────────────
     local legacyNow = MDMUtil.getGameTime()
@@ -558,6 +630,7 @@ function MarketSerializer:toTable(coordinator)
             end
             prices[#prices + 1] = {
                 index             = index,
+                fillTypeName      = nameOfIndex(index),
                 current           = entry.current,
                 volatilityFactor  = entry.volatilityFactor or 1,
                 lastHistoryDay    = calendar and entry.lastHistoryDay or nil,
@@ -591,6 +664,7 @@ function MarketSerializer:applyTable(coordinator, data)
     -- Contracts: the ledger is the source of truth, so clear the set imported from
     -- the own XML and rebuild it from the ledger block. nextId is a monotonic
     -- high-water mark (never reset) so an id is never reused.
+    local legacyPriceRows, legacyContracts = 0, 0
     if coordinator.futuresMarket and type(data.contracts) == "table" then
         local fm = coordinator.futuresMarket
         for k in pairs(fm.contracts) do fm.contracts[k] = nil end
@@ -598,11 +672,20 @@ function MarketSerializer:applyTable(coordinator, data)
             local id = c.id
             local deliveryTime = tonumber(c.deliveryTime)
             if id and deliveryTime and deliveryTime > 0 then
+                local ftIndex, how = resolveSavedFillType(c.fillTypeName, c.fillTypeIndex)
+                if how == "unknown" then
+                    MDMLog.warn(string.format("MarketSerializer.applyTable: contract %s names fill type '%s' which is not registered in this session; keeping saved index %s", tostring(id), tostring(c.fillTypeName), tostring(c.fillTypeIndex)))
+                    ftIndex = c.fillTypeIndex
+                elseif how == "legacy" then
+                    legacyContracts = legacyContracts + 1
+                elseif ftIndex ~= c.fillTypeIndex then
+                    MDMLog.info(string.format("MarketSerializer.applyTable: contract %s fill type '%s' moved from index %s to %s", tostring(id), c.fillTypeName, tostring(c.fillTypeIndex), tostring(ftIndex)))
+                end
                 fm.contracts[id] = {
                     id                = id,
                     farmId            = c.farmId,
-                    fillTypeIndex     = c.fillTypeIndex,
-                    fillTypeName      = c.fillTypeName,
+                    fillTypeIndex     = ftIndex,
+                    fillTypeName      = c.fillTypeName or nameOfIndex(ftIndex),
                     quantity          = c.quantity,
                     lockedPrice       = c.lockedPrice,
                     deliveryTime      = deliveryTime,
@@ -622,11 +705,18 @@ function MarketSerializer:applyTable(coordinator, data)
         end
     end
 
-    -- Prices: overwrite by fillTypeIndex and recalculate (the full keyed set is
-    -- always present, so overwrite is a complete replacement).
+    -- Prices: overwrite by fill type NAME (the index may have moved) and
+    -- recalculate; a legacy row without a name is applied by its index.
     if coordinator.marketEngine and type(data.prices) == "table" then
         for _, p in ipairs(data.prices) do
-            local index = p.index
+            local index, how = resolveSavedFillType(p.fillTypeName, p.index)
+            if how == "unknown" then
+                MDMLog.warn(string.format("MarketSerializer.applyTable: price row for fill type '%s' (saved index %s) is not registered in this session; row skipped", tostring(p.fillTypeName), tostring(p.index)))
+            elseif how == "legacy" then
+                legacyPriceRows = legacyPriceRows + 1
+            elseif index ~= p.index then
+                MDMLog.info(string.format("MarketSerializer.applyTable: price row '%s' moved from index %s to %s", p.fillTypeName, tostring(p.index), tostring(index)))
+            end
             if index then
                 local entry = coordinator.marketEngine.prices[index]
                 if entry then
@@ -649,6 +739,7 @@ function MarketSerializer:applyTable(coordinator, data)
             coordinator.marketEngine.volatilityScale = data.volatilityScale
         end
     end
+    logLegacy("ledger", legacyPriceRows, legacyContracts)
 
     -- lastGameTime: prevents contracts from expiring immediately on reload.
     if data.lastGameTime then
