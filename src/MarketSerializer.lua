@@ -329,10 +329,13 @@ function MarketSerializer:load(coordinator)
             local savedName  = xmlFile:getString(base .. "#fillTypeName")
             local ftIndex, how = resolveSavedFillType(savedName, savedIndex)
             if how == "unknown" then
-                -- The contract is the player's money: keep it on the saved index
-                -- and say so rather than drop it.
-                MDMLog.warn(string.format("MarketSerializer: contract %d names fill type '%s' which is not registered in this session; keeping saved index %s", id, tostring(savedName), tostring(savedIndex)))
-                ftIndex = savedIndex
+                -- The contract is the player's money, so it is kept, but with an
+                -- UNRESOLVED index: FuturesMarket matches deliveries by index alone
+                -- (FuturesMarket.lua:173), and the saved index may now belong to
+                -- another product. Unresolved, no delivery can match it and it runs
+                -- to expiry under its normal non-delivery rules.
+                MDMLog.warn(string.format("MarketSerializer: contract %d names fill type '%s' which is not registered in this session; kept unresolved (no delivery can match it) until that product is back", id, tostring(savedName)))
+                ftIndex = nil
             elseif how == "legacy" then
                 legacyContracts = legacyContracts + 1
             elseif ftIndex ~= savedIndex then
@@ -674,8 +677,8 @@ function MarketSerializer:applyTable(coordinator, data)
             if id and deliveryTime and deliveryTime > 0 then
                 local ftIndex, how = resolveSavedFillType(c.fillTypeName, c.fillTypeIndex)
                 if how == "unknown" then
-                    MDMLog.warn(string.format("MarketSerializer.applyTable: contract %s names fill type '%s' which is not registered in this session; keeping saved index %s", tostring(id), tostring(c.fillTypeName), tostring(c.fillTypeIndex)))
-                    ftIndex = c.fillTypeIndex
+                    MDMLog.warn(string.format("MarketSerializer.applyTable: contract %s names fill type '%s' which is not registered in this session; kept unresolved (no delivery can match it) until that product is back", tostring(id), tostring(c.fillTypeName)))
+                    ftIndex = nil
                 elseif how == "legacy" then
                     legacyContracts = legacyContracts + 1
                 elseif ftIndex ~= c.fillTypeIndex then

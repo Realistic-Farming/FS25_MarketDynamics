@@ -1,4 +1,4 @@
---!load: src/MarketSerializer.lua, src/MarketEngine.lua
+--!load: src/MarketSerializer.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/MDMHUD.lua
 -- D7 (2026-09-15): saved prices and futures contracts are restored by fill
 -- type NAME, not by the raw fill type index, because the index shifts with the
 -- selected mod set. Runs the real MarketSerializer toTable/applyTable (the
@@ -111,10 +111,24 @@ do
     T.eq("D1 an unknown product's price row never lands on the index's current occupant", b.marketEngine.prices[3].volatilityFactor, 1)
     T.ok("D2 the skip is logged", anyLog("not registered in this session; row skipped"))
     T.eq("D3 the contract is kept", b.futuresMarket.contracts[2] ~= nil, true)
-    T.eq("D4 on its saved index", b.futuresMarket.contracts[2].fillTypeIndex, 3)
+    T.eq("D4 with an unresolved index, never the saved one", b.futuresMarket.contracts[2].fillTypeIndex, nil)
     T.eq("D5 with its saved name", b.futuresMarket.contracts[2].fillTypeName, "GOLD")
-    T.ok("D6 the kept contract is logged", anyLog("keeping saved index 3"))
+    T.ok("D6 the kept contract is logged as unresolved", anyLog("kept unresolved"))
     T.ok("D7 no legacy warning", not anyLog("legacy save"))
+    -- No delivery of the product now at the old index can match the unresolved contract.
+    local fm = FuturesMarket.new()
+    fm.contracts = b.futuresMarket.contracts
+    local c = fm.contracts[2]
+    c.status = "active"; c.delivered = 0; c.deliveryStartTime = 0
+    g_server = nil
+    fm:onCropDelivered(1, 3, 500, 1.0)
+    T.eq("D8 a delivery of the product now at the old index does not count toward the unresolved contract", c.delivered, 0)
+    T.eq("D9 the contract stays active for its normal expiry rules", c.status, "active")
+    -- The HUD reads the fill type through a nil-safe helper and still has the saved name for the title.
+    g_fillTypeManager.getFillTypeByIndex = function(_, i) return { index = i, hudOverlayFilename = "x" } end
+    T.eq("D10 HUD fill type lookup is nil for an unresolved contract", MDMHUD.contractFillType(c), nil)
+    T.eq("D11 the HUD title still has the saved name", c.fillTypeName:upper(), "GOLD")
+    T.eq("D12 a resolved contract still yields its fill type", MDMHUD.contractFillType({ fillTypeIndex = 5 }).index, 5)
 end
 
 -- (E) The own XML: save writes the name, load restores by it.
