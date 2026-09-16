@@ -156,6 +156,15 @@ function R.destinationRole(station, farmId, fillTypeIndex, basisSupported)
         return "UNSUPPORTED", "UNAVAILABLE", R.reasons({ "PROFILE_UNSUPPORTED" })
     end
 
+    -- WHERE THESE TWO ACTUALLY LIVE, since the answer changes how to read this
+    -- function: getStoreGoods and getSkipSell are defined on a ProductionPoint's
+    -- unloading station (engine ProductionPoint.lua:244 and :249), NOT on a plain
+    -- SellingStation. So an ordinary selling station has neither, falls to the
+    -- UNSUPPORTED branch below, and the READY paths here are unreachable for it.
+    -- That is correct rather than broken: both calls are protected and an absent
+    -- method yields UNSUPPORTED, which leaks no favourable default. Recorded so
+    -- the next reader does not spend an afternoon wondering why a selling station
+    -- never reaches STORE_INPUT.
     local store, skip
     if type(station.getStoreGoods) == "function" then
         pcall(function() store = station:getStoreGoods(farmId, fillTypeIndex) end)

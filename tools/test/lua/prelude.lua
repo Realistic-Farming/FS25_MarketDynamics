@@ -65,12 +65,17 @@ function _sfMockStream()
   return { q = {}, r = 1, typeErrors = 0, underflows = 0 }
 end
 
-local function _sfPush(s, tag, v) s.q[#s.q + 1] = { t = tag, v = v } end
-local function _sfPull(s, tag)
+-- `bits` is carried for the sized-integer lane. A UIntN written at one width and
+-- read at another is a real desync that a tag-only check cannot see, because both
+-- sides agree it is a "uN": it is the width that drifts. Counted as a type error
+-- so an existing round-trip assertion catches it without needing a new one.
+local function _sfPush(s, tag, v, bits) s.q[#s.q + 1] = { t = tag, v = v, bits = bits } end
+local function _sfPull(s, tag, bits)
   local e = s.q[s.r]
   if e == nil then s.underflows = s.underflows + 1; return nil end
   s.r = s.r + 1
   if e.t ~= tag then s.typeErrors = s.typeErrors + 1 end
+  if e.bits ~= bits then s.typeErrors = s.typeErrors + 1 end
   return e.v
 end
 
@@ -84,8 +89,8 @@ function streamWriteString(s, v)    _sfPush(s, "str", v) end
 function streamReadString(s)        return _sfPull(s, "str") end
 function streamWriteBool(s, v)      _sfPush(s, "bool", v and true or false) end
 function streamReadBool(s)          return _sfPull(s, "bool") end
-function streamWriteUIntN(s, v, _n) _sfPush(s, "uN", v) end
-function streamReadUIntN(s, _n)     return _sfPull(s, "uN") end
+function streamWriteUIntN(s, v, n)  _sfPush(s, "uN", v, n) end
+function streamReadUIntN(s, n)      return _sfPull(s, "uN", n) end
 function streamWriteUInt32(s, v)    _sfPush(s, "u32", v) end
 function streamReadUInt32(s)        return _sfPull(s, "u32") end
 

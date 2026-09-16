@@ -3,7 +3,7 @@
 -- ported against the BUILT modules rather than against local copies of the
 -- arithmetic, plus production cases for the parts of this subset the reference
 -- bar does not reach.
---!load: src/MarketEngine.lua, src/FuturesMarket.lua, src/md16/Md16Values.lua, src/md16/Md16Material.lua, src/md16/Md16SaleComponents.lua, src/md16/Md16FuturesPlan.lua, src/md16/Md16Resolvers.lua, src/md16/MarketDynamicsSalePreviewEvent.lua
+--!load: src/OrganicPremiumBridge.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/md16/Md16Values.lua, src/md16/Md16Material.lua, src/md16/Md16SaleComponents.lua, src/md16/Md16FuturesPlan.lua, src/md16/Md16Resolvers.lua, src/md16/MarketDynamicsSalePreviewEvent.lua
 --
 -- Engine-neutral. Nothing here proves native station execution, GUI, locale,
 -- multiplayer or save behaviour; those are implementation and release
@@ -57,7 +57,8 @@ T.eq('B1 256 source witnesses reconcile to the paid basis', a.paidBasisAmount, 2
 T.ok('B2 the grade contract coalesces to at most four price buckets', #a.rows <= 4)
 T.eq('B3 sale detail never exposes one raw row per witness', #a.rows < 256, true)
 T.near('B4 complete origin numerator yields one whole-call organic factor', a.organicFactor, 1.10, 1e-9)
-T.near('B5 preview and execution share the same aggregate factor', a.effectiveFactor, M.reduce(many).effectiveFactor, 1e-9)
+T.near('B5 preview and execution share the same aggregate factor',
+    M.effectiveFactor(a, 100, 2.8), M.effectiveFactor(M.reduce(many), 100, 2.8), 1e-9)
 
 -- Every litre is still accounted for after the coalescing.
 local summed = 0
@@ -76,7 +77,8 @@ T.eq('B11 whole-call incomplete grade keeps the neutral grade rule', incompleteG
 T.eq('B12 unknown grade is shown as UNAVAILABLE rather than C', incompleteGrade.rows[1].bucket, 'GRADE_UNAVAILABLE')
 T.eq('B13 whole-call unavailable grade still accounts for every litre', incompleteGrade.rows[1].paidBasisAmount, 100)
 T.near('B14 grade failure does not void independently proved organic share', incompleteGrade.organicFactor, 1.198, 1e-9)
-T.eq('B15 zero paid basis has no invalid weighted division', M.reduce({}).effectiveFactor, 1)
+T.eq('B15 zero paid basis has no aggregate factor at all, rather than a neutral 1',
+    M.effectiveFactor(M.reduce({}), 100, 2.8), nil)
 
 -- DIFFERENCE: the per-part grade build a reasonable person writes without the
 -- whole-call rule. It lets a known letter earn its addition while another
@@ -321,7 +323,11 @@ T.eq('G18 field 1 is isReply as a Bool', stream.q[1].t .. "=" .. tostring(stream
 T.eq('G19 field 2 is the schema version as a UInt8', stream.q[2].t .. "=" .. tostring(stream.q[2].v), "u8=1")
 T.eq('G20 field 3 is the kind as a UInt8', stream.q[3].t .. "=" .. tostring(stream.q[3].v), "u8=3")
 T.eq('G21 field 4 is the request id as an Int32', stream.q[4].t .. "=" .. tostring(stream.q[4].v), "i32=11")
-T.eq('G22 field 5 is the token count as a UInt32', stream.q[5].t, "u32")
+-- The token count is no longer a UInt32 against a 4096 bound, which left every
+-- value from 4097 up expressible and mis-aligned the stream when one arrived.
+-- It is a field sized to exactly the token budget, so out of range cannot travel.
+T.eq('G22 field 5 is the token count in a field sized to the budget', stream.q[5].t, "uN")
+T.eq('G22b and that field is TOKEN_COUNT_BITS wide', stream.q[5].bits, E.TOKEN_COUNT_BITS)
 T.eq('G23 and the tokens follow as strings', stream.q[6].t, "str")
 T.eq('G24 the token count matches the tokens written', stream.q[5].v, #stream.q - 5)
 
@@ -440,5 +446,173 @@ T.eq('H37 more than four buckets is a shape error rather than something to trim'
     select(2, R.validatePreview({ schemaVersion = 1, state = "READY", gradeState = "QUALIFIED", organicState = "QUALIFIED",
         parts = { {}, {}, {}, {}, {} } })), "PARTS")
 T.eq('H38 a non-READY stock page carrying rows is refused', select(2, R.validateStockPage({ schemaVersion = 1, availability = "UNAVAILABLE", rows = {} })), "NON_READY_PAYLOAD")
+
+
+-- =========================================================
+-- GROUP J: Bob's cold review of 6747d7a, the seven MAJORs
+--
+-- Each case below exists because a rule was load-bearing and had nothing under
+-- it. Where a mutation is named, it was actually run against this bar.
+-- =========================================================
+
+-- J1: THE RETIREMENT IS PINNED TO THE REGISTRY, not to itself.
+-- Bob set C.RETIRED_MODIFIER to "OrganicPremiumX" and the whole bar stayed green
+-- at 609/0, because the retirement cases register their probe under the same
+-- constant they assert against. Nothing bound either to the name the bridge
+-- really registers. This is that binding.
+T.eq('J1 the retirement names exactly the modifier the bridge registers',
+    C.RETIRED_MODIFIER, OrganicPremiumBridge.MODIFIER_NAME)
+T.eq('J1b the bridge name is the literal the composition point excludes',
+    OrganicPremiumBridge.MODIFIER_NAME, "OrganicPremium")
+T.eq('J1c the binding check passes when they agree', (C.verifyRetiredModifierBinding()), true)
+do
+    -- Drift the registry name and the check must catch it. This is the exact
+    -- mutation that used to leave the bar fully green.
+    local real = OrganicPremiumBridge.MODIFIER_NAME
+    OrganicPremiumBridge.MODIFIER_NAME = "OrganicPremiumX"
+    local okBind, why = C.verifyRetiredModifierBinding()
+    T.eq('J1d a drifted registry name is caught', okBind, false)
+    T.ok('J1e and the reason says the premium is still paying',
+        type(why) == "string" and why:find("still paying") ~= nil)
+    OrganicPremiumBridge.MODIFIER_NAME = real
+    T.eq('J1f restored', (C.verifyRetiredModifierBinding()), true)
+end
+
+-- J2: THE AGGREGATE FACTOR AGREES WITH THE MONEY, ACROSS THE RAIL.
+-- Bob's probe: base 100, consumer product 2.8, 50 L grade A and 50 L grade C.
+-- Grade A rails (2.8 * 1.15 = 3.22 clamps to 3.0), grade C does not. The money
+-- path pays 290. The old blended-then-unrailed factor implied 300.
+do
+    local reduced = M.reduce({
+        { amount = 50, grade = 'A', originKnown = true, originShare = 0 },
+        { amount = 50, grade = 'C', originKnown = true, originShare = 0 },
+    })
+    T.near('J2 the organic term is neutral so this case is purely about grade',
+        reduced.organicFactor, 1, 1e-9)
+    local factor, effective, baseline = M.effectiveFactor(reduced, 100, 2.8)
+    T.near('J2b the effective rate is what the money path pays', effective, 290, 1e-9)
+    T.near('J2c the baseline carries no material term', baseline, 280, 1e-9)
+    T.near('J2d the factor is the ratio of the two', factor, 290 / 280, 1e-9)
+    T.near('J2e and it reconstructs the rate exactly', factor * baseline, 290, 1e-9)
+
+    -- DIFFERENCE, and it is the defect this replaces: blending the grade factors
+    -- and only then railing gives 1.075, which implies 300 rather than 290.
+    local blended = reduced.gradeFactor * reduced.organicFactor
+    T.near('J2f DIFFERENCE: the old blended factor was 1.075', blended, 1.075, 1e-9)
+    T.near('J2g DIFFERENCE: which implies 300, not the 290 actually paid',
+        100 * M.rail(2.8 * blended), 300, 1e-9)
+    T.ok('J2h so the old factor and the money genuinely disagreed',
+        math.abs(100 * M.rail(2.8 * blended) - effective) > 9)
+
+    -- The reducer must no longer publish a factor at all: it cannot rail without
+    -- the consumer product, so a field there could only ever be the wrong one.
+    T.eq('J2i the reducer publishes no aggregate factor of its own',
+        reduced.effectiveFactor, nil)
+
+    -- Below the rail the two agree, which is why this went unnoticed.
+    local low = M.effectiveFactor(reduced, 100, 1.0)
+    T.near('J2j well inside the rail the factor is just the blend', low, 1.075, 1e-9)
+end
+
+T.eq('J2k a non-finite consumer product yields no factor',
+    M.effectiveFactor(M.reduce({ { amount = 10, grade = 'A' } }), 100, 0 / 0), nil)
+T.eq('J2l a non-table reduction yields no factor', M.effectiveFactor(nil, 100, 2.8), nil)
+
+-- J3: weightedRate's TWO refusal branches, which had zero coverage.
+-- Bob mutated both and the bar stayed green: returning 0 instead of nil on zero
+-- litres, and accepting a non-finite rate.
+T.eq('J3 zero paid litres does not divide and returns no rate',
+    M.weightedRate({ { litres = 0, rate = 100 } }), nil)
+T.eq('J3b an empty allocation list returns no rate', M.weightedRate({}), nil)
+T.eq('J3c a non-finite rate refuses the whole call',
+    M.weightedRate({ { litres = 10, rate = 100 }, { litres = 10, rate = 0 / 0 } }), nil)
+T.eq('J3d a negative litre amount refuses',
+    M.weightedRate({ { litres = -1, rate = 100 } }), nil)
+T.eq('J3e a valid pair still pays the litre-weighted rate',
+    M.weightedRate({ { litres = 50, rate = 300 }, { litres = 50, rate = 280 } }), 290)
+
+-- J4: C.validate's EIGHT refusal branches, read through the public C.get.
+-- Bob replaced the whole body with a bare pass-through and the bar stayed green.
+do
+    local function readBack(rec)
+        C.reset()
+        C._components[77] = rec
+        local got, why = C.get(77)
+        return got, why
+    end
+    local function sound(over)
+        local base = { schemaVersion = 1, fillTypeName = "WHEAT", marketRevision = "mr1",
+                       state = "READY", baseThroughEvents = 100, otherConsumerProduct = 2,
+                       baselineRate = 200 }
+        for k, v in pairs(over or {}) do base[k] = v end
+        return base
+    end
+
+    T.eq('J4 a sound record reads back', (readBack(sound())).fillTypeName, "WHEAT")
+    T.eq('J4a a non-table record refuses NOT_TABLE', select(2, readBack("not a table")), "NOT_TABLE")
+    T.eq('J4b a foreign schema refuses SCHEMA', select(2, readBack(sound({ schemaVersion = 2 }))), "SCHEMA")
+    T.eq('J4c an empty fill type name refuses FILL_TYPE', select(2, readBack(sound({ fillTypeName = "" }))), "FILL_TYPE")
+    T.eq('J4d a non-string fill type name refuses FILL_TYPE', select(2, readBack(sound({ fillTypeName = 7 }))), "FILL_TYPE")
+    T.eq('J4e an empty market revision refuses MARKET_REVISION', select(2, readBack(sound({ marketRevision = "" }))), "MARKET_REVISION")
+    T.eq('J4f an unknown state refuses STATE', select(2, readBack(sound({ state = "MAYBE" }))), "STATE")
+    T.eq('J4g a negative event base refuses BASE_THROUGH_EVENTS', select(2, readBack(sound({ baseThroughEvents = -1 }))), "BASE_THROUGH_EVENTS")
+    T.eq('J4h a non-finite event base refuses BASE_THROUGH_EVENTS', select(2, readBack(sound({ baseThroughEvents = 0 / 0 }))), "BASE_THROUGH_EVENTS")
+    T.eq('J4i a zero consumer product refuses CONSUMER_PRODUCT', select(2, readBack(sound({ otherConsumerProduct = 0 }))), "CONSUMER_PRODUCT")
+    T.eq('J4j a negative baseline rate refuses BASELINE_RATE', select(2, readBack(sound({ baselineRate = -5 }))), "BASELINE_RATE")
+    T.eq('J4k a non-finite baseline rate refuses BASELINE_RATE', select(2, readBack(sound({ baselineRate = math.huge }))), "BASELINE_RATE")
+    -- An UNAVAILABLE record is structurally valid and still not a quote.
+    T.eq('J4l an UNAVAILABLE state reads as NO_MARKET, not as a number',
+        select(2, readBack({ schemaVersion = 1, fillTypeName = "WHEAT", marketRevision = "mr1",
+                             state = "UNAVAILABLE" })), "NO_MARKET")
+end
+
+-- J5: C.reset is actually called by the mission lifecycle, so a second savegame
+-- in one process does not inherit the first one's records.
+do
+    C.reset()
+    C.capture(5, "WHEAT", 100, 2)
+    T.ok('J5 a captured component reads back', C.get(5) ~= nil)
+    C.reset()
+    T.eq('J5b reset clears the captured components', select(2, C.get(5)), "NO_MARKET")
+    C.capture(5, "WHEAT", 100, 2)
+    T.eq('J5c and the revision counter restarts with it', C.get(5).marketRevision, "mr1")
+end
+
+-- J6: THE COMPONENTS BELONG TO THE PRICE AUTHORITY.
+-- A pure client asked for a price before the server's first sync has no
+-- entry.current, so it falls past the early return and composes locally. It must
+-- not capture: that record would carry a client-local revision and be served as
+-- though it were the owner's answer.
+do
+    local savedServer = g_server
+    C.reset()
+    g_MarketDynamics = { priceModifiers = { probe = function() return 2 end } }
+
+    g_server = nil
+    local client = setmetatable({ prices = { [3] = { base = 100, volatilityFactor = 1, modifiers = {}, current = nil } } }, { __index = MarketEngine })
+    client:_recalculate(3)
+    T.eq('J6 a pure client before its first sync captures nothing',
+        select(2, C.get(3)), "NO_MARKET")
+
+    -- The same call on the server does capture, so J6 is about the role and not
+    -- about the call simply never running.
+    g_server = {}
+    local server = setmetatable({ prices = { [3] = { base = 100, volatilityFactor = 1, modifiers = {}, current = nil } } }, { __index = MarketEngine })
+    server:_recalculate(3)
+    T.ok('J6b the server on the identical call does capture', C.get(3) ~= nil)
+    T.eq('J6c and its record is READY', C.get(3).state, "READY")
+
+    g_server = savedServer
+end
+
+-- J7: an out-of-range token count cannot be put on the wire at all.
+-- It used to travel as a UInt32 against a 4096 bound, so 4097 upwards were
+-- expressible; the reader then refused, zeroed the count and read no strings,
+-- leaving the sender's strings in the stream to mis-align every later event in
+-- the same packet.
+T.eq('J7 the count field is sized to exactly the token budget',
+    E.MAX_TOKENS, 2 ^ E.TOKEN_COUNT_BITS - 1)
+T.eq('J7b the budget is still large enough for a full preview payload',
+    E.MAX_TOKENS >= 4095, true)
 
 T.summary()

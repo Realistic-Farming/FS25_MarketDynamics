@@ -40,7 +40,37 @@ C.SCHEMA_VERSION = 1
 --- registered it, whether MD-16 is enabled, and whether the bridge ran at all.
 --- The bridge keeps registering so the name stays reserved against another
 --- suite mod claiming it; the modifier simply can never contribute again.
+--
+-- THIS LITERAL IS DELIBERATE, AND SO IS THE CHECK BELOW IT. The exclusion has to
+-- work even when OrganicPremiumBridge never loaded, so this cannot simply read
+-- the bridge's field. But a bare literal that only the bench compares against
+-- itself proves nothing: point both at "OrganicPremiumX" and every retirement
+-- assertion stays green while the real premium keeps paying. The name is pinned
+-- to the registry's own name by verifyRetiredModifierBinding, which the mission
+-- load calls and the bench asserts with the bridge actually loaded.
 C.RETIRED_MODIFIER = "OrganicPremium"
+
+--- Does the retirement constant still name the modifier the bridge registers?
+--- Loud on mismatch, because a drift here is silent everywhere else: the premium
+--- would go on contributing and every existing assertion would still pass.
+--- A bridge that is not loaded at all is not a mismatch; the exclusion is by name
+--- and holds regardless of who registered it.
+-- @return boolean ok, string|nil reason
+function C.verifyRetiredModifierBinding()
+    if OrganicPremiumBridge == nil or type(OrganicPremiumBridge.MODIFIER_NAME) ~= "string" then
+        return true, nil
+    end
+    if OrganicPremiumBridge.MODIFIER_NAME == C.RETIRED_MODIFIER then
+        return true, nil
+    end
+    local reason = "MD-16 retirement names '" .. tostring(C.RETIRED_MODIFIER)
+        .. "' but OrganicPremiumBridge registers '" .. tostring(OrganicPremiumBridge.MODIFIER_NAME)
+        .. "'. The retired modifier is NOT being excluded and is still paying."
+    if MDMLog ~= nil and type(MDMLog.warn) == "function" then
+        MDMLog.warn("Md16SaleComponents: " .. reason)
+    end
+    return false, reason
+end
 
 C.STATE_READY = "READY"
 C.STATE_UNAVAILABLE = "UNAVAILABLE"

@@ -183,6 +183,22 @@ function MarketDynamics:onMissionLoaded(mission)
     -- (reads SoilFertilizer's organic provenance; a no-op when SF is absent).
     OrganicPremiumBridge.register()
 
+    -- [MD-16] Clear the captured sale components. These are mission-local and
+    -- nothing saves them, so a second savegame loaded in the same process would
+    -- otherwise start out holding the FIRST save's records and revision counter
+    -- until every fill type happened to recalculate.
+    -- Guarded because this file must keep working with the MD-16 modules absent,
+    -- the same stance MarketEngine already takes for the capture itself.
+    if Md16SaleComponents ~= nil then
+        Md16SaleComponents.reset()
+
+        -- [MD-16] Prove the retirement constant still names the modifier the
+        -- bridge actually registers. The retirement excludes a modifier BY NAME
+        -- at the composition point, so if these two strings ever drift apart the
+        -- premium silently keeps paying and nothing else in the mod would notice.
+        Md16SaleComponents.verifyRetiredModifierBinding()
+    end
+
     MDMLog.info("MarketDynamics: mission loaded, system active")
 end
 
@@ -612,6 +628,8 @@ function MarketDynamics:delete()
         g_MDMHud:delete()
     end
     OrganicPremiumBridge.unregister()
+    -- [MD-16] Drop the captured components with the mission that produced them.
+    if Md16SaleComponents ~= nil then Md16SaleComponents.reset() end
     MDMLog.info("MarketDynamics: deleted")
 end
 

@@ -417,7 +417,17 @@ function MarketEngine:_recalculate(fillTypeIndex)
     -- callback exactly once. The product recorded is UNCLAMPED: the rail belongs
     -- after the material terms compose, so a pre-clamped record would make the
     -- correct composition unreachable.
-    if md16 ~= nil then
+    --
+    -- SERVER ONLY, and the check is g_server rather than the early return above.
+    -- That return only fires once entry.current is set, so a pure client asked
+    -- for a price BEFORE the server's first sync for that fill type falls through
+    -- and composes locally, from whatever modifiers that client happens to have
+    -- registered. Capturing there would mint a record with a client-local
+    -- marketRevision that getSaleQuoteComponents would then hand out as though it
+    -- were the owner's answer. The components belong to the price authority, and
+    -- on a client that is never this machine. With no record the reader reports
+    -- unavailable, which is the truth.
+    if md16 ~= nil and g_server ~= nil then
         md16.capture(fillTypeIndex, nil, baseThroughEvents, consumerProduct)
     end
 

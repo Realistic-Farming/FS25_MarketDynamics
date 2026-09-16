@@ -50,7 +50,16 @@ E.KIND_NAMES = {
 
 -- Budgets. Refuse rather than truncate: a silently clipped record is a wrong
 -- answer that looks like a right one.
-E.MAX_TOKENS = 4096
+-- MAX_TOKENS IS 4095, NOT 4096, AND THE ODD NUMBER IS THE POINT. The count goes
+-- on the wire in exactly TOKEN_COUNT_BITS bits, so the largest value the field
+-- can carry is 4095 and an out-of-range count cannot be represented at all.
+-- It used to travel as a UInt32 against a 4096 bound, which left every value
+-- from 4097 to 2^32-1 expressible: on that branch the reader refused, set the
+-- count to zero and read no strings, leaving the sender's strings unread in the
+-- stream and mis-aligning every later event in the same packet. Sizing the field
+-- to the domain removes the branch instead of handling it.
+E.TOKEN_COUNT_BITS = 12
+E.MAX_TOKENS = 4095
 E.MAX_TOKEN_BYTES = 4096
 E.MAX_TOTAL_BYTES = 32768
 E.MAX_REQUEST_ID = 2147483647
@@ -174,7 +183,7 @@ function E:writeStream(streamId, connection)
         streamWriteUInt8(streamId, 0)
         streamWriteUInt8(streamId, 0)
         streamWriteInt32(streamId, 0)
-        streamWriteUInt32(streamId, 0)
+        streamWriteUIntN(streamId, 0, E.TOKEN_COUNT_BITS)
         return
     end
 
@@ -182,7 +191,7 @@ function E:writeStream(streamId, connection)
     streamWriteUInt8(streamId, E.SCHEMA_VERSION)
     streamWriteUInt8(streamId, self.kind)
     streamWriteInt32(streamId, self.requestId)
-    streamWriteUInt32(streamId, #self.tokens)
+    streamWriteUIntN(streamId, #self.tokens, E.TOKEN_COUNT_BITS)
     for i = 1, #self.tokens do
         streamWriteString(streamId, self.tokens[i])
     end
@@ -193,12 +202,16 @@ function E:readStream(streamId, connection)
     self.schemaVersion = streamReadUInt8(streamId)
     self.kind = streamReadUInt8(streamId)
     self.requestId = streamReadInt32(streamId)
-    local count = streamReadUInt32(streamId)
+    local count = streamReadUIntN(streamId, E.TOKEN_COUNT_BITS)
 
     self.malformed = nil
     if self.schemaVersion ~= E.SCHEMA_VERSION then self.malformed = "SCHEMA" end
     if E.KIND_NAMES[self.kind] == nil then self.malformed = self.malformed or "KIND" end
     if not isPositiveInt31(self.requestId) then self.malformed = self.malformed or "REQUEST_ID" end
+    -- Belt and braces only. The field is TOKEN_COUNT_BITS wide and MAX_TOKENS is
+    -- the largest value those bits can hold, so a hostile or malformed peer has
+    -- no way to put an out-of-range count on the wire. If this ever fires the two
+    -- constants have drifted apart.
     if type(count) ~= "number" or count < 0 or count > E.MAX_TOKENS then
         self.malformed = self.malformed or "TOKEN_COUNT"
         count = 0

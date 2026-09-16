@@ -129,7 +129,9 @@ M.wholeCallGradeComplete = wholeCallGradeComplete
 --
 -- @param parts  ordered list of { amount, grade?, originKnown?, originShare?, selectedUse? }
 -- @return table { paidBasisAmount, buckets, rows, gradeFactor, organicFactor,
---                 effectiveFactor, gradeComplete, originComplete }
+--                 gradeComplete, originComplete }
+--         The aggregate factor is NOT here: it needs the consumer product to be
+--         railed correctly, so it is M.effectiveFactor(reduced, base, product).
 function M.reduce(parts)
     parts = type(parts) == "table" and parts or {}
 
@@ -194,11 +196,61 @@ function M.reduce(parts)
         rows = rows,
         gradeFactor = gradeFactorTotal,
         organicFactor = organicFactor,
-        effectiveFactor = gradeFactorTotal * organicFactor,
+        -- NO effectiveFactor HERE, AND THAT IS THE FIX. It used to be
+        -- gradeFactor * organicFactor, blended and never railed, while the money
+        -- path rails each bucket inside partRate and only then blends. The two
+        -- agree until any bucket crosses the rail and then they do not: base 100,
+        -- consumer product 2.8, 50 L grade A with 50 L grade C pays 290.0 and the
+        -- blended factor implies 300.0.
+        --
+        -- The deeper problem is that a single factor CANNOT express the railed
+        -- result, because railing happens per bucket against the consumer product
+        -- and this reducer is not given it. So the aggregate factor moved to
+        -- M.effectiveFactor below, which takes that product and derives the answer
+        -- from the same railed arithmetic the money path uses. One definition
+        -- means display and money cannot drift apart again.
         eligibleKnownOrganicAmount = originNumerator,
         gradeComplete = gradeComplete,
         originComplete = originComplete,
     }
+end
+
+--- The aggregate factor a preview may show, derived from the SAME railed
+--- arithmetic that pays the money.
+---
+--- It is effectiveRate / baselineRate: the litre-weighted blend of the railed
+--- per-bucket rates, over the rate the same call would have earned with no
+--- material term at all. Because every part of it goes through partRate, a
+--- display built on this cannot disagree with what the farmer is actually paid,
+--- which the old blended-then-unrailed factor could and did.
+---
+--- Returns nil rather than a guess when the reduction carries no paid basis, when
+--- the inputs are not finite, or when the baseline rate is zero. A factor is a
+--- ratio and there is nothing to take a ratio against.
+-- @param reduced the table M.reduce returned
+-- @return number|nil factor, number|nil effectiveRate, number|nil baselineRate
+function M.effectiveFactor(reduced, baseThroughEvents, otherConsumerProduct)
+    if type(reduced) ~= "table" then return nil end
+    if not isFiniteNumber(baseThroughEvents) or not isFiniteNumber(otherConsumerProduct) then return nil end
+    if not isAmount(reduced.paidBasisAmount) or reduced.paidBasisAmount <= 0 then return nil end
+
+    local organic = reduced.organicFactor
+    if not isFiniteNumber(organic) then return nil end
+
+    local allocations = {}
+    for _, row in ipairs(reduced.rows or {}) do
+        local rate = M.partRate(baseThroughEvents, otherConsumerProduct, row.gradeFactor, organic)
+        if rate == nil then return nil end
+        allocations[#allocations + 1] = { litres = row.paidBasisAmount, rate = rate }
+    end
+
+    local effective = M.weightedRate(allocations)
+    if effective == nil then return nil end
+
+    local baseline = M.baselineRate(baseThroughEvents, otherConsumerProduct)
+    if baseline == nil or baseline == 0 then return nil, effective, baseline end
+
+    return effective / baseline, effective, baseline
 end
 
 --- One native weighted rate pays the entire accepted call.
