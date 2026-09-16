@@ -354,6 +354,17 @@ request2:writeStream(reqStream2, mockConnection(true))
 local received2 = E.emptyNew()
 received2.readStream(received2, reqStream2, mockConnection(false))
 T.eq('G28 a request from a real client on the server runs', ran, 1)
+
+-- THE ROUND TRIP ITSELF, which nothing here was asserting. G22b only inspects the
+-- declared WRITE width, so the read side was unguarded: reading the token count at
+-- a different width than it was written left the whole bar green. The mock stream
+-- already counts a tag or width mismatch and an underflow, so this is the same one
+-- line RSF-F203 and RSF-F204 both carry, and it is what makes a read-side width
+-- change fail. A desync is exactly "the two sides disagreed about the shape",
+-- which is what these two counters mean.
+T.eq('G28b the request round trip has no type or width mismatch', reqStream2.typeErrors, 0)
+T.eq('G28c and drained the stream exactly, with no underflow', reqStream2.underflows, 0)
+T.eq('G28d the reply round trip is clean too', stream.typeErrors, 0)
 E.onRequest = nil
 
 -- =========================================================

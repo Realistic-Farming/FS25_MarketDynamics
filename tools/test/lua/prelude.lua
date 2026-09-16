@@ -91,8 +91,6 @@ function streamWriteBool(s, v)      _sfPush(s, "bool", v and true or false) end
 function streamReadBool(s)          return _sfPull(s, "bool") end
 function streamWriteUIntN(s, v, n)  _sfPush(s, "uN", v, n) end
 function streamReadUIntN(s, n)      return _sfPull(s, "uN", n) end
-function streamWriteUInt32(s, v)    _sfPush(s, "u32", v) end
-function streamReadUInt32(s)        return _sfPull(s, "u32") end
 
 -- ── MDM module globals (defaults; tests override as needed) ─
 MDMLog = { info = function() end, warn = function() end, debug = function() end, error = function() end }
