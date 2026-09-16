@@ -3,7 +3,7 @@
 -- ported against the BUILT modules rather than against local copies of the
 -- arithmetic, plus production cases for the parts of this subset the reference
 -- bar does not reach.
---!load: src/OrganicPremiumBridge.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/md16/Md16Values.lua, src/md16/Md16Material.lua, src/md16/Md16SaleComponents.lua, src/md16/Md16FuturesPlan.lua, src/md16/Md16Resolvers.lua, src/md16/MarketDynamicsSalePreviewEvent.lua
+--!load: src/OrganicPremiumBridge.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/md16/Md16Values.lua, src/md16/Md16Material.lua, src/md16/Md16SaleComponents.lua, src/md16/Md16FuturesPlan.lua, src/md16/Md16Resolvers.lua, src/md16/MarketDynamicsSalePreviewEvent.lua, src/MarketDynamics.lua
 --
 -- Engine-neutral. Nothing here proves native station execution, GUI, locale,
 -- multiplayer or save behaviour; those are implementation and release
@@ -625,5 +625,75 @@ T.eq('J7 the count field is sized to exactly the token budget',
     E.MAX_TOKENS, 2 ^ E.TOKEN_COUNT_BITS - 1)
 T.eq('J7b the budget is still large enough for a full preview payload',
     E.MAX_TOKENS >= 4095, true)
+
+
+-- J8: THE RESET IS ACTUALLY INVOKED, proved through the real entry points.
+--
+-- J5 proves reset does its job. It does not prove anything still calls it, and
+-- "the code is right and nothing would notice if it stopped being" is exactly the
+-- shape of MAJOR 5, where reset was documented as called on mission load and
+-- teardown and nothing called it at all.
+--
+-- The obvious guard, reading MarketDynamics.lua as text and looking for the two
+-- call sites, is the wrong one: it tests the file rather than the behaviour and
+-- breaks the moment the call legitimately moves inside its function. So these
+-- call the REAL onMissionLoaded and the REAL delete. The stubs below are only the
+-- collaborators those two methods reach on the way; g_client stays nil so the
+-- client-only dialog registrations are skipped by the method's own guard.
+do
+    local savedClient = g_client
+    g_client = nil
+
+    local noop = function() end
+    local savedBC, savedUP     = BCIntegration, UPIntegration
+    local savedPanel           = MDMSettingsPanel
+    local savedReg, savedRem   = MDMAdminCommands_register, MDMAdminCommands_remove
+    local savedLoader          = MDMDialogLoader
+    local savedMaster, savedNS = MDMMasterHUDBridge, MDMNetworkSyncBridge
+
+    BCIntegration            = { init = noop }
+    UPIntegration            = { init = noop }
+    MDMSettingsPanel         = { new = function() return {} end }
+    MDMAdminCommands_register = noop
+    MDMAdminCommands_remove   = noop
+    MDMDialogLoader          = { init = noop, register = noop, cleanup = noop }
+    MDMMasterHUDBridge       = { register = noop }
+    MDMNetworkSyncBridge     = { register = noop }
+
+    local md = setmetatable({
+        settings       = {},
+        marketEngine   = { init = noop },
+        futuresMarket  = {},
+        rweIntegration = { detect = noop, cleanup = noop },
+        modDir         = "",
+    }, { __index = MarketDynamics })
+
+    -- Load side. A component captured by the previous mission must not survive
+    -- into the next one; this is the "second savegame in one process" bug.
+    C.reset()
+    C.capture(11, "WHEAT", 100, 2)
+    T.ok('J8 a component is captured before the mission loads', C.get(11) ~= nil)
+    local okLoad, whyLoad = pcall(function() md:onMissionLoaded(nil) end)
+    T.ok('J8a the real onMissionLoaded runs in the bench: ' .. tostring(whyLoad), okLoad)
+    T.eq('J8b and it cleared the previous mission components',
+        select(2, C.get(11)), "NO_MARKET")
+
+    -- Teardown side.
+    C.capture(12, "WHEAT", 100, 2)
+    T.ok('J8c a component is captured before teardown', C.get(12) ~= nil)
+    local okDel, whyDel = pcall(function() md:delete() end)
+    T.ok('J8d the real delete runs in the bench: ' .. tostring(whyDel), okDel)
+    T.eq('J8e and teardown dropped the components with its mission',
+        select(2, C.get(12)), "NO_MARKET")
+
+    BCIntegration, UPIntegration = savedBC, savedUP
+    MDMSettingsPanel             = savedPanel
+    MDMAdminCommands_register    = savedReg
+    MDMAdminCommands_remove      = savedRem
+    MDMDialogLoader              = savedLoader
+    MDMMasterHUDBridge           = savedMaster
+    MDMNetworkSyncBridge         = savedNS
+    g_client                     = savedClient
+end
 
 T.summary()
