@@ -375,22 +375,60 @@ function MarketEngine:_recalculate(fillTypeIndex)
     end
     local currentPrice = entry.base * factor
 
+    -- [MD-16] baseThroughEvents = base * volatilityFactor * product(event factors).
+    -- Named before the consumers compose, because the sale components have to
+    -- separate the event base from the consumer product and the rail, and the
+    -- finished quote cannot be divided back into them.
+    local baseThroughEvents = currentPrice
+
+    -- Resolved defensively: MarketEngine.lua loads before the MD-16 modules, and
+    -- this engine must keep working with them absent. With no module there is no
+    -- retirement and no capture, and the quote is exactly what it was.
+    local md16 = Md16SaleComponents
+    local retiredModifier = md16 ~= nil and md16.RETIRED_MODIFIER or nil
+
     -- Consumer composition: product of all registered modifier multipliers
+    local consumerProduct = 1.0
     if g_MarketDynamics and g_MarketDynamics.priceModifiers then
-        local consumerMult = 1.0
         for name, fn in pairs(g_MarketDynamics.priceModifiers) do
-            local ok, mult = pcall(fn, {
-                fillTypeIndex = fillTypeIndex,
-                basePrice = entry.base,
-                marketPrice = currentPrice,
-            })
-            if ok and type(mult) == "number" and mult > 0 then
-                consumerMult = consumerMult * mult
+            -- [MD-16] THE RETIRED POOLED ORGANIC PREMIUM IS EXCLUDED HERE.
+            -- Excluded at the composition point rather than at registration, so
+            -- the retirement holds in every mode: whichever mod registered it,
+            -- whether MD-16 is enabled, and whether its bridge ran at all. The
+            -- name stays registered and reserved; it simply cannot contribute.
+            -- Its replacement is MD-16's captured-origin term, which is why this
+            -- must not reach players before that term exists.
+            if retiredModifier == nil or name ~= retiredModifier then
+                local ok, mult = pcall(fn, {
+                    fillTypeIndex = fillTypeIndex,
+                    basePrice = entry.base,
+                    marketPrice = currentPrice,
+                })
+                if ok and type(mult) == "number" and mult > 0 then
+                    consumerProduct = consumerProduct * mult
+                end
             end
         end
         -- Clamp B: consumer composition band (ruled 0.5-3.0, authority #3)
-        consumerMult = math.max(0.5, math.min(3.0, consumerMult))
-        currentPrice = currentPrice * consumerMult
+        currentPrice = currentPrice * math.max(0.5, math.min(3.0, consumerProduct))
+    end
+
+    -- [MD-16] Capture the components from the SAME pass that just evaluated each
+    -- callback exactly once. The product recorded is UNCLAMPED: the rail belongs
+    -- after the material terms compose, so a pre-clamped record would make the
+    -- correct composition unreachable.
+    --
+    -- SERVER ONLY, and the check is g_server rather than the early return above.
+    -- That return only fires once entry.current is set, so a pure client asked
+    -- for a price BEFORE the server's first sync for that fill type falls through
+    -- and composes locally, from whatever modifiers that client happens to have
+    -- registered. Capturing there would mint a record with a client-local
+    -- marketRevision that getSaleQuoteComponents would then hand out as though it
+    -- were the owner's answer. The components belong to the price authority, and
+    -- on a client that is never this machine. With no record the reader reports
+    -- unavailable, which is the truth.
+    if md16 ~= nil and g_server ~= nil then
+        md16.capture(fillTypeIndex, nil, baseThroughEvents, consumerProduct)
     end
 
     entry.current = currentPrice
