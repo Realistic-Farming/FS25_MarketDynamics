@@ -26,7 +26,7 @@
 - [x] NetworkSync FULLY bridged. (1) Contract ACTION channel via NS Path 3 (`MarketDynamics_Contract`, anti-spoof + ownership preserved; commit 3bd0255). (2) STATE-sync module (id `FS25_MarketDynamics`, channel `MarketDynamics_Sync`; commit ad70e30): one FULL-snapshot carrying all contracts + market prices + active events, onWriteState/onReadState reuse the hardened MDMContractSyncEvent.execute + MDMMarketSyncEvent.applyState paths (no apply rewrite); sendToClients delegate to markStateDirty, join request skipped when NS active. Serialization round-trip verified. Owed: two-machine MP test.
 - [x] MasterHUD: MDMHUD + settings panel bridged (Phase 1); own draw stands down when active.
 - [x] SettingsHub: `MarketDynamics` module bridged (Phase 1, selfPersisted). ESC-menu injection retained as the standalone fallback (delegate-when-present).
-- [ ] Reads: RandomWorldEvents `getPriceModifier`, SeasonalCropStress `cropStressManager`. Read by: CropDisease, ProStaff.
+- [ ] Reads: SeasonalCropStress `cropStressManager` (RandomWorldEvents is not read since EC-6; it registers a consumer price modifier). Read by: CropDisease, ProStaff, RandomWorldEvents (`rweConsumerContractVersion`, `refreshConsumerPrices`).
 
 ## Docs / localization
 - [ ] Keep all 26 languages in step for any new setting.

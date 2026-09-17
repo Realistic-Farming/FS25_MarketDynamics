@@ -33,7 +33,7 @@
 - [ ] Deeper market model (supply/demand curves, regional pricing) without breaking the read API.
 
 ## Cross-mod / ecosystem dependencies
-- [ ] Reads RandomWorldEvents `getPriceModifier` and SeasonalCropStress (`cropStressManager`).
+- [ ] Reads SeasonalCropStress (`cropStressManager`). RandomWorldEvents is no longer read: since EC-6 it prices its own events through `registerPriceModifier`, gated on `rweConsumerContractVersion` and refreshed through `refreshConsumerPrices()`.
 - [ ] Read by CropDisease (getActiveEvents) and ProStaff (trend + getEligibleEvents).
 - [x] All four bedrock migrations DONE (StateLedger + NetworkSync + MasterHUD + SettingsHub), shipped v1.2.0.9. Whole-wave two-machine MP test still owed.
 

@@ -1,29 +1,19 @@
 -- RWEIntegration.lua
--- Bridges FS25_RandomWorldEvents world events and FS25_SeasonalCropStress data into
--- MarketDynamics price modifiers.
+-- Bridges FS25_SeasonalCropStress data into MarketDynamics price modifiers.
 --
--- RWE detection: g_currentMission.randomWorldEvents (set by RWE's Mission00.load hook).
 -- CropStress detection: g_currentMission.cropStressManager (set by CS's Mission00.load hook).
--- Pattern mirrors BCIntegration/UPIntegration — detected once in onMissionLoaded, then polled.
+-- Pattern mirrors BCIntegration/UPIntegration: detected once in onMissionLoaded, then polled.
+--
+-- EC-6 (brief v1.7 section 3.2): this file no longer reads FS25_RandomWorldEvents.
+-- RandomWorldEvents prices its own events through the registered consumer modifier
+-- (MarketDynamics:registerPriceModifier), and MarketDynamics advertises that with
+-- rweConsumerContractVersion = 1. A second reader here would apply two price paths
+-- to one event. The file name and the MDMRWEIntegration alias are kept for the
+-- construction in MarketDynamics.lua.
 
 MDMExternalIntegration = MDMExternalIntegration or {}
 MDMExternalIntegration.__index = MDMExternalIntegration
 
--- RWE event id → price multiplier applied to all tracked fill types.
--- >1.0 = prices rise, <1.0 = prices fall. Values are intentionally modest
--- to layer cleanly on top of MDM's own WorldEventSystem events.
-local EVENT_PRICE_EFFECTS = {
-    market_boom        = 1.12,
-    market_crash       = 0.87,
-    export_opportunity = 1.18,
-    economic_crisis    = 0.80,
-    government_subsidy = 1.08,
-    price_fixing       = 0.92,
-    crop_yield_penalty = 1.10,  -- lower supply → prices rise
-    crop_yield_bonus   = 0.95,  -- surplus supply → prices ease
-}
-
-local RWE_MODIFIER_PREFIX    = "rwe_"
 local CS_MODIFIER_ID         = "cs_stress_pressure"
 local CS_DAILY_INTERVAL_MS   = 24 * 60 * 60 * 1000  -- check once per in-game day
 local CS_CRITICAL_THRESHOLD  = 0.70                  -- field stress above this is "critical"
@@ -33,9 +23,6 @@ local CS_STRONG_FRACTION     = 0.55                  -- >55% critical fields →
 function MDMExternalIntegration.new(engine)
     local self = setmetatable({}, MDMExternalIntegration)
     self.engine = engine
-    -- RWE state
-    self.rweManager = nil
-    self.lastActiveEvent = nil
     -- CropStress state
     self.cropStressManager = nil
     self.csDailyTimer = 0                 -- incumbent path: raw-dt day accumulator
@@ -44,14 +31,8 @@ function MDMExternalIntegration.new(engine)
     return self
 end
 
--- Called once from MarketDynamics:onMissionLoaded() — detect both companion mods.
+-- Called once from MarketDynamics:onMissionLoaded(): detect SeasonalCropStress.
 function MDMExternalIntegration:detect()
-    local rwe = g_currentMission and g_currentMission.randomWorldEvents
-    if rwe then
-        self.rweManager = rwe
-        MDMLog.info("MDMExternalIntegration: FS25_RandomWorldEvents detected — world events will influence prices")
-    end
-
     local cs = g_currentMission and g_currentMission.cropStressManager
     if cs then
         self.cropStressManager = cs
@@ -63,72 +44,11 @@ end
 -- session's latched model ("incumbent" | "calendar"); nil (pure client, or a
 -- missing latch) takes the incumbent clock, matching the LOCKED default.
 function MDMExternalIntegration:update(dt, economicModel)
-    self:_updateRWE()
     if economicModel == "calendar" then
         self:_updateCropStressCalendar()
     else
         self:_updateCropStressIncumbent(dt)
     end
-end
-
--- ── RWE ──────────────────────────────────────────────────────────────────────
-
--- Reconcile RWE price modifiers with the RWE manager's active event.
--- Reacts to event changes (remove old, apply new) and periodically re-applies
--- the current event's modifier when it is missing from the engine (e.g. after
--- a restore or a client-side drift). addModifier/removeModifierById request
--- final quote publication on every successful mutation.
-function MDMExternalIntegration:_updateRWE()
-    if not self.rweManager then return end
-    local state = self.rweManager.EVENT_STATE
-    if not state then return end
-
-    local currentEvent = state.activeEvent
-    if currentEvent == self.lastActiveEvent then
-        -- Periodic reconcile: ensure the current event's modifier is present.
-        if currentEvent and EVENT_PRICE_EFFECTS[currentEvent] then
-            local modId = RWE_MODIFIER_PREFIX .. currentEvent
-            local missing = false
-            for fillTypeIndex in pairs(self.engine.prices) do
-                if not self:_hasModifier(fillTypeIndex, modId) then
-                    missing = true
-                    break
-                end
-            end
-            if missing then
-                for fillTypeIndex in pairs(self.engine.prices) do
-                    self.engine:addModifier({ id = modId, fillTypeIndex = fillTypeIndex, factor = EVENT_PRICE_EFFECTS[currentEvent] })
-                end
-                MDMLog.info("MDMExternalIntegration: re-applied missing RWE modifier for '" .. currentEvent .. "'")
-            end
-        end
-        return
-    end
-
-    -- Clear modifiers from the previous event
-    if self.lastActiveEvent and EVENT_PRICE_EFFECTS[self.lastActiveEvent] then
-        local modId = RWE_MODIFIER_PREFIX .. self.lastActiveEvent
-        for fillTypeIndex in pairs(self.engine.prices) do
-            self.engine:removeModifierById(fillTypeIndex, modId)
-        end
-        MDMLog.info("MDMExternalIntegration: removed RWE price modifier for '" .. self.lastActiveEvent .. "'")
-    end
-
-    -- Apply modifiers for the new event (if it has a price effect)
-    if currentEvent then
-        local factor = EVENT_PRICE_EFFECTS[currentEvent]
-        if factor then
-            local modId = RWE_MODIFIER_PREFIX .. currentEvent
-            for fillTypeIndex in pairs(self.engine.prices) do
-                self.engine:addModifier({ id = modId, fillTypeIndex = fillTypeIndex, factor = factor })
-            end
-            MDMLog.info(string.format(
-                "MDMExternalIntegration: RWE '%s' → price factor %.2f on %d fill types",
-                currentEvent, factor, self:_countPrices()))
-        end
-    end
-
-    self.lastActiveEvent = currentEvent
 end
 
 -- ── CropStress ───────────────────────────────────────────────────────────────
@@ -208,39 +128,14 @@ end
 -- ── Shared ───────────────────────────────────────────────────────────────────
 
 function MDMExternalIntegration:cleanup()
-    -- Remove RWE modifier
-    if self.lastActiveEvent and EVENT_PRICE_EFFECTS[self.lastActiveEvent] then
-        local modId = RWE_MODIFIER_PREFIX .. self.lastActiveEvent
-        for fillTypeIndex in pairs(self.engine.prices) do
-            self.engine:removeModifierById(fillTypeIndex, modId)
-        end
-    end
     -- Remove CS modifier
     if self.lastCsModifierFactor then
         for fillTypeIndex in pairs(self.engine.prices) do
             self.engine:removeModifierById(fillTypeIndex, CS_MODIFIER_ID)
         end
     end
-    self.rweManager = nil
     self.cropStressManager = nil
-    self.lastActiveEvent = nil
     self.lastCsModifierFactor = nil
-end
-
-function MDMExternalIntegration:_countPrices()
-    local n = 0
-    for _ in pairs(self.engine.prices) do n = n + 1 end
-    return n
-end
-
--- True if the engine's modifier stack for fillTypeIndex contains modId.
-function MDMExternalIntegration:_hasModifier(fillTypeIndex, modId)
-    local entry = self.engine.prices[fillTypeIndex]
-    if not entry then return false end
-    for _, mod in ipairs(entry.modifiers) do
-        if mod.id == modId then return true end
-    end
-    return false
 end
 
 -- Backward-compatible alias (was MDMRWEIntegration before crop stress was added)

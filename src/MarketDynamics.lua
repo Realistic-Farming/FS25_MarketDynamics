@@ -63,6 +63,13 @@ function MarketDynamics.new(modDir, modName)
     -- and returns a multiplier that is applied to the final price.
     self.priceModifiers = {}
 
+    -- EC-6 (brief v1.7 section 3.2): read-only capability for FS25_RandomWorldEvents.
+    -- 1 means this MarketDynamics has no RandomWorldEvents reader of its own, prices
+    -- RandomWorldEvents only through the registered consumer modifier, and offers
+    -- refreshConsumerPrices(). A plain number: never saved, never sent, and read by
+    -- no MarketDynamics code. A later MarketDynamics that changes that meaning raises it.
+    self.rweConsumerContractVersion = 1
+
     -- Expose BCIntegration so external mods (e.g. BetterContracts) can reach it via
     -- g_MarketDynamics.bcIntegration without depending on the global table name.
     self.bcIntegration = BCIntegration
@@ -312,7 +319,7 @@ function MarketDynamics:update(dt)
     if MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.update) == "function" then
         pcall(MDMMarketScreenGraph.update, dt)
     end
-    self.rweIntegration:update(dt, self.economicModel) -- RWE events + CS stress → price modifiers (clock per model)
+    self.rweIntegration:update(dt, self.economicModel) -- CS stress → price modifiers (clock per model); RWE prices itself (EC-6)
     self.futuresMarket:checkExpiry()          -- settle contracts past delivery date
     self.futuresMarket:checkTimeScaleDrift()  -- warn if timeScale changed mid real-day contract
     if self.economicModel == "calendar" then
@@ -633,6 +640,27 @@ end
 function MarketDynamics:unregisterPriceModifier(name)
     self.priceModifiers[name] = nil
     MDMLog.info("MarketDynamics: unregistered price modifier '" .. tostring(name) .. "'")
+end
+
+---Recompose every current quote through the registered consumer modifiers and the
+---clamp, now, and request their publication (EC-6, brief v1.7 section 3.2; offered at
+---rweConsumerContractVersion 1). The one way another mod can ask MarketDynamics to
+---recompose its current quotes: a consumer whose term just ended or narrowed calls it
+---so a cached quote cannot keep that term until the next market update.
+---
+---Composition and publication stay MarketDynamics-owned. It changes no base price,
+---volatility, stack modifier, history or save state: composeAll re-runs _recalculate,
+---which only rewrites each entry's current quote. A true return means the recompose
+---ran and publication was requested; the quotes reach clients on the next publication
+---flush of MarketDynamics' own update pass, which waits out the first second of mission
+---time and any saved-time catch-up.
+---@return boolean composed  false on a client, or while saved market state is still loading
+function MarketDynamics:refreshConsumerPrices()
+    if g_server == nil then return false end
+    if self._loadPhase then return false end
+    self.marketEngine:composeAll()
+    self:requestQuotePublication()
+    return true
 end
 
 -- ---------------------------------------------------------------------------

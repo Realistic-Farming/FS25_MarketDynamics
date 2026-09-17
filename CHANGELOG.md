@@ -9,9 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **RandomWorldEvents prices through one path (EC-6).** MarketDynamics now publishes `rweConsumerContractVersion = 1` and a server-only `refreshConsumerPrices()` that recomposes every current quote through the registered consumer modifiers and the clamp, then publishes them on the normal flush. It changes no base price, volatility, stack modifier, history or save state, and returns false on a client or while saved market state is still loading. Ships in the same release as the paired RandomWorldEvents update; update both mods together.
 - **Calendar-paced quotes (MD-15 / RSF-F203).** Economic work is now admitted from the canonical monotonic clock instead of raw-dt timer accumulation: one quote step per crossed whole farming hour, one seasonal base refresh and one endpoint-day history sample per new farming day, one world-event roll per accumulated opportunity interval, and absolute canonical expiry for events and BC supply spikes. Serializer v3 persists the canonical fields (with v2 migration); the `MDM-CALENDAR/1` wire format carries the server's exact base/current quote as decimal strings so clients keep the received quote instead of a float32-truncated recomposition. TimeGuard ticks drive the calendar when present, with native environment messages and per-frame polling as fallbacks.
 - **Control Center actions** (suite Control Center, requires SettingsHub): `MDM_MARKET_SCREEN`, `MDM_CREATE_CONTRACT`, `MDM_OPEN_SETTINGS`.
 - **Playtest fixes:** MarketScreen + graph, MdPriceFormat, RF PDA guest page and Esc profiles, modDesc alignment.
+
+### Removed
+- **The built-in RandomWorldEvents price reader (EC-6).** MarketDynamics no longer watches RandomWorldEvents' active event and stacks its own `rwe_*` price factors. The paired RandomWorldEvents registers its own consumer modifier instead, so an event is priced once. The SeasonalCropStress supply pressure in the same bridge is unchanged.
 
 ### Fixed
 - **Saved prices and futures contracts follow the product name, not the raw fill type index (D7).** Adding or removing a mod that registers fill types shifts every later index; a save restored by index alone put a price history or a contract on the wrong product. The save and the StateLedger block now carry each fill type name and restore by it; a legacy save without names is restored by index once and the log says so.
