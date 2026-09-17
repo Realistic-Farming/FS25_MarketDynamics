@@ -34,6 +34,9 @@ ZIP_NAME = "FS25_MarketDynamics.zip"
 # Exclusion lists — keep in sync with build.sh
 EXCLUDE_DIRS = {".git", ".claude", ".vscode", ".idea", "node_modules", "tools"}
 EXCLUDE_FILES = {
+    # ".git" is a FILE, not a directory, in a git worktree (it points at the main
+    # clone's git dir), so EXCLUDE_DIRS alone does not keep it out of the zip.
+    ".git",
     "build.sh", "build.py",
     "find_unused_code.sh", "find_unused_code.py",
     "lang_sync.js", "lang_sync.py",
