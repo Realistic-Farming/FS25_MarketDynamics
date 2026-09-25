@@ -312,7 +312,7 @@
 		<text name="mdm_label_add" text="[EN] Add"/>        <!-- BUILD 11:27 F155 Esc RF button labels -->
         <text name="wc_rf_pda_open_manager" text="작업자 관리자 열기" />
         <text name="sf_pda_btn_rotation_planner" text="윤작 계획기" />
-        <text name="sf_pda_btn_field_detail" text="밯 상세" />
+        <text name="sf_pda_btn_field_detail" text="필드 상세" />
         <text name="mdm_evt_tracked_label" text="Tracked market categories" />
         <text name="mdm_cat_crops" text="Crops" />
         <text name="mdm_cat_silage" text="Silage" />
