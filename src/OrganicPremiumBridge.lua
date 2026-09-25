@@ -78,8 +78,15 @@ function OrganicPremiumBridge.register()
     local ok, err = pcall(md.registerPriceModifier, md,
         OrganicPremiumBridge.MODIFIER_NAME, OrganicPremiumBridge.modifierFn)
     if ok then
+        -- [MD-16] The name is registered so no other suite mod can claim it, but
+        -- the composition point excludes it, so it can no longer contribute to a
+        -- price. Saying only "registered ... certified premium 1.2" would tell a
+        -- reader of log.txt the opposite of what this build actually pays, and
+        -- log.txt is the post-deploy diagnostic surface for exactly this.
         MDMLog.info("OrganicPremiumBridge: registered '" .. OrganicPremiumBridge.MODIFIER_NAME
-            .. "' price modifier (certified premium " .. OrganicPremiumBridge.ORGANIC_PREMIUM.CERTIFIED .. ")")
+            .. "' price modifier and RETIRED it (name reserved; the pooled premium of "
+            .. OrganicPremiumBridge.ORGANIC_PREMIUM.CERTIFIED
+            .. " no longer contributes, MD-16 captured origin replaces it)")
     else
         MDMLog.warn("OrganicPremiumBridge: registration failed: " .. tostring(err))
     end
