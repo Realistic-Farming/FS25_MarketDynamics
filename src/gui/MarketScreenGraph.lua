@@ -272,10 +272,22 @@ local function _aggregatedSeries()
         return _aggCache or nil
     end
 
+    -- BUILD 17:48 (George CLOSED DESIGN 17:40 item 7a): livestock is excluded. A livestock ring
+    -- holds a price PER HEAD and a crop ring a price PER LITRE, and drawAggregatedMedian paints
+    -- with no perHead flag, so the painter multiplies the whole series by 1000. Pooling the two put
+    -- an animal worth twelve thousand a head into a median beside wheat at well under a unit a
+    -- litre, and then scaled it. One axis can only carry one unit.
+    -- The per-commodity branch is untouched: selecting an animal still draws its own ring with
+    -- perHead set, which was always right.
     local arrays = {}
     local maxCount = 0
-    for _, buf in pairs(_buffers) do
-        if buf and buf.count and buf.count > 0 then
+    for fillTypeIndex, buf in pairs(_buffers) do
+        local isLivestock = false
+        if type(MDMMarketScreenGraph._isLivestock) == "function" then
+            local okLive, live = pcall(MDMMarketScreenGraph._isLivestock, fillTypeIndex)
+            isLivestock = okLive and live == true
+        end
+        if buf and buf.count and buf.count > 0 and not isLivestock then
             local ordered = _orderedFor(buf)
             if ordered ~= nil then
                 arrays[#arrays + 1] = ordered
