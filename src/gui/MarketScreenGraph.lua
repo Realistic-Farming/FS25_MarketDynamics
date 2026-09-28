@@ -282,11 +282,7 @@ local function _aggregatedSeries()
     local arrays = {}
     local maxCount = 0
     for fillTypeIndex, buf in pairs(_buffers) do
-        local isLivestock = false
-        if type(MDMMarketScreenGraph._isLivestock) == "function" then
-            local okLive, live = pcall(MDMMarketScreenGraph._isLivestock, fillTypeIndex)
-            isLivestock = okLive and live == true
-        end
+        local isLivestock = MDMMarketScreenGraph._isLivestock(fillTypeIndex) == true
         if buf and buf.count and buf.count > 0 and not isLivestock then
             local ordered = _orderedFor(buf)
             if ordered ~= nil then
