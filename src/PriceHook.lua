@@ -94,8 +94,20 @@ end
 if SellingStation and SellingStation.sellFillType then
     SellingStation.sellFillType = Utils.overwrittenFunction(
         SellingStation.sellFillType,
-        function(self, superFunc, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
-            local result = superFunc(self, farmId, fillDelta, fillTypeIndex, fillPositionData, toolType, extraAttributes)
+        -- [MD-16] THE NATIVE SALE VECTOR IS FIVE ARGUMENTS, NOT SIX.
+        -- This wrapper declared (farmId, fillDelta, fillTypeIndex, fillPositionData,
+        -- toolType, extraAttributes). Native sellFillType takes
+        -- (farmId, fillDelta, fillTypeIndex, toolType, extraAttributes): there is no
+        -- position argument. Forwarding the unchanged positional vector still passed
+        -- the native toolType and extraAttributes through in their original slots, so
+        -- the pass-through alone did NOT drop them, and saying otherwise would be
+        -- wrong. What it did was misname the wrapper's own locals: `fillPositionData`
+        -- actually held the tool type and `toolType` actually held the extra
+        -- attributes, while `extraAttributes` was always nil. Any MD-16 work that
+        -- reads a named local here, and the correctly bound original getter, both
+        -- need the real five-slot shape.
+        function(self, superFunc, farmId, fillDelta, fillTypeIndex, toolType, extraAttributes)
+            local result = superFunc(self, farmId, fillDelta, fillTypeIndex, toolType, extraAttributes)
 
             if g_server ~= nil
                 and g_MarketDynamics and g_MarketDynamics.isActive
