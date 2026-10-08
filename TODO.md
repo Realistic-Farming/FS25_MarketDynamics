@@ -58,3 +58,8 @@
 
 - [x] One garbled run in the English description decoded back, its em dash written as a spaced hyphen; nothing else touched.
 - [~] In game (owed): TESTING row 487.
+
+## 2026-10-08 (Fred): Time Guard calendar latch (MAINTENANCE row 249)
+
+- [x] `src/MarketDynamics.lua`: the latch reads the mission's Time Guard first and keeps it; delete unsubscribes from it. Bar `MAINT-249-timeguard_handle_spec_test.lua`, battery `tools/test/mutate_maint249.py`, 2 of 2.
+- [~] In game (owed): TESTING row 510.

@@ -505,9 +505,15 @@ function MarketDynamics:_latchCalendarSource()
     if g_server == nil or self.economicModel ~= "calendar" then return end
     self._calendarLatched = true
 
-    local tg = g_timeGuard
+    -- [MAINTENANCE row 249] TimeGuard's handle from the mission (TimeGuard main.lua:48), as RSF-F203 :50
+    -- asks ("bind to the actual mission handle ... retain the actual provider instance"): TimeGuard
+    -- writes g_timeGuard into its own mod environment (getfenv(0), :38), so a bare read here is nil
+    -- in a game and the calendar always fell back to the native messages. The instance is kept so
+    -- delete detaches from the provider it attached to. The bare global stays as the fallback.
+    local tg = (g_currentMission ~= nil and g_currentMission.timeGuard) or g_timeGuard
     if tg ~= nil and type(tg.subscribeTick) == "function" then
         self.calendarSource = "timeguard"
+        self._calendarTimeGuard = tg
         tg:subscribeTick("hour", "MDM-calendar", function(ctx) self:_onCalendarTick("hour", ctx) end)
         tg:subscribeTick("day",  "MDM-calendar", function(ctx) self:_onCalendarTick("day", ctx) end)
         MDMLog.info("MarketDynamics: calendar source latched to FS25_TimeGuard ticks")
@@ -603,11 +609,13 @@ end
 function MarketDynamics:delete()
     self.isActive = false
     self._marketStateReady = false
-    -- Unsubscribe the latched calendar source.
-    if self.calendarSource == "timeguard" and g_timeGuard ~= nil
-        and type(g_timeGuard.unsubscribeTick) == "function" then
-        g_timeGuard:unsubscribeTick("hour", "MDM-calendar")
-        g_timeGuard:unsubscribeTick("day",  "MDM-calendar")
+    -- Unsubscribe the latched calendar source: the TimeGuard instance it attached to (row 249,
+    -- RSF-F203 :50 "detach at delete"), not a re-read of the global.
+    local tg = self._calendarTimeGuard
+    if self.calendarSource == "timeguard" and tg ~= nil
+        and type(tg.unsubscribeTick) == "function" then
+        tg:unsubscribeTick("hour", "MDM-calendar")
+        tg:unsubscribeTick("day",  "MDM-calendar")
     elseif self.calendarSource == "native" and g_messageCenter ~= nil then
         g_messageCenter:unsubscribe(MessageType.HOUR_CHANGED, self._onNativeHourChanged, self)
         g_messageCenter:unsubscribe(MessageType.DAY_CHANGED,  self._onNativeDayChanged,  self)

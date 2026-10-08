@@ -56,3 +56,8 @@
 ## 2026-10-06 (Fred): the English description readable again (MAINTENANCE row 226)
 
 - [x] `modDesc.xml:9`, the English description: one em dash had been saved through two wrong code pages (UTF-8 read as cp1252, then as the DOS cp850 page), so the mod manager showed "system ├óÔé¼ÔÇØ lock in prices". It now reads "system - lock in prices": the text the file held before the damage (148be3c, 2026-08-08), its em dash written as a spaced hyphen by the house rule. No other line changes.
+
+## 2026-10-08 (Fred): the calendar economy latches to Time Guard in a game (MAINTENANCE row 249)
+
+- [x] `_latchCalendarSource` read Time Guard through the bare global `g_timeGuard`, which Time Guard sets only in its own mod environment, so an experimental calendar session always latched to the native hour and day messages. It now reads `g_currentMission.timeGuard` first and keeps the instance, and `delete` detaches from that instance rather than re-reading the global. Design origin RSF-F203 v1.0 :38 and :50, CARRIES (Bob's R-15).
+- The in-game check is TESTING row 510.
