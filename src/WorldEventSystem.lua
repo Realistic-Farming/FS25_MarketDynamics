@@ -54,6 +54,10 @@ function WorldEventSystem:registerEvent(event)
     end
     -- lastFiredAt starts at -math.huge so the first roll is never blocked by cooldown.
     event.lastFiredAt = -math.huge
+    -- Canonical cooldown state (RSF-F203): never-fired is a MISSING record, not
+    -- a timestamp of zero. Set at firing from current monotonic time.
+    event.lastFiredMonotonicMs = nil
+    event.cooldownUntilMonotonicMs = nil
     self.registry[event.id] = event
     MDMLog.info("WorldEventSystem: registered event '" .. event.id .. "'")
 end
@@ -63,14 +67,33 @@ end
 -- extraData is an optional string persisted by the event's getExtraData() callback;
 -- if the event defines onLoad, that is called instead of onFire so per-event state
 -- (e.g. which crops were affected) can be deterministically restored.
-function WorldEventSystem:loadActiveEvent(id, endsAt, intensity, extraData)
+-- endsAtMonotonicMs is the canonical deadline (v3 saves). When omitted (legacy
+-- migration), it is derived from the public endsAt via the current clock offset.
+-- Already-expired records are omitted without a new firing/notification.
+function WorldEventSystem:loadActiveEvent(id, endsAt, intensity, extraData, endsAtMonotonicMs)
     local event = self.registry[id]
     if not event then
         MDMLog.warn("WorldEventSystem: cannot restore unknown event '" .. tostring(id) .. "'")
         return
     end
 
-    self.active[id] = { event = event, endsAt = endsAt, intensity = intensity }
+    local legacyNow = MDMUtil.getGameTime()
+    local monoNow   = MDMUtil.getMonotonicTime()
+    local canonicalEndsAt = endsAtMonotonicMs or (monoNow + (endsAt - legacyNow))
+    if canonicalEndsAt <= monoNow then
+        MDMLog.info("WorldEventSystem: skipping expired restored event '" .. id .. "'")
+        return
+    end
+    -- Public projection at the current clock offset; reprojected by the
+    -- coordinator when the offset changes.
+    local publicEndsAt = legacyNow + (canonicalEndsAt - monoNow)
+
+    self.active[id] = {
+        event = event,
+        endsAt = publicEndsAt,
+        endsAtMonotonicMs = canonicalEndsAt,
+        intensity = intensity,
+    }
 
     -- Prefer onLoad (deterministic restore) over onFire (which may re-roll random state)
     if event.onLoad then
@@ -80,11 +103,55 @@ function WorldEventSystem:loadActiveEvent(id, endsAt, intensity, extraData)
     end
 
     -- Re-apply UP market modifier with remaining duration.
-    local now = MDMUtil.getGameTime()
-    UPIntegration.onWorldEventFired(id, intensity, math.max(0, endsAt - now))
+    UPIntegration.onWorldEventFired(id, intensity, math.max(0, canonicalEndsAt - monoNow))
 
     MDMLog.info("WorldEventSystem: restored active event '" .. id .. "' (ends in " ..
-        string.format("%.1f", (endsAt - now) / 60000) .. "m)")
+        string.format("%.1f", (canonicalEndsAt - monoNow) / 60000) .. "m)")
+end
+
+-- Expire events whose canonical deadline has passed. Absolute comparison, so a
+-- jump removes an already-active event once without recreating it. Returns the
+-- number of events removed.
+function WorldEventSystem:expireDue(monotonicNow)
+    if g_server == nil then return 0 end
+    local removed = 0
+    for id, active in pairs(self.active) do
+        if active.endsAtMonotonicMs and monotonicNow >= active.endsAtMonotonicMs then
+            self:_expireEvent(id)
+            removed = removed + 1
+        end
+    end
+    return removed
+end
+
+-- Roll at most one event opportunity at the current endpoint. The coordinator
+-- owns the phase accounting (eventPhase in the calendar block); this only
+-- performs the single current roll using existing eligibility and original
+-- probabilities. When events are disabled, no roll happens and no backlog is
+-- released on re-enable.
+function WorldEventSystem:rollOpportunity()
+    if g_server == nil then return end
+    local settings = g_MarketDynamics and g_MarketDynamics.settings
+    if not settings or settings.eventsEnabled == false then return end
+    self:_rollForEvents()
+end
+
+-- Reproject public endsAt/lastFiredAt from the canonical fields using the
+-- current clock offset (legacyNow - monotonicNow). Canonical deadlines and
+-- cooldowns are untouched. Called by the coordinator when the offset changes,
+-- including at equal or earlier monotonic time.
+function WorldEventSystem:reprojectPublic(monotonicNow, legacyNow)
+    local offset = legacyNow - monotonicNow
+    for id, active in pairs(self.active) do
+        if active.endsAtMonotonicMs then
+            active.endsAt = active.endsAtMonotonicMs + offset
+        end
+    end
+    for id, event in pairs(self.registry) do
+        if event.lastFiredMonotonicMs then
+            event.lastFiredAt = event.lastFiredMonotonicMs + offset
+        end
+    end
 end
 
 -- Advance the event tick timer, expire any events past their endsAt, and
@@ -161,14 +228,22 @@ function WorldEventSystem:forceFireEvent(id, intensity)
     end
 
     intensity = math.max(0, math.min(1, intensity or 1.0))
-    local now    = MDMUtil.getGameTime()
+    local legacyNow = MDMUtil.getGameTime()
+    local monoNow   = MDMUtil.getMonotonicTime()
     local scale  = MDMUtil.getMonthLengthScale()
     local minDur = (event.minDurationMs or (5  * 60 * 1000)) * scale
     local maxDur = (event.maxDurationMs or (15 * 60 * 1000)) * scale
     local duration = minDur + math.random() * (maxDur - minDur)
 
-    event.lastFiredAt = now
-    self.active[id]   = { event = event, endsAt = now + duration, intensity = intensity }
+    event.lastFiredAt = legacyNow
+    event.lastFiredMonotonicMs = monoNow
+    event.cooldownUntilMonotonicMs = monoNow + (event.cooldownMs or MIN_COOLDOWN_MS) * scale
+    self.active[id] = {
+        event = event,
+        endsAt = legacyNow + duration,
+        endsAtMonotonicMs = monoNow + duration,
+        intensity = intensity,
+    }
 
     MDMLog.info("WorldEventSystem: FORCED '" .. id .. "' intensity=" .. string.format("%.2f", intensity))
 
@@ -206,8 +281,9 @@ end
 
 -- Iterate all registered events and roll each one for firing.
 -- An event is eligible if: not disabled, not currently active, and cooldown has elapsed.
+-- Cooldown uses the canonical monotonic clock; never-fired is a missing record.
 function WorldEventSystem:_rollForEvents()
-    local now       = MDMUtil.getGameTime()
+    local monoNow   = MDMUtil.getMonotonicTime()
     local settings  = g_MarketDynamics and g_MarketDynamics.settings
     local freqScale = (settings and settings.eventFrequency) or 1.0
     local disabled  = settings and settings.disabledEvents
@@ -219,7 +295,17 @@ function WorldEventSystem:_rollForEvents()
     for id, event in pairs(self.registry) do
         if not (disabled and disabled[id]) and not self.active[id] then
             local cooldown = (event.cooldownMs or MIN_COOLDOWN_MS) * scale
-            if (now - event.lastFiredAt) >= cooldown then
+            local lastFired = event.lastFiredMonotonicMs
+            if lastFired == nil then
+                -- Legacy fallback (incumbent path / v2 restore): the public
+                -- field shares the same epoch in normal operation.
+                lastFired = event.lastFiredAt
+                if lastFired == nil or lastFired == -math.huge then
+                    table.insert(eligible, event)  -- never fired: missing record
+                elseif (monoNow - lastFired) >= cooldown then
+                    table.insert(eligible, event)
+                end
+            elseif (monoNow - lastFired) >= cooldown then
                 table.insert(eligible, event)
             end
         end
@@ -230,22 +316,31 @@ function WorldEventSystem:_rollForEvents()
     end
     for _, event in ipairs(eligible) do
         if math.random() < (event.probability * freqScale) then
-            self:_fireEvent(event, now)
+            self:_fireEvent(event, monoNow)
             break
         end
     end
 end
 
 -- Fire an event: roll intensity and duration, record in active table, call onFire.
-function WorldEventSystem:_fireEvent(event, now)
+-- Sets both the canonical monotonic deadline and the public legacy projection.
+function WorldEventSystem:_fireEvent(event, monoNow)
     local intensity = event.minIntensity + math.random() * (event.maxIntensity - event.minIntensity)
     local scale     = MDMUtil.getMonthLengthScale()
     local minDur    = (event.minDurationMs or (5  * 60 * 1000)) * scale
     local maxDur    = (event.maxDurationMs or (15 * 60 * 1000)) * scale
     local duration  = minDur + math.random() * (maxDur - minDur)
+    local legacyNow = MDMUtil.getGameTime()
 
-    event.lastFiredAt         = now
-    self.active[event.id]     = { event = event, endsAt = now + duration, intensity = intensity }
+    event.lastFiredAt = legacyNow
+    event.lastFiredMonotonicMs = monoNow
+    event.cooldownUntilMonotonicMs = monoNow + (event.cooldownMs or MIN_COOLDOWN_MS) * scale
+    self.active[event.id] = {
+        event = event,
+        endsAt = legacyNow + duration,
+        endsAtMonotonicMs = monoNow + duration,
+        intensity = intensity,
+    }
 
     MDMLog.info("WorldEventSystem: firing '" .. event.id ..
         "' intensity=" .. string.format("%.2f", intensity))

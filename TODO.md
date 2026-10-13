@@ -17,6 +17,7 @@
 - [x] 2026-07-26 bug sweep: MDM auth gate, MDM persistence, MDM bcManaged bugs fixed and merged to main. All closed.
 
 ## Features / enhancements
+- [x] Calendar-paced quotes (MD-15 / RSF-F203, 2026-09-08): canonical monotonic clock admission replaces raw-dt timer accumulation. `MarketEngine:update(dt)` retired no-op; `applyHourlyMovement(n)` one step per crossed whole farming hour (MD-15 equation, skipped-interval endpoint approximation); `appendDailyHistory()` one endpoint-day sample; `refreshBasePrices(false)` once per new farming day. World events: opportunity phase (one roll per whole `300000 * daysPerPeriod` interval, period-length change resets), absolute canonical expiry, never-fired = missing record, legacy v2 fallback. BC spikes expire on the canonical hour; RWE/CS checks once per monotonic day. Serializer v3 (canonical fields, `lastHistoryDay`, `lastMonotonicTime`, v2 migration, `selectMarketSnapshot` precedence, `finalizeRestore` cursor anchoring). Wire format `MDM-CALENDAR/1`: server base/current/endsAt as `%.17g` strings, client retains exact received quote. Calendar source: TimeGuard ticks when present, else native messages, else poll. Spec suite 188 assertions green (66 MD-15 + 122 RSF-F203). Ships LOCKED; PR into development.
 - [x] Release gate mechanism (2026-08-04): `ReleaseGate.lua` with an EMPTY registry (Arissani 2026-08-03). `experimentalSystems` opt-in (default false, orthogonal to difficulty) through the coordinator settings, `MarketSerializer` save/load, the MP `MDMSettingsSyncEvent`, the SettingsHub mirror and a settings-panel row. `mdmRelease` status command. Nothing gated; a row drops in the moment a system needs locking.
 - [ ] `getEligibleEvents()` to unblock ProStaff L20 early-warning (off-cooldown, not-active events).
 
@@ -25,7 +26,7 @@
 - [x] NetworkSync FULLY bridged. (1) Contract ACTION channel via NS Path 3 (`MarketDynamics_Contract`, anti-spoof + ownership preserved; commit 3bd0255). (2) STATE-sync module (id `FS25_MarketDynamics`, channel `MarketDynamics_Sync`; commit ad70e30): one FULL-snapshot carrying all contracts + market prices + active events, onWriteState/onReadState reuse the hardened MDMContractSyncEvent.execute + MDMMarketSyncEvent.applyState paths (no apply rewrite); sendToClients delegate to markStateDirty, join request skipped when NS active. Serialization round-trip verified. Owed: two-machine MP test.
 - [x] MasterHUD: MDMHUD + settings panel bridged (Phase 1); own draw stands down when active.
 - [x] SettingsHub: `MarketDynamics` module bridged (Phase 1, selfPersisted). ESC-menu injection retained as the standalone fallback (delegate-when-present).
-- [ ] Reads: RandomWorldEvents `getPriceModifier`, SeasonalCropStress `cropStressManager`. Read by: CropDisease, ProStaff.
+- [ ] Reads: SeasonalCropStress `cropStressManager` (RandomWorldEvents is not read since EC-6; it registers a consumer price modifier). Read by: CropDisease, ProStaff, RandomWorldEvents (`rweConsumerContractVersion`, `refreshConsumerPrices`).
 
 ## Docs / localization
 - [ ] Keep all 26 languages in step for any new setting.
@@ -42,3 +43,23 @@
 
 ## Module page dots always visible (2026-08-07)
 - [x] The Esc RF module page dots were hidden while Worker Costs or Market Dynamics was active, so WC never read as the 3rd module. All four RfPdaMenuPage copies now keep them visible. Built, deployed, PR open.
+
+## 2026-10-04 (Fred): the shared RF Esc door (Wizard, #164)
+
+- [x] The four shared door files at the suite's STOCK page set, byte-same in all ten door mods; StockGuard's STOCK page chrome inert without StockGuard; the herd-advisory panel hidden.
+- [~] In game (owed): TESTING row 415.
+
+## 2026-10-05 (Fred): the Esc side panel's info box (Wizard, #166)
+
+- [x] The side info boxes start clear of the selected tab; text bodies 352 and 348 px wide, so line length and the right edge are unchanged; byte-same in all ten door mods.
+- [~] In game (owed): TESTING row 450.
+
+## 2026-10-06 (Fred): modDesc.xml encoding repair (MAINTENANCE row 226)
+
+- [x] One garbled run in the English description decoded back, its em dash written as a spaced hyphen; nothing else touched.
+- [~] In game (owed): TESTING row 487.
+
+## 2026-10-08 (Fred): Time Guard calendar latch (MAINTENANCE row 249)
+
+- [x] `src/MarketDynamics.lua`: the latch reads the mission's Time Guard first and keeps it; delete unsubscribes from it. Bar `MAINT-249-timeguard_handle_spec_test.lua`, battery `tools/test/mutate_maint249.py`, 2 of 2.
+- [~] In game (owed): TESTING row 510.

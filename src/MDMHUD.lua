@@ -32,6 +32,14 @@ MDMHUD.C_LABEL      = {0.72, 0.72, 0.72, 1.00}   -- neutral gray
 MDMHUD.C_VALUE      = {1.00, 1.00, 1.00, 1.00}
 MDMHUD.C_WARN       = {1.00, 0.35, 0.35, 1.00}   -- red for urgent deadlines
 
+--- The fill type of a contract, or nil for an unresolved one (D7: a saved
+--- product that is not registered in this session keeps its name and no
+--- index; the title still shows the saved name).
+function MDMHUD.contractFillType(contract)
+    if contract == nil or contract.fillTypeIndex == nil or g_fillTypeManager == nil then return nil end
+    return g_fillTypeManager:getFillTypeByIndex(contract.fillTypeIndex)
+end
+
 function MDMHUD.new()
     local self = setmetatable({}, MDMHUD_mt)
     
@@ -161,7 +169,7 @@ function MDMHUD:drawPanel(contract)
     -- Icon
     local iconX = tx
     local iconSize = 0.016 * s
-    local ft = g_fillTypeManager:getFillTypeByIndex(contract.fillTypeIndex)
+    local ft = MDMHUD.contractFillType(contract)
     if ft and ft.hudOverlayFilename then
         local handle = self:getIconOverlay(ft.hudOverlayFilename)
         if handle then

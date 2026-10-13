@@ -170,8 +170,8 @@ function countFeatures(data) {
     // Integrations — BC/UP/RWE bridges
     const extensions = luaRels.filter(f => /^src\/(BCIntegration|UPIntegration|RWEIntegration)\.lua$/.test(f));
 
-    // Utilities — AdminCommands, MDMEventConfig, DebugHUD
-    const utilities = luaRels.filter(f => /^src\/(AdminCommands|MDMEventConfig|DebugHUD)\.lua$/.test(f));
+    // Utilities — AdminCommands, MDMEventConfig
+    const utilities = luaRels.filter(f => /^src\/(AdminCommands|MDMEventConfig)\.lua$/.test(f));
 
     // Entry point
     const vehicleScripts = luaRels.filter(f => f === 'main.lua');

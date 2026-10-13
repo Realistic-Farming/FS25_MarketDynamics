@@ -15,7 +15,7 @@
 --
 -- Public API (called externally):
 --   init()                                 — snapshot base prices from economy
---   update(dt)                             — advance intraday/daily timers
+--   update(dt)                             - incumbent path only: advance intraday/daily timers
 --   refreshBasePrices()                    — sync base prices with vanilla seasonal curves
 --   addModifier(modifier)                  — push an event modifier onto the stack
 --   removeModifierById(fillTypeIndex, id)  — pop a modifier by id
@@ -104,7 +104,12 @@ function MarketEngine:refreshBasePrices(isInitial)
     end
 end
 
--- Advance timers and fire intraday/daily volatility ticks.
+-- Incumbent economic path: raw-dt intraday/daily timers. The coordinator calls
+-- this only when the session latched the incumbent model (the LOCKED default,
+-- MD-15 brief section 2 / RSF-F203 "Paired activation"). The calendar model
+-- never calls it: its work is admitted from the canonical monotonic clock via
+-- applyHourlyMovement / appendDailyHistory / refreshBasePrices. One selected
+-- path per session; retiring these timers is the later stable-cutover work.
 -- dt is in-game milliseconds (from FSBaseMission.update).
 function MarketEngine:update(dt)
     if g_server == nil then return end
@@ -127,30 +132,133 @@ function MarketEngine:update(dt)
     end
 
     if changed and MDMMarketSyncEvent then
-        MDMMarketSyncEvent.sendToClients()
+        -- Coalesced intraday+daily send: it can carry a new daily sample, so
+        -- history is always included (RSF-F204).
+        MDMMarketSyncEvent.sendToClients(true)
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- Calendar path (MD-15 / RSF-F203)
+-- ---------------------------------------------------------------------------
+
+-- MD-15 quote equation. Pure arithmetic, shared by the hourly movement and the
+-- production tests.
+--
+--   a = 2 ^ (-1 / 24)                       (24-hour deviation half-life)
+--   gain(n) = sqrt((1 - a^(2n)) / (1 - a*a))
+--   vNext = clamp(1 + (v - 1) * a^n + 0.02 * s * gain(n) * u, 0.50, 2.00)
+--
+-- v: stored volatility factor in [0.50, 2.00]; n: nonnegative integer count of
+-- newly crossed farming hours; s: price-volatility scale >= 0; u: one uniform
+-- signed sample in [-1,1] (or an RNG callback returning one). n == 0 preserves
+-- the factor and draws nothing. Invalid input returns nil and preserves the
+-- last valid state.
+function MarketEngine.quoteStep(v, n, scale, u)
+    local function finite(x)
+        return type(x) == "number" and x == x and x ~= math.huge and x ~= -math.huge
+    end
+    if not finite(v) or v < 0.5 or v > 2.0
+        or not finite(n) or n < 0 or n ~= math.floor(n)
+        or not finite(scale) or scale < 0 then
+        return nil
+    end
+    if type(u) == "function" then
+        if n == 0 then return v end
+        u = u()
+    end
+    if not finite(u) or u < -1 or u > 1 then return nil end
+    if n == 0 then return v end
+    local a    = 2 ^ (-1 / 24)
+    local gain = math.sqrt((1 - a ^ (2 * n)) / (1 - a * a))
+    local result = 1 + (v - 1) * a ^ n + 0.02 * scale * gain * u
+    return math.max(0.5, math.min(2.0, result))
+end
+
+-- Apply one hourly quote step to every tracked fill type. nHours is the whole
+-- count of newly crossed farming hours; a skipped interval computes the
+-- equation once with one uniform draw per fill type (deliberate endpoint
+-- approximation — no replay of the skipped interval). nHours == 0 is inert.
+function MarketEngine:applyHourlyMovement(nHours, shockFn)
+    if g_server == nil then return end
+    if type(nHours) ~= "number" or nHours < 0 or nHours ~= math.floor(nHours) then
+        MDMLog.warn("MarketEngine:applyHourlyMovement — invalid hour count rejected")
+        return
+    end
+    if nHours == 0 then return end
+
+    local scale = self.volatilityScale or 1.0
+    for fillTypeIndex, entry in pairs(self.prices) do
+        local u = shockFn and shockFn() or (math.random() * 2 - 1)
+        local nextFactor = MarketEngine.quoteStep(entry.volatilityFactor, nHours, scale, u)
+        if nextFactor then
+            entry.volatilityFactor = nextFactor
+            self:_recalculate(fillTypeIndex)
+        end
+    end
+end
+
+-- Append one actual endpoint-day price sample per fill type. Uses the existing
+-- public timestamp convention: history.time = MDMUtil.getGameTime() at the
+-- actual final observation. Private monotonic history-day state (coordinator)
+-- controls duplicate admission; old samples are never relabelled.
+function MarketEngine:appendDailyHistory()
+    local now = MDMUtil.getGameTime()
+    for fillTypeIndex, entry in pairs(self.prices) do
+        table.insert(entry.history, { price = entry.current, time = now })
+        if #entry.history > HISTORY_MAX_ENTRIES then
+            table.remove(entry.history, 1)
+        end
+    end
+end
+
+-- Compose the final quote for every tracked fill type (server-side composition;
+-- pure clients retain the authoritative received quote via _recalculate).
+function MarketEngine:composeAll()
+    for fillTypeIndex in pairs(self.prices) do
+        self:_recalculate(fillTypeIndex)
+    end
+end
+
+-- Request final quote publication through the coordinator's pending flags.
+-- Pure clients cannot create authoritative mutations or outgoing quote work.
+function MarketEngine:_requestQuotePublication()
+    local mdm = g_MarketDynamics
+    if mdm ~= nil and type(mdm.requestQuotePublication) == "function" then
+        mdm:requestQuotePublication()
     end
 end
 
 -- Push an event modifier onto a fillType's modifier stack.
+-- Requests final quote publication for every successful server stack mutation
+-- (RSF-F203: the common add/remove methods are the single request path for all
+-- server writers, including BC, RWE/SCS, event config and forced actions).
 function MarketEngine:addModifier(modifier)
     local entry = self.prices[modifier.fillTypeIndex]
     if not entry then return end
 
     table.insert(entry.modifiers, modifier)
     self:_recalculate(modifier.fillTypeIndex)
+    self:_requestQuotePublication()
 end
 
 -- Remove a modifier by id from a fillType's modifier stack.
+-- A removal that removes nothing does not mark work.
 function MarketEngine:removeModifierById(fillTypeIndex, id)
     local entry = self.prices[fillTypeIndex]
     if not entry then return end
 
+    local removed = false
     for i = #entry.modifiers, 1, -1 do
         if entry.modifiers[i].id == id then
             table.remove(entry.modifiers, i)
+            removed = true
         end
     end
-    self:_recalculate(fillTypeIndex)
+    if removed then
+        self:_recalculate(fillTypeIndex)
+        self:_requestQuotePublication()
+    end
 end
 
 -- Returns the current effective price for a fillType, or nil if not tracked.
@@ -250,9 +358,16 @@ function MarketEngine:_applyDailyShift()
 end
 
 -- Recompute current = base * volatilityFactor * product(all event modifier factors).
+-- On a pure client the received authoritative quote is retained: local modifier
+-- callbacks, seasonal reads and later RWE/SCS polling must not overwrite it
+-- (RSF-F203). Server-side composition is unchanged.
 function MarketEngine:_recalculate(fillTypeIndex)
     local entry = self.prices[fillTypeIndex]
     if not entry then return end
+
+    if g_server == nil and entry.current ~= nil then
+        return entry.current
+    end
 
     local factor = entry.volatilityFactor
     for _, mod in ipairs(entry.modifiers) do

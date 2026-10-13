@@ -29,6 +29,10 @@ function MarketDynamics.new(modDir, modName)
     self.modName  = modName
     self.isActive = false
     self._loadPhase = true
+    -- Transient, never saved: true once this side holds a complete market
+    -- state (server: after restore; client: after its first full snapshot).
+    -- Read by the F205 graph sampler (RSF-F204).
+    self._marketStateReady = false
 
     -- Player-configurable settings (persisted by MarketSerializer, edited via SettingsUI)
     -- Add new settings here and wire them in MarketSerializer + SettingsUI.
@@ -59,11 +63,45 @@ function MarketDynamics.new(modDir, modName)
     -- and returns a multiplier that is applied to the final price.
     self.priceModifiers = {}
 
+    -- EC-6 (brief v1.7 section 3.2): read-only capability for FS25_RandomWorldEvents.
+    -- 1 means this MarketDynamics has no RandomWorldEvents reader of its own, prices
+    -- RandomWorldEvents only through the registered consumer modifier, and offers
+    -- refreshConsumerPrices(). A plain number: never saved, never sent, and read by
+    -- no MarketDynamics code. A later MarketDynamics that changes that meaning raises it.
+    self.rweConsumerContractVersion = 1
+
     -- Expose BCIntegration so external mods (e.g. BetterContracts) can reach it via
     -- g_MarketDynamics.bcIntegration without depending on the global table name.
     self.bcIntegration = BCIntegration
 
     self.rweIntegration = MDMRWEIntegration.new(self.marketEngine)
+
+    -- Calendar path state (MD-15 / RSF-F203). The economic clock is the
+    -- canonical monotonic time; observation admission replaces raw-dt timer
+    -- accumulation. Cursors are anchored at the first valid observation and
+    -- persisted by the serializer (v3).
+    self.lastObservedMs   = nil   -- monotonic high-water of observations
+    self.processedHour    = nil   -- last whole farming hour that produced a quote step
+    self.refreshDay       = nil   -- last farming day that refreshed seasonal bases
+    self.lastHistoryDay   = nil   -- last farming day that appended an endpoint sample
+    self._clockOffset     = nil   -- legacyNow - monoNow; reprojects public fields on change
+    self.quoteDirty       = false -- pending final-quote publication (stack changes, hour steps)
+    self.displayDirty     = false -- pending display publication (offset reprojection, expiry)
+    -- Event opportunity phase (reference contract C): fractional accumulator
+    -- over 300000 * daysPerPeriod ms; one roll per accumulated whole interval.
+    self.eventPhaseObservedMs = 0
+    self.eventPhaseDays       = nil
+    self.eventPhase           = 0
+    -- Calendar source latch: "timeguard" | "native" | "poll".
+    self.calendarSource   = nil
+    self._calendarLatched = false
+
+    -- Economic model latch (MD-15 brief section 2 / RSF-F203 "Paired
+    -- activation"): "incumbent" | "calendar". Selected once per mission by the
+    -- server in onStartMission after saved settings are restored; never
+    -- re-read mid-session; nil on a pure client (it never selects).
+    self.economicModel  = nil
+    self._modelLatched  = false
 
     local modInfo = g_modManager:getModByName(modName)
     MDMLog.info("MarketDynamics created — v" .. (modInfo and modInfo.version or "?"))
@@ -75,6 +113,35 @@ end
 ---@return boolean
 function MarketDynamics:allowsExperimentalSystems()
     return self.settings.experimentalSystems == true
+end
+
+--- True when this session latched the calendar (MD-15) economic model.
+---@return boolean
+function MarketDynamics:usesCalendarModel()
+    return self.economicModel == "calendar"
+end
+
+-- Strict per-mission server latch of the economic model (MD-15 brief :35,
+-- RSF-F203 :135). Runs once, on the server, after saved settings are selected
+-- (own XML, then the StateLedger override). The calendar model is chosen only
+-- for settings.experimentalSystems == true; nil, false or a missing settings
+-- table select the incumbent. Deliberately NOT routed through the fail-open
+-- ReleaseGate.isSystemLive or its EXPERIMENTAL table, and never re-read
+-- mid-session: a toggle during play takes effect at the next mission start.
+-- Pure clients never select (economicModel stays nil).
+function MarketDynamics:_latchEconomicModel()
+    if self._modelLatched then return self.economicModel end
+    if g_server == nil then return nil end
+    self._modelLatched = true
+
+    local settings = self.settings
+    if type(settings) == "table" and settings.experimentalSystems == true then
+        self.economicModel = "calendar"
+    else
+        self.economicModel = "incumbent"
+    end
+    MDMLog.info("MarketDynamics: economic model latched for this mission: " .. self.economicModel)
+    return self.economicModel
 end
 
 -- Called after mission is fully loaded. Safe to access all game APIs from here.
@@ -105,6 +172,9 @@ function MarketDynamics:onMissionLoaded(mission)
 
     -- Detect optional companion mods
     self.rweIntegration:detect()
+
+    -- The calendar tick source is latched in onStartMission, on the server,
+    -- only after the economic model is selected (calendar path only).
 
     -- Register the HUD with MasterHUD (if installed) so it owns the single
     -- suspend-aware draw loop. No-ops safely if MasterHUD is absent; the own
@@ -155,6 +225,28 @@ function MarketDynamics:onStartMission(mission)
         self.marketEngine:cleanupStaleEntries()
         MDMEventConfig.validateAndClean()
         UPIntegration.reregisterActiveContracts(self.futuresMarket.contracts)
+
+        -- Strict per-mission model latch, after saved settings are selected
+        -- (own XML + ledger override above). Fixed for the whole session.
+        local model = self:_latchEconomicModel()
+
+        if model == "calendar" then
+            -- Anchor the calendar cursors to the current monotonic time so the
+            -- first quote step after restore fires within the current farming
+            -- hour instead of replaying unobserved hours from a stale or missing
+            -- cursor (v2-to-v3 first-anchor migration lives here too).
+            self.serializer:finalizeRestore(self)
+            -- Only the selected calendar path subscribes to TimeGuard/native
+            -- ticks; the incumbent never receives a calendar tick.
+            self:_latchCalendarSource()
+        else
+            -- Incumbent selected (possibly after a v3 save): project the
+            -- canonical event dates into the legacy fields and drop the live
+            -- calendar cursor so the incumbent timers own subsequent progress
+            -- (RSF-F203 :137).
+            self.serializer:projectIncumbentRestore(self)
+        end
+        self._marketStateReady = true
         MDMLog.info("MarketDynamics: savegame data loaded")
     else
         -- When NetworkSync is active it delivers the full state to joining clients, so the
@@ -173,6 +265,13 @@ function MarketDynamics:onStartMission(mission)
 end
 
 -- Per-frame tick. dt = in-game milliseconds from FSBaseMission.update.
+-- Exactly one economic path runs per session, chosen by the server latch:
+--   incumbent  raw-dt MarketEngine/WorldEventSystem timers, RWE crop-stress
+--              day accumulator and BC mission-time spike expiry (LOCKED default);
+--   calendar   MD-15 / RSF-F203 admission from the canonical monotonic clock in
+--              _reconcile (no raw-dt accumulation: a time jump or speed change
+--              yields one current result, never invented history).
+-- A pure client has no model and runs neither simulation.
 function MarketDynamics:update(dt)
     if not self.isActive then return end
     
@@ -194,13 +293,20 @@ function MarketDynamics:update(dt)
     -- can default prematurely on MP join because the simulation catches up to saved
     -- timestamps before the client has received its full initial state.
     if self._loadPhase then
-        -- Zero timers so they don't accumulate during loading and fire on resume
+        -- Incumbent timers must not accumulate during loading and fire on resume.
         self.marketEngine.intradayTimer = 0
         self.marketEngine.dailyTimer = 0
         return
     end
 
-    self.marketEngine:update(dt)              -- intraday and daily price ticks
+    if self.economicModel == "calendar" then
+        -- Calendar-path reconciliation: offset reprojection, hourly quote
+        -- admission, seasonal base refresh, endpoint-day history, event phase +
+        -- expiry, and pending publication flush. Idempotent per observation.
+        self:_reconcile()
+    elseif self.economicModel == "incumbent" then
+        self:_updateIncumbent(dt)
+    end
 
     -- BUILD 22:27b: warm the price-trend ring here rather than only inside a GUI.
     -- MDMMarketScreenGraph.update samples one point per 20s, and draw needs 2, but it
@@ -213,15 +319,237 @@ function MarketDynamics:update(dt)
     if MDMMarketScreenGraph ~= nil and type(MDMMarketScreenGraph.update) == "function" then
         pcall(MDMMarketScreenGraph.update, dt)
     end
-    self.worldEvents:update(dt)               -- event expiry and probability rolls
-    self.rweIntegration:update(dt)            -- sync RWE world events + CS stress → price modifiers
+    self.rweIntegration:update(dt, self.economicModel) -- CS stress → price modifiers (clock per model); RWE prices itself (EC-6)
     self.futuresMarket:checkExpiry()          -- settle contracts past delivery date
     self.futuresMarket:checkTimeScaleDrift()  -- warn if timeScale changed mid real-day contract
-    BCIntegration.update()                    -- expire BC supply-spike modifiers
-    
+    if self.economicModel == "calendar" then
+        BCIntegration.update()                -- expire BC supply spikes on the canonical clock
+    else
+        BCIntegration.updateIncumbent()       -- expire BC supply spikes on mission time
+    end
+
     if self.settingsPanel then
         self.settingsPanel:update(dt)
     end
+end
+
+-- ---------------------------------------------------------------------------
+-- Incumbent path (LOCKED default)
+-- ---------------------------------------------------------------------------
+
+-- Incumbent per-frame dispatch: the pre-MD-15 raw-dt economic tick. Server
+-- only. Runs the engine's intraday/daily timers and the world-event timer,
+-- then flushes any publication requested by stack writers (RWE/SCS/BC) during
+-- this pass. Never touches the calendar cursors or _reconcile.
+function MarketDynamics:_updateIncumbent(dt)
+    if g_server == nil then return end
+    self.marketEngine:update(dt)     -- intraday and daily price ticks
+    self.worldEvents:update(dt)      -- event expiry and probability rolls
+    self:_flushPublications()
+end
+
+-- ---------------------------------------------------------------------------
+-- Calendar path (MD-15 / RSF-F203)
+-- ---------------------------------------------------------------------------
+
+-- Per-frame reconciliation. Server-only. Reads the canonical monotonic clock
+-- and performs, in order:
+--   1. clock-offset reprojection of public event fields (display-only work,
+--      independent of the economic high-water — reference contract G);
+--   2. observation admission: crossed farming hours → one quote step with
+--      n = crossed hours; newly observed farming day → seasonal base refresh +
+--      one endpoint-day history sample (reference contract C);
+--   3. event opportunity phase: one roll per accumulated whole interval,
+--      period-length transition resets the phase (reference contract C);
+--   4. canonical expiry of active events (absolute comparison, jump-safe);
+--   5. flush of pending publications (quote + display).
+-- Idempotent: duplicate or out-of-order observations are inert.
+function MarketDynamics:_reconcile()
+    if g_server == nil then return end
+    if self.economicModel ~= "calendar" then return end
+    if self._loadPhase then return end
+    if g_currentMission == nil or g_currentMission.environment == nil then return end
+
+    local monoNow   = MDMUtil.getMonotonicTime()
+    local legacyNow = MDMUtil.getGameTime()
+    if monoNow <= 0 then return end
+
+    -- 1. Clock-offset reprojection (display-only).
+    local offset = legacyNow - monoNow
+    if offset ~= self._clockOffset then
+        self._clockOffset = offset
+        self.worldEvents:reprojectPublic(monoNow, legacyNow)
+        self.displayDirty = true
+    end
+
+    -- 2. Observation admission (quote steps, base refresh, history).
+    self:_observeCalendar(monoNow)
+
+    -- 3. Event opportunity phase.
+    self:_advanceEventPhase(monoNow)
+
+    -- 4. Canonical expiry.
+    if self.worldEvents:expireDue(monoNow) > 0 then
+        self.displayDirty = true
+    end
+
+    -- 5. Flush pending publications.
+    self:_flushPublications()
+end
+
+-- Observation admission (reference contract C). The first valid observation
+-- only anchors the cursors; a crossed whole farming hour produces exactly one
+-- quote step with n = crossed hours; a newly observed farming day refreshes
+-- seasonal bases and appends one endpoint-day sample. Rewinds and duplicates
+-- are inert; the high-water is never lowered.
+function MarketDynamics:_observeCalendar(monotonicMs)
+    if g_server == nil then return false end
+    if self._loadPhase then return false end
+    if type(monotonicMs) ~= "number" then return false end
+    if monotonicMs ~= monotonicMs or monotonicMs < 0
+        or monotonicMs == math.huge or monotonicMs == -math.huge then
+        return false
+    end
+
+    local HOUR = 3600000
+    local DAY  = 86400000
+    local h   = math.floor(monotonicMs / HOUR)
+    local day = math.floor(monotonicMs / DAY)
+
+    if self.lastObservedMs == nil then
+        self.lastObservedMs, self.processedHour, self.refreshDay, self.lastHistoryDay =
+            monotonicMs, h, day, day
+        return false
+    end
+    if monotonicMs <= self.lastObservedMs then return false end
+    self.lastObservedMs = math.max(self.lastObservedMs, monotonicMs)
+    if h <= self.processedHour then return false end
+
+    local n = h - self.processedHour
+    self.processedHour = h
+    self.marketEngine:applyHourlyMovement(n)
+    self.quoteDirty = true
+
+    if day > self.refreshDay then
+        self.refreshDay = day
+        self.marketEngine:refreshBasePrices(false)
+    end
+    if day > self.lastHistoryDay then
+        self.lastHistoryDay = day
+        self.marketEngine:appendDailyHistory()
+    end
+    return true
+end
+
+-- Event opportunity phase (reference contract C). Phase accumulates
+-- (monoNow - observed) / (300000 * daysPerPeriod); each whole interval grants
+-- one roll at the current endpoint. A period-length transition resets the
+-- phase without granting a roll; a rewind keeps the high-water.
+function MarketDynamics:_advanceEventPhase(monoNow)
+    local env  = g_currentMission and g_currentMission.environment
+    local days = (env and env.daysPerPeriod) or 30
+    if days ~= self.eventPhaseDays then
+        self.eventPhaseObservedMs = math.max(self.eventPhaseObservedMs or monoNow, monoNow)
+        self.eventPhaseDays = days
+        self.eventPhase = 0
+        return
+    end
+    if monoNow <= (self.eventPhaseObservedMs or monoNow) then return end
+    local total = self.eventPhase + (monoNow - self.eventPhaseObservedMs) / (300000 * days)
+    local due = math.floor(total)
+    self.eventPhaseObservedMs = monoNow
+    self.eventPhase = total - due
+    if due > 0 then
+        self.worldEvents:rollOpportunity()
+    end
+end
+
+-- Flush pending publications (reference contract G). Flags are cleared BEFORE
+-- publishing so a request arriving during publication remains pending for the
+-- next flush.
+function MarketDynamics:_flushPublications()
+    if g_server == nil then return end
+    if not (self.quoteDirty or self.displayDirty) then return end
+    self.quoteDirty, self.displayDirty = false, false
+    self:publishMarketState()
+end
+
+-- Publish the current market state to clients (own event, or NetworkSync's
+-- state module when present — sendToClients routes internally).
+function MarketDynamics:publishMarketState()
+    if g_server == nil then return end
+    if MDMMarketSyncEvent ~= nil then
+        -- Calendar path publisher, fired after a day may have been appended:
+        -- history is always included (RSF-F204).
+        MDMMarketSyncEvent.sendToClients(true)
+    end
+end
+
+-- Request a final-quote publication. Called by MarketEngine on every successful
+-- server stack mutation (addModifier / removeModifierById). Pure clients cannot
+-- create outgoing quote work.
+function MarketDynamics:requestQuotePublication()
+    if g_server == nil then return end
+    self.quoteDirty = true
+end
+
+-- Latch the calendar source (RSF-F203 "when present" rule): when FS25_TimeGuard
+-- is present its calendar ticks drive the economic clock; otherwise the native
+-- environment messages do. The observation admission makes duplicate or
+-- out-of-order ticks inert either way, and the per-frame _reconcile remains the
+-- safety net. Falls back to per-frame polling when neither is available.
+-- Only the server's selected calendar session subscribes (no ticks on the
+-- incumbent, none on a pure client).
+function MarketDynamics:_latchCalendarSource()
+    if self._calendarLatched then return end
+    if g_server == nil or self.economicModel ~= "calendar" then return end
+    self._calendarLatched = true
+
+    -- [MAINTENANCE row 249] TimeGuard's handle from the mission (TimeGuard main.lua:48), as RSF-F203 :50
+    -- asks ("bind to the actual mission handle ... retain the actual provider instance"): TimeGuard
+    -- writes g_timeGuard into its own mod environment (getfenv(0), :38), so a bare read here is nil
+    -- in a game and the calendar always fell back to the native messages. The instance is kept so
+    -- delete detaches from the provider it attached to. The bare global stays as the fallback.
+    local tg = (g_currentMission ~= nil and g_currentMission.timeGuard) or g_timeGuard
+    if tg ~= nil and type(tg.subscribeTick) == "function" then
+        self.calendarSource = "timeguard"
+        self._calendarTimeGuard = tg
+        tg:subscribeTick("hour", "MDM-calendar", function(ctx) self:_onCalendarTick("hour", ctx) end)
+        tg:subscribeTick("day",  "MDM-calendar", function(ctx) self:_onCalendarTick("day", ctx) end)
+        MDMLog.info("MarketDynamics: calendar source latched to FS25_TimeGuard ticks")
+        return
+    end
+
+    if g_messageCenter ~= nil and MessageType ~= nil then
+        self.calendarSource = "native"
+        g_messageCenter:subscribe(MessageType.HOUR_CHANGED, self._onNativeHourChanged, self)
+        g_messageCenter:subscribe(MessageType.DAY_CHANGED,  self._onNativeDayChanged,  self)
+        MDMLog.info("MarketDynamics: calendar source latched to native environment messages")
+        return
+    end
+
+    self.calendarSource = "poll"
+    MDMLog.info("MarketDynamics: calendar source latched to per-frame polling")
+end
+
+-- TimeGuard tick callback. Reconciles at the tick boundary; the admission model
+-- makes this idempotent with the per-frame reconcile. Inert unless this
+-- session selected the calendar model (the incumbent never subscribes, and a
+-- stray tick must not enter the calendar path).
+function MarketDynamics:_onCalendarTick(event, ctx)
+    if g_server == nil or self._loadPhase or self.economicModel ~= "calendar" then return end
+    self:_reconcile()
+end
+
+-- Native message-center callbacks (same idempotent reconcile, same guard).
+function MarketDynamics:_onNativeHourChanged()
+    if g_server == nil or self._loadPhase or self.economicModel ~= "calendar" then return end
+    self:_reconcile()
+end
+
+function MarketDynamics:_onNativeDayChanged()
+    if g_server == nil or self._loadPhase or self.economicModel ~= "calendar" then return end
+    self:_reconcile()
 end
 
 -- Per-frame draw. Delegates to g_MDMHud if the market screen registers one.
@@ -280,6 +608,18 @@ end
 
 function MarketDynamics:delete()
     self.isActive = false
+    self._marketStateReady = false
+    -- Unsubscribe the latched calendar source: the TimeGuard instance it attached to (row 249,
+    -- RSF-F203 :50 "detach at delete"), not a re-read of the global.
+    local tg = self._calendarTimeGuard
+    if self.calendarSource == "timeguard" and tg ~= nil
+        and type(tg.unsubscribeTick) == "function" then
+        tg:unsubscribeTick("hour", "MDM-calendar")
+        tg:unsubscribeTick("day",  "MDM-calendar")
+    elseif self.calendarSource == "native" and g_messageCenter ~= nil then
+        g_messageCenter:unsubscribe(MessageType.HOUR_CHANGED, self._onNativeHourChanged, self)
+        g_messageCenter:unsubscribe(MessageType.DAY_CHANGED,  self._onNativeDayChanged,  self)
+    end
     self.rweIntegration:cleanup()
     MDMAdminCommands_remove()
     MDMDialogLoader.cleanup()
@@ -308,6 +648,27 @@ end
 function MarketDynamics:unregisterPriceModifier(name)
     self.priceModifiers[name] = nil
     MDMLog.info("MarketDynamics: unregistered price modifier '" .. tostring(name) .. "'")
+end
+
+---Recompose every current quote through the registered consumer modifiers and the
+---clamp, now, and request their publication (EC-6, brief v1.7 section 3.2; offered at
+---rweConsumerContractVersion 1). The one way another mod can ask MarketDynamics to
+---recompose its current quotes: a consumer whose term just ended or narrowed calls it
+---so a cached quote cannot keep that term until the next market update.
+---
+---Composition and publication stay MarketDynamics-owned. It changes no base price,
+---volatility, stack modifier, history or save state: composeAll re-runs _recalculate,
+---which only rewrites each entry's current quote. A true return means the recompose
+---ran and publication was requested; the quotes reach clients on the next publication
+---flush of MarketDynamics' own update pass, which waits out the first second of mission
+---time and any saved-time catch-up.
+---@return boolean composed  false on a client, or while saved market state is still loading
+function MarketDynamics:refreshConsumerPrices()
+    if g_server == nil then return false end
+    if self._loadPhase then return false end
+    self.marketEngine:composeAll()
+    self:requestQuotePublication()
+    return true
 end
 
 -- ---------------------------------------------------------------------------
