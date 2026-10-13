@@ -63,3 +63,9 @@
 
 - [x] `src/MarketDynamics.lua`: the latch reads the mission's Time Guard first and keeps it; delete unsubscribes from it. Bar `MAINT-249-timeguard_handle_spec_test.lua`, battery `tools/test/mutate_maint249.py`, 2 of 2.
 - [~] In game (owed): TESTING row 510.
+
+## 2026-10-13 (Fred (via Desk)): money in the player's currency (#170)
+
+- [x] `MDMHUD.money` (formatMoney); the contract messages, the HUD contract line and both contract dialogs use it; the five money texts in all 26 locale files without "$". Bars: `MD-170-currency_symbol_spec_test.lua`, `currency-symbol-check.mjs`; battery `mutate_md170_currency.py`, 6 of 6.
+- [ ] The market screen's price table (`MdPriceFormat.money`) and graph labels: follow a currency mod's conversion once its hook is known (Additional Currencies).
+- [~] In game (owed): TESTING row 554.

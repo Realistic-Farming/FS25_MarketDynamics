@@ -171,8 +171,9 @@ function MDMContractAdminDialog:_populate()
     if self.admCropValue     then self.admCropValue:setText(c.fillTypeName or "?") end
     if self.admQtyValue      then self.admQtyValue:setText(self:_fmt(c.quantity) .. " L") end
     if self.admPriceValue    then
-        local fmt = g_i18n:getText("mdm_locked_price_fmt") or "$%.0f / 1,000L"
-        self.admPriceValue:setText(string.format(fmt, (c.lockedPrice or 0) * 1000))
+        -- [#170] Money through the game's money formatter (MDMHUD.money), never a fixed "$".
+        local fmt = g_i18n:getText("mdm_locked_price_fmt") or "Locked price: %s / 1,000L"
+        self.admPriceValue:setText(string.format(fmt, MDMHUD.money((c.lockedPrice or 0) * 1000)))
     end
 
     local delivPct = 0
@@ -225,13 +226,13 @@ function MDMContractAdminDialog:_populate()
     -- Right column summary
     local totalValue = math.floor((c.lockedPrice or 0) * (c.quantity or 0))
     if self.admSumTotal then
-        local lbl = g_i18n:getText("mdm_total_value") or "Total value:  $"
-        self.admSumTotal:setText(lbl .. self:_fmt(totalValue))
+        local lbl = g_i18n:getText("mdm_total_value") or "Total value:  "
+        self.admSumTotal:setText(lbl .. MDMHUD.money(totalValue))
     end
     if self.admSumProgress then
         local delivValue = math.floor((c.lockedPrice or 0) * (c.delivered or 0))
-        local fmt = g_i18n:getText("mdm_delivered_value") or "Delivered value:  $%s  (%d%%)"
-        self.admSumProgress:setText(string.format(fmt, self:_fmt(delivValue), delivPct))
+        local fmt = g_i18n:getText("mdm_delivered_value") or "Delivered value:  %s  (%d%%)"
+        self.admSumProgress:setText(string.format(fmt, MDMHUD.money(delivValue), delivPct))
     end
 
     -- Show/hide action buttons based on contract status and user role.

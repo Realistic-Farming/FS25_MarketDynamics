@@ -61,3 +61,8 @@
 
 - [x] `_latchCalendarSource` read Time Guard through the bare global `g_timeGuard`, which Time Guard sets only in its own mod environment, so an experimental calendar session always latched to the native hour and day messages. It now reads `g_currentMission.timeGuard` first and keeps the instance, and `delete` detaches from that instance rather than re-reading the global. Design origin RSF-F203 v1.0 :38 and :50, CARRIES (Bob's R-15).
 - The in-game check is TESTING row 510.
+
+## 2026-10-13 (Fred (via Desk)): money written in the player's currency, never a fixed "$" (#170)
+
+- [x] The futures contract messages, the HUD's contract line and the two contract dialogs wrote money with a fixed "$": a euro player read "+$1,234 €" in a contract message, and a player on a currency mod read its symbol beside an amount it never converted (Mocskos1230, Additional Currencies, HUF). They now write it through the game's own money formatter (`MDMHUD.money`, `g_i18n:formatMoney`), so it carries the player's currency, and a currency mod that converts amounts there converts these too. The five money texts in all 26 language files lost their "$" and take the formatted amount (`%s`). Bar `MD-170-currency_symbol_spec_test.lua` from the real `recordDelivery`, `checkExpiry` and the dialogs' own functions, and `tools/test/currency-symbol-check.mjs` over every locale file; battery `mutate_md170_currency.py`, 6 of 6. Design origin none.
+- Not here: the market screen's own price table (`MdPriceFormat`) still writes the currency symbol beside its own number, so a currency mod that converts inside formatMoney shows its symbol there with the base amount; that waits on reading the currency mod. The in-game check is TESTING row 554.
