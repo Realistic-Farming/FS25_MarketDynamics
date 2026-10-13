@@ -225,7 +225,9 @@ do
   T.eq("T5 incumbent: BC expiry runs on mission time", bcIncumbent, 1)
   T.eq("T6 incumbent: BC canonical expiry does not run", bcCanonical, 0)
   inc:update(86400000)
-  T.eq("T7 incumbent: a full raw day fires the daily shift", inc.marketEngine._dailyCalls, 1)
+  T.eq("T7 incumbent: a full raw day of dt no longer fires the daily shift (row 303)", inc.marketEngine._dailyCalls, 0)
+  inc:_onIncumbentDayChanged()
+  T.eq("T7b incumbent: the game's day change fires the daily shift once", inc.marketEngine._dailyCalls, 1)
   T.eq("T8 incumbent: still no calendar cursor after ticking", inc.lastObservedMs, nil)
   -- Calendar tick callbacks are inert on the incumbent.
   inc:_onNativeHourChanged(); inc:_onNativeDayChanged(); inc:_onCalendarTick("hour", {})
@@ -285,18 +287,18 @@ do
   end
   local e1 = MarketEngine.new(); e1.prices[2] = { base = 100, current = 100, volatilityFactor = 1, modifiers = {}, history = {} }
   local r1 = MDMExternalIntegration.new(e1); r1.cropStressManager = stressed()
-  r1:update(86400000 - 1, "incumbent")
-  T.eq("R1 incumbent: crop stress is not evaluated before one raw day accumulates", r1.lastCsModifierFactor, nil)
-  r1:update(1, "incumbent")
-  T.eq("R2 incumbent: one accumulated raw day evaluates crop stress", r1.lastCsModifierFactor, 1.12)
-  T.eq("R3 incumbent: the accumulator resets after the check", r1.csDailyTimer, 0)
+  r1:update(86400000, "incumbent")
+  T.eq("R1 incumbent: a full raw day of dt no longer evaluates crop stress (row 303)", r1.lastCsModifierFactor, nil)
+  r1:onIncumbentDay()
+  T.eq("R2 incumbent: the game's day change evaluates crop stress", r1.lastCsModifierFactor, 1.12)
+  T.eq("R3 incumbent: no raw-dt accumulator remains", r1.csDailyTimer, nil)
   T.eq("R4 incumbent: the monotonic day cursor is untouched", r1.lastCsCheckMonotonicDay, nil)
 
   local e2 = MarketEngine.new(); e2.prices[2] = { base = 100, current = 100, volatilityFactor = 1, modifiers = {}, history = {} }
   local r2 = MDMExternalIntegration.new(e2); r2.cropStressManager = stressed()
   r2:update(86400000, "calendar")
   T.eq("R5 calendar: first observed monotonic day evaluates once", r2.lastCsModifierFactor, 1.12)
-  T.eq("R6 calendar: the raw-dt accumulator is not used", r2.csDailyTimer, 0)
+  T.eq("R6 calendar: no raw-dt accumulator exists", r2.csDailyTimer, nil)
   r2.lastCsModifierFactor = nil
   r2:update(86400000, "calendar")
   T.eq("R7 calendar: the same monotonic day does not re-evaluate", r2.lastCsModifierFactor, nil)
@@ -404,7 +406,8 @@ do
   T.eq("Z27 no live canonical firing time is retained", next1.worldEvents.registry.drought.lastFiredMonotonicMs, nil)
   T.eq("Z28 no calendar cursor is retained", next1.lastObservedMs, nil)
   T.eq("Z29 restored price row drops the history-day cursor", next1.marketEngine.prices[2].lastHistoryDay, nil)
-  T.eq("Z30 incumbent timers start from zero", next1.marketEngine.intradayTimer + next1.marketEngine.dailyTimer + next1.worldEvents.timer, 0)
+  T.eq("Z30 incumbent timers start from zero", next1.marketEngine.intradayTimer + next1.worldEvents.timer, 0)
+  T.eq("Z30b no raw-dt daily timer exists (row 303)", next1.marketEngine.dailyTimer, nil)
   T.eq("Z31 the selection itself fires no event", (function() local n = 0; for _ in pairs(next1.worldEvents.active) do n = n + 1 end; return n end)(), 1)
   MarketSerializer:save(next1)
   T.eq("Z32 the incumbent's next save is legacy v2 again", xmlStore[SAVE_PATH]["marketDynamics#version"], "2")

@@ -236,35 +236,34 @@ do
 
     -- Intraday only.
     e.intradayTimer = 60 * 1000
-    e.dailyTimer = 0
     e:update(0)
     T.eq("E1 intraday-only tick sends exactly one event", #sent, 1)
     T.eq("E2 intraday-only send includes history", sent[1].historyIncluded, true)
     T.eq("E3 intraday-only tick appends no daily sample", #entry.history, 0)
 
-    -- Daily only.
+    -- Daily only: the game's day change (MAINTENANCE row 303; raw dt no longer
+    -- fires the daily shift).
     sent = {}
     e.intradayTimer = 0
-    e.dailyTimer = 24 * 60 * 60 * 1000
-    e:update(0)
+    e:onDayChanged()
     T.eq("E4 daily-only tick sends exactly one event", #sent, 1)
     T.eq("E5 daily-only send includes history", sent[1].historyIncluded, true)
     T.eq("E6 daily-only tick appended one sample on the server", #entry.history, 1)
     T.eq("E7 daily-only send carries that sample", #sent[1].prices[1].history, 1)
 
-    -- Coincident.
+    -- An intraday tick and a day change in the same frame are two sends now:
+    -- they come from two clocks (row 303).
     sent = {}
     e.intradayTimer = 60 * 1000
-    e.dailyTimer = 24 * 60 * 60 * 1000
     e:update(0)
-    T.eq("E8 coincident tick coalesces into one send", #sent, 1)
-    T.eq("E9 coincident send includes history", sent[1].historyIncluded, true)
-    T.eq("E10 coincident send carries two samples", #sent[1].prices[1].history, 2)
+    e:onDayChanged()
+    T.eq("E8 intraday tick and day change send one event each", #sent, 2)
+    T.eq("E9 both sends include history", sent[1].historyIncluded == true and sent[2].historyIncluded == true, true)
+    T.eq("E10 the day change's send carries two samples", #sent[2].prices[1].history, 2)
 
     -- No change: no send.
     sent = {}
     e.intradayTimer = 0
-    e.dailyTimer = 0
     e:update(0)
     T.eq("E11 an idle tick sends nothing", #sent, 0)
 

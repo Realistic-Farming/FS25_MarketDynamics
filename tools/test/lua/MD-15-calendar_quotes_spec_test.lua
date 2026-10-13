@@ -31,8 +31,10 @@ end
 
 -- Group A: source witness. MarketEngine:update(dt) is the incumbent raw-dt
 -- path (LOCKED default); it is server guarded and, when an incumbent session
--- calls it, fires one intraday tick per raw minute and one daily shift per
--- raw day. The calendar model never calls it; its methods are witnessed below.
+-- calls it, fires one intraday tick per raw minute. Since MAINTENANCE row 303
+-- the daily shift is MarketEngine:onDayChanged, called on the game's day change,
+-- never by raw dt. The calendar model never calls either; its methods are
+-- witnessed below.
 do
   local e = freshEngine()
   g_server = nil
@@ -45,8 +47,10 @@ do
   T.eq("A4 incumbent: one raw minute fires one intraday tick", e._intradayCalls, 1)
   T.eq("A5 incumbent: the intraday timer resets after the tick", e.intradayTimer, 0)
   e:update(86400000)
-  T.eq("A6 incumbent: a full raw day fires the daily shift", e._dailyCalls, 1)
-  T.eq("A7 incumbent: a fired tick publishes through the sync event", MDMMarketSyncEvent.sends, 2)
+  T.eq("A6 incumbent: a full raw day of dt is one intraday tick, never the daily shift (row 303)", e._dailyCalls, 0)
+  e:onDayChanged()
+  T.eq("A6b incumbent: the game's day change fires the daily shift once", e._dailyCalls, 1)
+  T.eq("A7 incumbent: each fired tick publishes through the sync event", MDMMarketSyncEvent.sends, 3)
   MDMMarketSyncEvent.sends = 0
 
   -- Calendar admission drives: one crossed hour = one quote step.

@@ -28,9 +28,12 @@
 MarketEngine = MarketEngine or {}
 MarketEngine.__index = MarketEngine
 
--- Update intervals (ms of in-game time)
-local INTRADAY_INTERVAL_MS = 60 * 1000       -- every in-game minute
-local DAILY_INTERVAL_MS    = 24 * 60 * 60 * 1000  -- every in-game day (86,400,000 ms)
+-- Intraday interval in REAL milliseconds: the mission's dt is real time (BaseMission:update
+-- passes it on unscaled; only Environment:update multiplies it by the time scale,
+-- environment/Environment.lua:279), so this tick runs once per real minute at any time
+-- scale. Kept on real time by Tyson's ruling of 2026-10-13 (MAINTENANCE row 303). The daily
+-- shift follows the game's own day change instead (MarketEngine:onDayChanged).
+local INTRADAY_INTERVAL_MS = 60 * 1000       -- every real minute
 
 -- Volatility parameters
 local INTRADAY_MAGNITUDE   = 0.020  -- ±2.0% per intraday tick
@@ -49,7 +52,6 @@ function MarketEngine.new()
     -- { [fillTypeIndex] = { base, volatilityFactor, modifiers, current, history } }
     self.prices        = {}
     self.intradayTimer = 0
-    self.dailyTimer    = 0
 
     -- Scales both intraday and daily drift magnitudes.
     -- 0.5 = Low, 1.0 = Normal (default), 1.5 = High, 2.0 = Extreme.
@@ -104,36 +106,40 @@ function MarketEngine:refreshBasePrices(isInitial)
     end
 end
 
--- Incumbent economic path: raw-dt intraday/daily timers. The coordinator calls
--- this only when the session latched the incumbent model (the LOCKED default,
--- MD-15 brief section 2 / RSF-F203 "Paired activation"). The calendar model
--- never calls it: its work is admitted from the canonical monotonic clock via
--- applyHourlyMovement / appendDailyHistory / refreshBasePrices. One selected
--- path per session; retiring these timers is the later stable-cutover work.
--- dt is in-game milliseconds (from FSBaseMission.update).
+-- Incumbent economic path, intraday: a raw-dt timer. The coordinator calls this
+-- only when the session latched the incumbent model (the default while the
+-- calendar model is LOCKED, MD-15 brief section 2 / RSF-F203 "Paired
+-- activation"). The calendar model never calls it: its work is admitted from the
+-- canonical monotonic clock via applyHourlyMovement / appendDailyHistory /
+-- refreshBasePrices. One selected path per session; retiring these timers is the
+-- later stable-cutover work. dt is REAL milliseconds (from FSBaseMission.update).
 function MarketEngine:update(dt)
     if g_server == nil then return end
 
     self.intradayTimer = self.intradayTimer + dt
-    self.dailyTimer    = self.dailyTimer    + dt
-    local changed = false
 
     if self.intradayTimer >= INTRADAY_INTERVAL_MS then
         self.intradayTimer = 0
         self:_applyIntradayVolatility()
-        changed = true
+        if MDMMarketSyncEvent then
+            -- History is included as before (RSF-F204), so a client's view of the
+            -- market is replaced whole on every tick.
+            MDMMarketSyncEvent.sendToClients(true)
+        end
     end
+end
 
-    if self.dailyTimer >= DAILY_INTERVAL_MS then
-        self.dailyTimer = 0
-        self:_applyDailyShift()
-        self:refreshBasePrices(false) -- Sync with seasonal changes daily
-        changed = true
-    end
-
-    if changed and MDMMarketSyncEvent then
-        -- Coalesced intraday+daily send: it can carry a new daily sample, so
-        -- history is always included (RSF-F204).
+-- Incumbent economic path, daily: one shift per in-game day. Called by
+-- MarketDynamics:_onIncumbentDayChanged from the engine's DAY_CHANGED message
+-- (environment/Environment.lua:408). MAINTENANCE row 303: this used to be a raw-dt
+-- timer of 86,400,000 ms, which is 24 REAL hours, never saved, so the daily shift,
+-- the seasonal base refresh and the history sample effectively never ran.
+function MarketEngine:onDayChanged()
+    if g_server == nil then return end
+    self:_applyDailyShift()
+    self:refreshBasePrices(false) -- Sync with seasonal changes daily
+    if MDMMarketSyncEvent then
+        -- A new daily sample: history included (RSF-F204).
         MDMMarketSyncEvent.sendToClients(true)
     end
 end
