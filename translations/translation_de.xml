@@ -112,19 +112,19 @@
 		<text name="mdm_edit_fills" text="[EN] Edit Fills"/>
 		<text name="mdm_header_tracked_fills" text="[EN] TRACKED FILL TYPES"/>
 		<text name="mdm_days_remaining" text="[EN] %d day(s) remaining"/>
-		<text name="mdm_total_value" text="[EN] Total value:  $"/>
-		<text name="mdm_delivered_value" text="[EN] Delivered value:  $%s  (%d%%)"/>
+		<text name="mdm_total_value" text="[EN] Total value:  "/>
+		<text name="mdm_delivered_value" text="[EN] Delivered value:  %s  (%d%%)"/>
 		<text name="mdm_adm_hint_complete" text="[EN] Complete: force full payout now at locked price."/>
 		<text name="mdm_adm_hint_cancel" text="[EN] Cancel: remove contract — no payout, no penalty."/>
 		<text name="mdm_adm_btn_cancel" text="[EN] Cancel (No Penalty)"/>
 		<text name="mdm_adm_btn_forfeit" text="[EN] Forfeit (Penalty)"/>
 		<text name="mdm_adm_hint_forfeit" text="[EN] Forfeit: terminate contract immediately. A penalty will be applied to the undelivered portion."/>
-		<text name="mdm_current_price_fmt" text="[EN] Current price:  $%.0f / 1,000L"/>
+		<text name="mdm_current_price_fmt" text="[EN] Current price:  %s / 1,000L"/>
 		<text name="mdm_change_from_base_fmt" text="[EN] Change from base:  %s%.1f%%"/>
 		<text name="mdm_summary_crop" text="[EN] Crop:          "/>
 		<text name="mdm_summary_qty" text="[EN] Quantity:      "/>
-		<text name="mdm_locked_price_fmt" text="[EN] Locked price: $%.0f / 1,000L"/>
-		<text name="mdm_summary_total" text="[EN] Total:  $"/>
+		<text name="mdm_locked_price_fmt" text="[EN] Locked price: %s / 1,000L"/>
+		<text name="mdm_summary_total" text="[EN] Total:  "/>
 		<text name="mdm_deliver_in" text="[EN] Deliver in:    "/>
 		<text name="mdm_default_penalty_hint" text="[EN] Default penalty: 15% on unfulfilled qty"/>
 		<text name="mdm_signal_above" text="[EN] [+] %.1f%% above base - good time to lock in"/>

@@ -319,8 +319,9 @@ function MDMContractDialog:_updateSummary()
         self.cropNameEl:setText(crop.title)
     end
     if self.cropPriceEl then
-        local fmt = g_i18n:getText("mdm_current_price_fmt") or "Current price:  $%.0f / 1,000L"
-        self.cropPriceEl:setText(string.format(fmt, crop.current * 1000))
+        -- [#170] The price through the game's money formatter (MDMHUD.money), never a fixed "$".
+        local fmt = g_i18n:getText("mdm_current_price_fmt") or "Current price:  %s / 1,000L"
+        self.cropPriceEl:setText(string.format(fmt, MDMHUD.money(crop.current * 1000)))
     end
     if self.cropChangeEl and crop.base and crop.base > 0 then
         local pct  = ((crop.current - crop.base) / crop.base) * 100
@@ -343,10 +344,10 @@ function MDMContractDialog:_updateSummary()
     if self.sumCrop    then self.sumCrop:setText((g_i18n:getText("mdm_summary_crop") or "Crop:         ") .. crop.title) end
     if self.sumQty     then self.sumQty:setText((g_i18n:getText("mdm_summary_qty") or "Quantity:     ") .. self:_fmtNum(self.selectedQty) .. " L") end
     if self.sumLocked  then 
-        local fmt = g_i18n:getText("mdm_locked_price_fmt") or "Locked price: $%.0f / 1,000L"
-        self.sumLocked:setText(string.format(fmt, lockedPrice * 1000)) 
+        local fmt = g_i18n:getText("mdm_locked_price_fmt") or "Locked price: %s / 1,000L"
+        self.sumLocked:setText(string.format(fmt, MDMHUD.money(lockedPrice * 1000)))
     end
-    if self.sumTotal   then self.sumTotal:setText((g_i18n:getText("mdm_summary_total") or "Total:  $") .. self:_fmtNum(totalValue)) end
+    if self.sumTotal   then self.sumTotal:setText((g_i18n:getText("mdm_summary_total") or "Total:  ") .. MDMHUD.money(totalValue)) end
     if self.sumDeadline then
         local isRealDays = g_MarketDynamics and g_MarketDynamics.settings and g_MarketDynamics.settings.useRealDays
         local unit = isRealDays and (g_i18n:getText("mdm_unit_real_days") or "real days") or (g_i18n:getText("mdm_unit_game_days") or "game days")

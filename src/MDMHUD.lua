@@ -35,6 +35,18 @@ MDMHUD.C_WARN       = {1.00, 0.35, 0.35, 1.00}   -- red for urgent deadlines
 --- The fill type of a contract, or nil for an unresolved one (D7: a saved
 --- product that is not registered in this session keeps its name and no
 --- index; the title still shows the saved name).
+--- [#170] A money amount as the game writes one, through g_i18n:formatMoney: the player's own
+--- currency symbol (and a currency mod that converts amounts there converts this too), never a
+--- fixed "$". Whole units, the symbol after the number as the rest of the mod writes it.
+function MDMHUD.money(value)
+    local n = tonumber(value) or 0
+    if g_i18n ~= nil and type(g_i18n.formatMoney) == "function" then
+        local ok, s = pcall(g_i18n.formatMoney, g_i18n, n, 0, true, false)
+        if ok and type(s) == "string" then return s end
+    end
+    return string.format("%.0f", n)
+end
+
 function MDMHUD.contractFillType(contract)
     if contract == nil or contract.fillTypeIndex == nil or g_fillTypeManager == nil then return nil end
     return g_fillTypeManager:getFillTypeByIndex(contract.fillTypeIndex)
@@ -221,7 +233,8 @@ function MDMHUD:drawPanel(contract)
     
     setTextAlignment(RenderText.ALIGN_RIGHT)
     setTextColor(MDMHUD.C_VALUE[1], MDMHUD.C_VALUE[2], MDMHUD.C_VALUE[3], 1.0)
-    local qtyStr = string.format("%.0f L @ $%.0f", contract.quantity, contract.lockedPrice * 1000)
+    -- [#170] The price through the game's money formatter: the player's currency, never a fixed "$".
+    local qtyStr = string.format("%.0f L @ %s", contract.quantity, MDMHUD.money(contract.lockedPrice * 1000))
     renderText(px + pw - pad, cy - 0.008 * s, 0.009 * s, qtyStr)
 
     cy = cy - MDMHUD.LINE_H * s

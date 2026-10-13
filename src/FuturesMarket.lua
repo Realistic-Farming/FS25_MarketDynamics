@@ -247,10 +247,10 @@ function FuturesMarket:_fulfillContract(id)
         local amtStr = g_i18n:formatMoney(math.floor(math.abs(settlement) + 0.5), 0, true, false)
         local msg
         if settlement >= 0 then
-            msg = string.format("Contract fulfilled: %s — settled at locked price (+$%s)",
+            msg = string.format("Contract fulfilled: %s - settled at locked price (+%s)",
                 contract.fillTypeName, amtStr)
         else
-            msg = string.format("Contract fulfilled: %s — settled at locked price (-$%s, market was higher)",
+            msg = string.format("Contract fulfilled: %s - settled at locked price (-%s, market was higher)",
                 contract.fillTypeName, amtStr)
         end
         g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_OK, msg)
@@ -326,10 +326,10 @@ function FuturesMarket:_defaultContract(id)
         local amtStr = g_i18n:formatMoney(math.floor(math.abs(net) + 0.5), 0, true, false)
         local msg
         if net >= 0 then
-            msg = string.format("Contract defaulted: %s — %dL/%dL delivered, settled +$%s after penalty",
+            msg = string.format("Contract defaulted: %s - %dL/%dL delivered, settled +%s after penalty",
                 contract.fillTypeName, delivered, contract.quantity, amtStr)
         else
-            msg = string.format("Contract defaulted: %s — %dL/%dL delivered, charged $%s after penalty",
+            msg = string.format("Contract defaulted: %s - %dL/%dL delivered, charged %s after penalty",
                 contract.fillTypeName, delivered, contract.quantity, amtStr)
         end
         g_currentMission:addIngameNotification(FSBaseMission.INGAME_NOTIFICATION_CRITICAL, msg)

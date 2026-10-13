@@ -119,19 +119,19 @@
         <text name="mdm_edit_fills" text="Modifier les remplissages"/>
         <text name="mdm_header_tracked_fills" text="TYPES DE REMPLISSAGE SUIVIS"/>
         <text name="mdm_days_remaining" text="%d jour(s) restant(s)"/>
-        <text name="mdm_total_value" text="Valeur totale : $"/>
-        <text name="mdm_delivered_value" text="Valeur livrée : $%s (%d%%)"/>
+        <text name="mdm_total_value" text="Valeur totale : "/>
+        <text name="mdm_delivered_value" text="Valeur livrée : %s (%d%%)"/>
         <text name="mdm_adm_hint_complete" text="Terminer : forcer immédiatement le paiement complet au prix verrouillé."/>
         <text name="mdm_adm_hint_cancel" text="Annuler : supprimer le contrat — aucun paiement, aucune pénalité."/>
         <text name="mdm_adm_btn_cancel" text="Annuler (sans pénalité)"/>
         <text name="mdm_adm_btn_forfeit" text="Confisquer (avec pénalité)"/>
         <text name="mdm_adm_hint_forfeit" text="Confisquer : résilier le contrat immédiatement. Une pénalité sera appliquée à la partie non livrée."/>
-        <text name="mdm_current_price_fmt" text="Prix actuel : $%.0f / 1 000L"/>
+        <text name="mdm_current_price_fmt" text="Prix actuel : %s / 1 000L"/>
         <text name="mdm_change_from_base_fmt" text="Variation par rapport à la base : %s%.1f%%"/>
         <text name="mdm_summary_crop" text="Culture : "/>
         <text name="mdm_summary_qty" text="Quantité : "/>
-        <text name="mdm_locked_price_fmt" text="Prix verrouillé : $%.0f / 1 000L"/>
-        <text name="mdm_summary_total" text="Total : $"/>
+        <text name="mdm_locked_price_fmt" text="Prix verrouillé : %s / 1 000L"/>
+        <text name="mdm_summary_total" text="Total : "/>
         <text name="mdm_deliver_in" text="Livrer dans : "/>
         <text name="mdm_default_penalty_hint" text="Pénalité par défaut : 15% sur la quantité non livrée"/>
         <text name="mdm_signal_above" text="[+] %.1f%% au-dessus du prix de base - bon moment pour verrouiller"/>
