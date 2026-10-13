@@ -864,7 +864,6 @@ function MarketSerializer:projectIncumbentRestore(coordinator)
             end
         end
         engine.intradayTimer = 0
-        engine.dailyTimer    = 0
     end
 
     coordinator.lastObservedMs = nil

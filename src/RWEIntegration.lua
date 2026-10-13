@@ -15,7 +15,6 @@ MDMExternalIntegration = MDMExternalIntegration or {}
 MDMExternalIntegration.__index = MDMExternalIntegration
 
 local CS_MODIFIER_ID         = "cs_stress_pressure"
-local CS_DAILY_INTERVAL_MS   = 24 * 60 * 60 * 1000  -- check once per in-game day
 local CS_CRITICAL_THRESHOLD  = 0.70                  -- field stress above this is "critical"
 local CS_MILD_FRACTION       = 0.25                  -- >25% critical fields → mild price pressure
 local CS_STRONG_FRACTION     = 0.55                  -- >55% critical fields → strong pressure
@@ -25,7 +24,6 @@ function MDMExternalIntegration.new(engine)
     self.engine = engine
     -- CropStress state
     self.cropStressManager = nil
-    self.csDailyTimer = 0                 -- incumbent path: raw-dt day accumulator
     self.lastCsCheckMonotonicDay = nil    -- calendar path: monotonic day cursor
     self.lastCsModifierFactor = nil
     return self
@@ -41,28 +39,24 @@ function MDMExternalIntegration:detect()
 end
 
 -- Called every frame from MarketDynamics:update(dt). economicModel is the
--- session's latched model ("incumbent" | "calendar"); nil (pure client, or a
--- missing latch) takes the incumbent clock, matching the LOCKED default.
+-- session's latched model ("incumbent" | "calendar"). Only the calendar path
+-- works per frame; the incumbent checks once per in-game day through
+-- onIncumbentDay, and a pure client (nil) does nothing here.
 function MDMExternalIntegration:update(dt, economicModel)
     if economicModel == "calendar" then
         self:_updateCropStressCalendar()
-    else
-        self:_updateCropStressIncumbent(dt)
     end
 end
 
 -- ── CropStress ───────────────────────────────────────────────────────────────
 
--- Incumbent path: check CropStress supply pressure once per accumulated
--- in-game day of raw dt (pre-MD-15 behaviour, kept while the calendar model
--- is LOCKED).
-function MDMExternalIntegration:_updateCropStressIncumbent(dt)
+-- Incumbent path: check CropStress supply pressure once per in-game day.
+-- Called by MarketDynamics:_onIncumbentDayChanged from the engine's DAY_CHANGED
+-- message. MAINTENANCE row 303: this used to add up the frame's dt to
+-- 86,400,000 ms, but dt is real time and the sum was never saved, so the check
+-- waited for 24 real hours of play and effectively never ran.
+function MDMExternalIntegration:onIncumbentDay()
     if not self.cropStressManager then return end
-
-    self.csDailyTimer = self.csDailyTimer + (dt or 0)
-    if self.csDailyTimer < CS_DAILY_INTERVAL_MS then return end
-    self.csDailyTimer = 0
-
     self:_evaluateCropStress()
 end
 

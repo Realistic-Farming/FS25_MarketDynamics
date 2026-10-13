@@ -69,3 +69,9 @@
 - [x] `MDMHUD.money` (formatMoney); the contract messages, the HUD contract line and both contract dialogs use it; the five money texts in all 26 locale files without "$". Bars: `MD-170-currency_symbol_spec_test.lua`, `currency-symbol-check.mjs`; battery `mutate_md170_currency.py`, 6 of 6.
 - [ ] The market screen's price table (`MdPriceFormat.money`) and graph labels: follow a currency mod's conversion once its hook is known (Additional Currencies).
 - [~] In game (owed): TESTING row 554.
+
+## 2026-10-13 (Fred (via Desk)): the incumbent's daily work on the game's day change (MAINTENANCE row 303)
+
+- [x] `MarketDynamics:_latchIncumbentDay` subscribes DAY_CHANGED for an incumbent server session; `_onIncumbentDayChanged` runs `MarketEngine:onDayChanged` (daily shift, base refresh, a send with history) and `MDMExternalIntegration:onIncumbentDay` (the crop-stress check); delete unsubscribes in the engine's argument order. `dailyTimer`, `DAILY_INTERVAL_MS`, `csDailyTimer` and `CS_DAILY_INTERVAL_MS` are gone.
+- [x] Bar `MAINT-303-incumbent_day_clock_spec_test.lua`, 32 of 32 (development fails 20). Rows rewritten for the new clock: MD-15 calendar quotes A6 and A7, session latch T7, R1 to R3, R6 and Z30, RSF-F204 E4 to E10, EC-6 X3. Battery `tools/test/mutate_maint303.cjs`, 10 of 10.
+- [~] In game (owed): TESTING row 556.

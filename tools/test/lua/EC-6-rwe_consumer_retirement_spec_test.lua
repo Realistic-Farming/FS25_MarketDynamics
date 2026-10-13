@@ -146,14 +146,16 @@ group("X", function()
   T.eq("X1 detection binds no RandomWorldEvents manager", mdm.rweIntegration.rweManager, nil)
   T.ok("X2 [reached] the SeasonalCropStress half of the same bridge was detected", mdm.rweIntegration.cropStressManager ~= nil)
 
-  -- Drive the bridge's real per-frame update through a full raw day, for every name
-  -- the old reader priced. The crop-stress modifier appearing proves the update ran.
+  -- Drive the bridge's real per-frame update, for every name the old reader priced,
+  -- then the incumbent's day check (MAINTENANCE row 303 moved the incumbent's
+  -- crop-stress check from a raw-dt day to the game's day change). The crop-stress
+  -- modifier appearing proves the bridge ran on the same state.
   for _, name in ipairs(OLD_READER_NAMES) do
     rwe.EVENT_STATE.activeEvent = name
     mdm.rweIntegration:update(1000, "incumbent")
   end
-  mdm.rweIntegration:update(86400000, "incumbent")
-  T.eq("X3 [reached] the same update applied the crop-stress modifier", mdm.rweIntegration.lastCsModifierFactor, 1.12)
+  mdm.rweIntegration:onIncumbentDay()
+  T.eq("X3 [reached] the same bridge's day check applied the crop-stress modifier", mdm.rweIntegration.lastCsModifierFactor, 1.12)
   local rweMods = 0
   for _, entry in pairs(mdm.marketEngine.prices) do
     for _, m in ipairs(entry.modifiers) do

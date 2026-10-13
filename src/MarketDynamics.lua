@@ -245,6 +245,8 @@ function MarketDynamics:onStartMission(mission)
             -- calendar cursor so the incumbent timers own subsequent progress
             -- (RSF-F203 :137).
             self.serializer:projectIncumbentRestore(self)
+            -- The incumbent's daily work follows the game's day change.
+            self:_latchIncumbentDay()
         end
         self._marketStateReady = true
         MDMLog.info("MarketDynamics: savegame data loaded")
@@ -264,10 +266,13 @@ function MarketDynamics:onStartMission(mission)
     self._loadPhase = false
 end
 
--- Per-frame tick. dt = in-game milliseconds from FSBaseMission.update.
+-- Per-frame tick. dt = REAL milliseconds from FSBaseMission.update (only
+-- Environment:update scales it by the time scale, environment/Environment.lua:279).
 -- Exactly one economic path runs per session, chosen by the server latch:
---   incumbent  raw-dt MarketEngine/WorldEventSystem timers, RWE crop-stress
---              day accumulator and BC mission-time spike expiry (LOCKED default);
+--   incumbent  raw-dt MarketEngine intraday and WorldEventSystem timers (real
+--              time), the daily shift and the RWE crop-stress check on the
+--              game's DAY_CHANGED (_onIncumbentDayChanged, MAINTENANCE row 303),
+--              and BC mission-time spike expiry (the default while LOCKED);
 --   calendar   MD-15 / RSF-F203 admission from the canonical monotonic clock in
 --              _reconcile (no raw-dt accumulation: a time jump or speed change
 --              yields one current result, never invented history).
@@ -293,9 +298,8 @@ function MarketDynamics:update(dt)
     -- can default prematurely on MP join because the simulation catches up to saved
     -- timestamps before the client has received its full initial state.
     if self._loadPhase then
-        -- Incumbent timers must not accumulate during loading and fire on resume.
+        -- The incumbent timer must not accumulate during loading and fire on resume.
         self.marketEngine.intradayTimer = 0
-        self.marketEngine.dailyTimer = 0
         return
     end
 
@@ -547,6 +551,26 @@ function MarketDynamics:_onNativeHourChanged()
     self:_reconcile()
 end
 
+-- MAINTENANCE row 303: the incumbent's daily shift, seasonal base refresh, history
+-- sample and crop-stress check run once per in-game day, from the engine's
+-- DAY_CHANGED message (environment/Environment.lua:408). They used to add up the
+-- frame's dt, which is real time and was never saved, so they waited for 24 real
+-- hours of play. Server only, incumbent sessions only, once per mission.
+function MarketDynamics:_latchIncumbentDay()
+    if self._incumbentDayLatched then return end
+    if g_server == nil or self.economicModel ~= "incumbent" then return end
+    if g_messageCenter == nil or MessageType == nil or MessageType.DAY_CHANGED == nil then return end
+    g_messageCenter:subscribe(MessageType.DAY_CHANGED, self._onIncumbentDayChanged, self)
+    self._incumbentDayLatched = true
+end
+
+function MarketDynamics:_onIncumbentDayChanged()
+    if g_server == nil or self._loadPhase or not self.isActive then return end
+    if self.economicModel ~= "incumbent" then return end
+    self.marketEngine:onDayChanged()
+    self.rweIntegration:onIncumbentDay()
+end
+
 function MarketDynamics:_onNativeDayChanged()
     if g_server == nil or self._loadPhase or self.economicModel ~= "calendar" then return end
     self:_reconcile()
@@ -619,6 +643,11 @@ function MarketDynamics:delete()
     elseif self.calendarSource == "native" and g_messageCenter ~= nil then
         g_messageCenter:unsubscribe(MessageType.HOUR_CHANGED, self._onNativeHourChanged, self)
         g_messageCenter:unsubscribe(MessageType.DAY_CHANGED,  self._onNativeDayChanged,  self)
+    end
+    -- The engine's order is (messageType, callbackTarget, callback), MessageCenter.lua:53.
+    if self._incumbentDayLatched and g_messageCenter ~= nil then
+        g_messageCenter:unsubscribe(MessageType.DAY_CHANGED, self, self._onIncumbentDayChanged)
+        self._incumbentDayLatched = false
     end
     self.rweIntegration:cleanup()
     MDMAdminCommands_remove()
