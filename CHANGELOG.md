@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.4.0.0] - 2026-10-12
+
+> **This is not a final release.** It gives everyone, testers and players, new or returning, everything we have built so far, so nobody has to wait on an old version any longer. The Realistic Farming suite is far from done: we are still building and expanding every mod, and completing it could take months, possibly a year. Expect changes and rough edges along the way, and please report anything that looks wrong.
+
+> **Update Random World Events at the same time.** This release and Random World Events 2.3.0.0 are a pair: event price changes now go through Market Dynamics. An older Random World Events beside this version is safe but its price events do nothing.
+
+### Changed
+- Market prices move with the in-game calendar: quotes step once per farming hour and history is kept per day, so prices behave the same at any time speed. World events and supply spikes expire on the same clock.
+- With Time Guard installed and Experimental Systems on, the calendar economy follows Time Guard's shared clock.
+- Random World Events' price changes now come through Market Dynamics (see above).
+- The Market Dynamics Esc page: the price graph has more room, event settings and New Contract are on the glance page, and the old "Open full Market" link is gone.
+- Market actions have keyboard defaults (Right Shift) that do not collide with other suite mods.
+
+### Fixed
+- Saved prices and futures contracts are restored by product name, so adding or removing a mod that registers fill types no longer moves a price history or a contract onto the wrong product.
+- Multiplayer: market history reaches joining and seated players.
+- The aggregated median line no longer mixes livestock prices per head with crop prices per litre.
+- The market graph samples once every 20 seconds and reuses its numbers, so it costs less frame time.
+- Translations: the Esc pages fall back to English instead of showing raw keys, the Korean "Field Detail" label is fixed, the page legend shows a plain dot between page names, and the English description reads correctly in the mod manager.
+
 ### Added
 - **RandomWorldEvents prices through one path (EC-6).** MarketDynamics now publishes `rweConsumerContractVersion = 1` and a server-only `refreshConsumerPrices()` that recomposes every current quote through the registered consumer modifiers and the clamp, then publishes them on the normal flush. It changes no base price, volatility, stack modifier, history or save state, and returns false on a client or while saved market state is still loading. Ships in the same release as the paired RandomWorldEvents update; update both mods together.
 - **Calendar-paced quotes (MD-15 / RSF-F203).** Economic work is now admitted from the canonical monotonic clock instead of raw-dt timer accumulation: one quote step per crossed whole farming hour, one seasonal base refresh and one endpoint-day history sample per new farming day, one world-event roll per accumulated opportunity interval, and absolute canonical expiry for events and BC supply spikes. Serializer v3 persists the canonical fields (with v2 migration); the `MDM-CALENDAR/1` wire format carries the server's exact base/current quote as decimal strings so clients keep the received quote instead of a float32-truncated recomposition. TimeGuard ticks drive the calendar when present, with native environment messages and per-frame polling as fallbacks.
