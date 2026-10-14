@@ -71,3 +71,8 @@
 
 - [x] On the default economic model the daily price shift, the seasonal base refresh, the 7-day price history and the Seasonal Crop Stress supply check counted real time: 24 hours of unbroken play, starting from zero at every load, so in practice they never ran. They now run once per in-game day, on the game's own day change. The intraday price tick stays once per real minute (Tyson, 2026-10-13); only its comment, which said in-game minute, is corrected.
 - Not here: the world-event roll also counts real minutes (5, scaled by month length) while its comment says in-game, left as it is with the intraday tick; the calendar model's unsubscribe argument order is MAINTENANCE row 307. The in-game check is TESTING row 556.
+
+## 2026-10-14 (Fred (via Desk)): the build script packs only the mod (MAINTENANCE row 312)
+
+- [x] `build.py` keeps Markdown files (`EVENTS_API.md`) and the Python helpers under `translations/` out of the zip. Every build shipped them to players; nothing in the mod loads them.
+- Build tooling only, no in-game check (TESTING row 574). Found by a fleet sweep that built every mod once from development in a throwaway worktree, on Tyson's word of 2026-10-14.
