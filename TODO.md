@@ -75,3 +75,9 @@
 - [x] `MarketDynamics:_latchIncumbentDay` subscribes DAY_CHANGED for an incumbent server session; `_onIncumbentDayChanged` runs `MarketEngine:onDayChanged` (daily shift, base refresh, a send with history) and `MDMExternalIntegration:onIncumbentDay` (the crop-stress check); delete unsubscribes in the engine's argument order. `dailyTimer`, `DAILY_INTERVAL_MS`, `csDailyTimer` and `CS_DAILY_INTERVAL_MS` are gone.
 - [x] Bar `MAINT-303-incumbent_day_clock_spec_test.lua`, 32 of 32 (development fails 20). Rows rewritten for the new clock: MD-15 calendar quotes A6 and A7, session latch T7, R1 to R3, R6 and Z30, RSF-F204 E4 to E10, EC-6 X3. Battery `tools/test/mutate_maint303.cjs`, 10 of 10.
 - [~] In game (owed): TESTING row 556.
+
+## 2026-10-14 (Fred (via Desk)): build packaging (MAINTENANCE row 312)
+
+- [x] `build.py`: keeps Markdown files (`EVENTS_API.md`) and the Python helpers under `translations/` out of the zip. Every build shipped them to players; nothing in the mod loads them.
+- [x] Built from a worktree before and after this change: development's zip had 101 entries, three of them `EVENTS_API.md` and two `translations/*.py` helpers; this branch's has 98, with exactly those three removed, every other entry byte-identical (CRC), nothing added.
+- Build tooling only, no in-game check (TESTING row 574).

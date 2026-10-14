@@ -43,7 +43,8 @@ EXCLUDE_FILES = {
     "CLAUDE.md", "Thumbs.db", ".DS_Store", ".gitignore", ".gitattributes", "nul",
     "ROADMAP.md", "TODO.md", "VISION.md", "CHANGELOG.md", "README.md",
 }
-EXCLUDE_EXTS = {".zip", ".swp", ".swo"}
+# Docs and helper scripts never load in game (translations/ carries Python helpers).
+EXCLUDE_EXTS = {".zip", ".swp", ".swo", ".md", ".py"}
 
 
 def build_zip(source_dir: Path, output_path: Path) -> int:
