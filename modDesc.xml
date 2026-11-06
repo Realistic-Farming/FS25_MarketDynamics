@@ -21,6 +21,14 @@
         <sourceFile filename="src/FuturesMarket.lua" />
         <sourceFile filename="src/MarketSerializer.lua" />
         <sourceFile filename="src/PriceHook.lua" />
+        <!-- MD-16 material sale value. Md16Values is a vendored data-only codec,
+             so nothing here requires StockGuard to be installed. -->
+        <sourceFile filename="src/md16/Md16Values.lua" />
+        <sourceFile filename="src/md16/Md16Material.lua" />
+        <sourceFile filename="src/md16/Md16SaleComponents.lua" />
+        <sourceFile filename="src/md16/Md16FuturesPlan.lua" />
+        <sourceFile filename="src/md16/Md16Resolvers.lua" />
+        <sourceFile filename="src/md16/MarketDynamicsSalePreviewEvent.lua" />
         <sourceFile filename="src/AdminCommands.lua" />
         <sourceFile filename="src/BCIntegration.lua" />
         <sourceFile filename="src/UPIntegration.lua" />
