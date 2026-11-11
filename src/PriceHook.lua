@@ -72,6 +72,18 @@ if SellingStation and SellingStation.getEffectiveFillTypePrice then
                 return price
             end
 
+            -- [MD-16] Inside a qualified paid sale phase, the native body's one
+            -- price read (SellingStation.lua:356) takes the material rate. It is
+            -- answered once, to this station and this fill type only; every
+            -- other read, the futures read after the sale included, falls
+            -- through to the ordinary market price below.
+            if Md16SalePhase ~= nil then
+                local md16Rate = Md16SalePhase.rateFor(self, fillTypeIndex)
+                if md16Rate ~= nil then
+                    return md16Rate
+                end
+            end
+
             local mdmPrice = g_MarketDynamics.marketEngine:getPrice(fillTypeIndex)
             if mdmPrice and mdmPrice > 0 then
                 return mdmPrice
@@ -91,6 +103,40 @@ end
 -- SellingStation delivery hook (futures contract tracking)
 -- ---------------------------------------------------------------------------
 
+-- Pack a call's results with their count, so a value after a nil survives.
+local function packResults(...)
+    return select("#", ...), { ... }
+end
+
+-- The futures delivery report for one accepted sale call (server only).
+-- In FS25, we use fillDelta (requested) because result (accepted) can be
+-- unreliable in some selling station configurations.
+local function reportDelivery(station, farmId, fillDelta, fillTypeIndex, md16Entry)
+    if g_server == nil or not g_MarketDynamics or not g_MarketDynamics.isActive
+        or not g_MarketDynamics.futuresMarket then
+        return
+    end
+
+    MDMLog.debug(string.format("PriceHook: SellingStation.sellFillType(farmId=%s, delta=%.1f, ft=%s)",
+        tostring(farmId), tostring(fillDelta), tostring(fillTypeIndex)))
+
+    if fillDelta and fillDelta > 0 then
+        -- [MD-16] When this call's native read took the material rate, its
+        -- contract litres were frozen at the baseline before the sale, and the
+        -- tracker is told exactly that (Md16FuturesPlan's optional fifth
+        -- argument). Otherwise the unchanged legacy scan runs on the price read
+        -- after the sale.
+        local allocation = md16Entry ~= nil and Md16SalePhase ~= nil and Md16SalePhase.allocationContext(md16Entry) or nil
+        if allocation ~= nil then
+            g_MarketDynamics.futuresMarket:onCropDelivered(farmId, fillTypeIndex, fillDelta,
+                md16Entry.baselineRate, allocation)
+        else
+            local pricePerLiter = station:getEffectiveFillTypePrice(fillTypeIndex)
+            g_MarketDynamics.futuresMarket:onCropDelivered(farmId, fillTypeIndex, fillDelta, pricePerLiter)
+        end
+    end
+end
+
 if SellingStation and SellingStation.sellFillType then
     SellingStation.sellFillType = Utils.overwrittenFunction(
         SellingStation.sellFillType,
@@ -107,24 +153,34 @@ if SellingStation and SellingStation.sellFillType then
         -- reads a named local here, and the correctly bound original getter, both
         -- need the real five-slot shape.
         function(self, superFunc, farmId, fillDelta, fillTypeIndex, toolType, extraAttributes)
-            local result = superFunc(self, farmId, fillDelta, fillTypeIndex, toolType, extraAttributes)
-
-            if g_server ~= nil
-                and g_MarketDynamics and g_MarketDynamics.isActive
-                and g_MarketDynamics.futuresMarket then
-
-                MDMLog.debug(string.format("PriceHook: SellingStation.sellFillType(farmId=%s, delta=%.1f, ft=%s)",
-                    tostring(farmId), tostring(fillDelta), tostring(fillTypeIndex)))
-
-                -- In FS25, we use fillDelta (requested) because result (accepted) can be 
-                -- unreliable in some selling station configurations.
-                if fillDelta and fillDelta > 0 then
-                    local pricePerLiter = self:getEffectiveFillTypePrice(fillTypeIndex)
-                    g_MarketDynamics.futuresMarket:onCropDelivered(farmId, fillTypeIndex, fillDelta, pricePerLiter)
-                end
+            -- [MD-16] Qualify this paid call BEFORE the native body runs, inside
+            -- the paid phase StockGuard's station bracket has just opened around
+            -- it (Md16SalePhase). Server only; an entry is pushed for every call,
+            -- qualified or not, so a nested sale never reads this call's rate.
+            local md16Entry = nil
+            if g_server ~= nil and Md16SalePhase ~= nil then
+                local okOpen, opened = pcall(Md16SalePhase.open, self, farmId, fillDelta, fillTypeIndex)
+                if okOpen then md16Entry = opened end
             end
 
-            return result
+            -- The native body, under protection so the entry is closed on an
+            -- error too; the original error then propagates unchanged.
+            local count, packed = packResults(pcall(superFunc, self, farmId, fillDelta, fillTypeIndex, toolType, extraAttributes))
+            if md16Entry ~= nil then pcall(Md16SalePhase.close, md16Entry) end
+            if not packed[1] then
+                if md16Entry ~= nil then pcall(Md16SalePhase.release, md16Entry) end
+                error(packed[2], 0)
+            end
+
+            -- The futures report runs with this call's CLOSED entry still on top,
+            -- so its own price read can never reach an outer call's rate; the
+            -- entry comes off afterwards whether the report returned or raised.
+            local okReport, reportErr = pcall(reportDelivery, self, farmId, fillDelta, fillTypeIndex, md16Entry)
+            if md16Entry ~= nil then pcall(Md16SalePhase.release, md16Entry) end
+            if not okReport then error(reportErr, 0) end
+
+            -- Every value the native body returned, in its own slots.
+            return unpack(packed, 2, count)
         end
     )
 

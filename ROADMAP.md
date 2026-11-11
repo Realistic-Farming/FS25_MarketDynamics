@@ -76,3 +76,8 @@
 
 - [x] `build.py` keeps Markdown files (`EVENTS_API.md`) and the Python helpers under `translations/` out of the zip. Every build shipped them to players; nothing in the mod loads them.
 - Build tooling only, no in-game check (TESTING row 574). Found by a fleet sweep that built every mod once from development in a throwaway worktree, on Tyson's word of 2026-10-14.
+
+## 2026-11-11 (Fred (via Desk)): MD-16 wired for real
+
+- [x] The captured-origin organic premium now pays at a station sale: a load StockGuard captured with SoilFertilizer's harvestOrganicOriginV1 on it earns up to 20% for its proved organic share, and a known suitable SG-3 grade A or B adds 15% or 5% beside it. Contract litres keep their baseline. A load with no proved facts pays exactly what it paid before.
+- Not here: the load-value preview and its Esc surface (Wizard craft), production-point and Dairy paths, and SG-4. The in-game check is the TESTING.md row for this PR.

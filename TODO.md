@@ -81,3 +81,12 @@
 - [x] `build.py`: keeps Markdown files (`EVENTS_API.md`) and the Python helpers under `translations/` out of the zip. Every build shipped them to players; nothing in the mod loads them.
 - [x] Built from a worktree before and after this change: development's zip had 101 entries, three of them `EVENTS_API.md` and two `translations/*.py` helpers; this branch's has 98, with exactly those three removed, every other entry byte-identical (CRC), nothing added.
 - Build tooling only, no in-game check (TESTING row 574).
+
+## 2026-11-11 (Fred (via Desk)): MD-16 wired for real (the organic premium pays per load)
+
+- [x] SG-1 stock view read as a dot call, unwrapped from `{ state, reason, view }`; the page validated as the STOCK route, schema 2, READY, FARM, paging version 1 (`Md16Resolvers._resolveSaleStocks`).
+- [x] SG-3 read at `handle.sg3.assessMaterialUse`, through a registered `md16.saleInputs` consumer whose read context admits only the sale being qualified (`Md16Resolvers`).
+- [x] SG-2 consumed: `Md16SalePhase` qualifies every server sale inside StockGuard's paid phase (`getNativeSaleInputsV1(nil)`, dot), reads `harvestOrganicOriginV1` and the SG-3 grade, reduces through `Md16Material.reduce`/`partRate`, freezes contract litres at the baseline (`Md16FuturesPlan`), and PriceHook answers the native price read once with that rate.
+- [x] Bars: `MD-16-sale_phase_wiring_spec_test.lua` (from `addFillLevelFromTool`), the MD-16 spec's provider cases rebuilt on `fixtures/stockguard_handle_mirror.lua`; battery 12 of 12.
+- [ ] The preview (`_resolveSaleQuote`) stays BASELINE_ONLY until the PREVIEW read context and the Wizard load-value surface exist.
+- [~] In game (owed): the TESTING.md row for this PR; needs StockGuard #75 and SoilFertilizer #1150 for the origin to be known.
