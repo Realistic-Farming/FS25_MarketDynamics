@@ -1,17 +1,28 @@
 -- =========================================================
 -- FS25_MarketDynamics - MD-16 private read contract and resolvers
 -- =========================================================
--- The owner-side resolvers behind the load-value surface, built against the
--- DECLARED provider interfaces rather than against present ones.
+-- The owner-side resolvers behind the load-value surface.
 --
--- EVERY PROVIDER THIS FILE READS IS UNBUILT TODAY. SG-2's getNativeSaleInputsV1
--- facade, SG-3's assessMaterialUse and Organic's harvestOrganicOriginV1 payload
--- are paired owner work in their own handoffs, and SG-1's paged
--- getManagementView lands with the StockGuard family. So the absent path is not
--- an edge case here, it is the ONLY path that runs today, and it is written as
--- the normal one: every probe is protected, an absent or malformed provider is
--- explicitly unavailable with a reason, and nothing ever falls back to a
--- favorable default. A missing fact must never be worth money.
+-- EVERY PROVIDER THIS FILE READS IS NOW BUILT, AND EVERY ONE IS OPTIONAL.
+-- StockGuard publishes each of them on its mission handle as a DOT closure,
+-- never a method (StockGuard.lua buildHandle: "no implicit self"), so every call
+-- here is `sg.fn(...)`. A colon call hands the handle in as the first argument
+-- and shifts the rest one place to the right, which is the defect this file
+-- shipped with at both the SG-1 view read and the SG-2 sale read:
+--   SG-1  sg.getManagementView(actor, selection, readOptions), which returns the
+--         wrapper { state, reason, view }; the page fields live on .view
+--         (SGViews.lua getManagementView)
+--   SG-2  sg.getNativeSaleInputsV1(saleFrame), server only; nil means the frame
+--         of the current paid phase (SGNativeSale.lua inputs)
+--   SG-3  sg.sg3.assessMaterialUse(consumerLease, query, use, profileId), on the
+--         member table SG-3 installs on the handle (SG3.lua install), never on
+--         the handle itself
+--   SG-1  sg.registerConsumer(id, spec) for the md16.saleInputs lease SG-3 reads
+--         through
+-- StockGuard can still be absent, older, or not yet installed on this mission,
+-- so every probe is protected, an absent or malformed provider is explicitly
+-- unavailable with a reason, and nothing ever falls back to a favorable default.
+-- A missing fact must never be worth money.
 --
 -- Nothing in this file writes money, mutates a native object, creates a capture
 -- handle or grants permission to sell. A preview is an estimate tied to a stock
@@ -92,7 +103,9 @@ function R.stockGuard()
     return handle
 end
 
---- SG-2's declared native sale inputs facade. UNBUILT.
+--- SG-2's native sale inputs facade: handle.getNativeSaleInputsV1(saleFrame).
+--- A dot closure, server only (StockGuard.lua, the serverOnly wrapper forwards
+--- its arguments unchanged). Returns the handle that carries it.
 function R.saleInputsProvider()
     local sg = R.stockGuard()
     if sg == nil then return nil, "SOURCE_UNAVAILABLE" end
@@ -100,17 +113,18 @@ function R.saleInputsProvider()
     return sg
 end
 
---- SG-1's paged management view. UNBUILT at the paging version MD-16 needs.
+--- SG-1's paged management view: handle.getManagementView(actor, selection,
+--- readOptions), a dot closure, server only.
 --- The capability must explicitly advertise managementPagingVersion = 1 before a
 --- paged request is made: feeding a first page to an old whole-farm interpreter
---- is worse than reporting unavailable.
+--- is worse than reporting unavailable. getCapabilities is a dot closure too.
 function R.managementProvider()
     local sg = R.stockGuard()
     if sg == nil then return nil, "PUBLIC_UNAVAILABLE" end
     if type(sg.getManagementView) ~= "function" then return nil, "PUBLIC_UNAVAILABLE" end
     local caps
     if type(sg.getCapabilities) == "function" then
-        pcall(function() caps = sg:getCapabilities() end)
+        pcall(function() caps = sg.getCapabilities() end)
     end
     if type(caps) ~= "table" or caps.managementPagingVersion ~= 1 then
         return nil, "PUBLIC_UNAVAILABLE"
@@ -118,17 +132,121 @@ function R.managementProvider()
     return sg
 end
 
---- SG-3's four-argument pure evaluator. UNBUILT.
+--- SG-3's four-argument pure evaluator, on the member table SG-3 publishes as
+--- handle.sg3 (SG3.lua install: handle.sg3 = { getReadiness, assessMaterialUse }).
+--- It is NOT on the handle itself, which is where this used to look, so every
+--- call answered PROFILE_UNSUPPORTED whether SG-3 was installed or not.
 --- Called under protection: a thrown, nil or malformed result, or an absent
 --- required owner, is unavailable and can never grant a favorable term.
 function R.assessMaterialUse(consumerLease, query, use, profileId)
     local sg = R.stockGuard()
-    if sg == nil or type(sg.assessMaterialUse) ~= "function" then
+    local member = sg ~= nil and sg.sg3 or nil
+    if type(member) ~= "table" or type(member.assessMaterialUse) ~= "function" then
         return nil, "PROFILE_UNSUPPORTED"
     end
-    local ok, result = pcall(sg.assessMaterialUse, consumerLease, query, use, profileId)
+    local ok, result = pcall(member.assessMaterialUse, consumerLease, query, use, profileId)
     if not ok or type(result) ~= "table" then return nil, "PROFILE_UNSUPPORTED" end
     return result
+end
+
+-- ---------------------------------------------------------
+-- The md16.saleInputs consumer lease (brief :57)
+-- ---------------------------------------------------------
+-- SG-3 reads the material through the CALLER's own SG-1 consumer: its
+-- assessMaterialUse hands consumerLease straight to readMaterial, which refuses
+-- a lease that is not a live consumer of this mission (SGOperations readMaterial,
+-- "DENIED"/"LEASE"). So without this registration no grade can ever be read.
+R.CONSUMER_ID = "md16.saleInputs"
+-- The exact spec the brief names. sg4.composition is declared, as written, and
+-- never queried: every read below names its propertyIds, and SG-4 does not
+-- produce that property today (SG4.lua header, WITHHELD), so nothing here reaches
+-- SG-4 code.
+R.CONSUMER_SCHEMAS = { qualityBasisV1 = 1, ["sg4.composition"] = 1, harvestOrganicOriginV1 = 1 }
+R.CONSUMER_MATERIAL_KINDS = { "FILL_TYPE", "NATIVE_GROUP" }
+R.PURPOSE_EXECUTION = "EXECUTION"
+
+R._lease = nil
+R._leaseHandle = nil
+R._leaseRefused = false
+-- The one read the resolver below admits: the stockRefs of the paid phase that
+-- is qualifying right now, set and cleared around the SG-3 call.
+R._executionRead = nil
+
+local function sameValue(a, b)
+    if Md16Values ~= nil and type(Md16Values.equal) == "function" then return Md16Values.equal(a, b) end
+    return a == b
+end
+
+--- The consumer's resolveReadContext. SG-1 calls it with a COPY of the query.
+--- It admits exactly one context: EXECUTION, for the stockRefs of the paid sale
+--- phase being qualified at this moment. A PREVIEW context is not built (the
+--- preview path stays BASELINE_ONLY, below), and nothing a client sends ever
+--- reaches here: the lease never leaves this server.
+-- @return table|nil { stockRefs, purpose }, string|nil reason
+function R.resolveReadContext(query)
+    if type(query) ~= "table" or query.purpose ~= R.PURPOSE_EXECUTION then return nil, "CONTEXT_DENIED" end
+    local open = R._executionRead
+    if open == nil or type(query.stockRefs) ~= "table" then return nil, "CONTEXT_DENIED" end
+    if not sameValue(query.stockRefs, open.stockRefs) then return nil, "CONTEXT_DENIED" end
+    return { stockRefs = query.stockRefs, purpose = R.PURPOSE_EXECUTION }
+end
+
+function R.consumerSpec()
+    local schemas = {}
+    for k, v in pairs(R.CONSUMER_SCHEMAS) do schemas[k] = v end
+    return {
+        version = 1,
+        requiredSchemas = schemas,
+        materialKinds = { R.CONSUMER_MATERIAL_KINDS[1], R.CONSUMER_MATERIAL_KINDS[2] },
+        resolveReadContext = function(query) return R.resolveReadContext(query) end,
+    }
+end
+
+--- The live md16.saleInputs lease on THIS mission's handle, registered on first
+--- need. Server only. A lease belongs to one mission's registry epoch, so a new
+--- handle drops the cached one. A refusal (StockGuard too old, or the id already
+--- held) is logged once per mission and leaves the grade unavailable.
+-- @return table|nil lease
+function R.saleInputsLease()
+    if g_server == nil then return nil end
+    local sg = R.stockGuard()
+    if sg == nil then return nil end
+    if R._lease ~= nil and R._leaseHandle == sg then return R._lease end
+    if R._leaseHandle ~= sg then R._leaseRefused = false end
+    R._lease, R._leaseHandle = nil, sg
+    if R._leaseRefused or type(sg.registerConsumer) ~= "function" then return nil end
+    local ok, lease, why = pcall(sg.registerConsumer, R.CONSUMER_ID, R.consumerSpec())
+    if not ok or type(lease) ~= "table" then
+        R._leaseRefused = true
+        if MDMLog ~= nil then
+            MDMLog.warn("Md16Resolvers: StockGuard refused the '" .. R.CONSUMER_ID .. "' consumer ("
+                .. tostring(ok and why or lease) .. "); grade terms stay unavailable this mission")
+        end
+        return nil
+    end
+    R._lease = lease
+    if MDMLog ~= nil then
+        MDMLog.info("Md16Resolvers: registered StockGuard consumer '" .. R.CONSUMER_ID .. "' (MD-16 sale grading)")
+    end
+    return lease
+end
+
+--- Withdraw the lease from the handle it was issued on. Teardown.
+function R.releaseLease()
+    local lease, sg = R._lease, R._leaseHandle
+    R._lease, R._leaseHandle, R._leaseRefused, R._executionRead = nil, nil, false, nil
+    if lease ~= nil and type(sg) == "table" and type(sg.unregisterOwner) == "function" then
+        pcall(sg.unregisterOwner, lease)
+    end
+end
+
+--- Open and close the one EXECUTION read the resolver admits.
+function R.beginExecutionRead(stockRefs)
+    R._executionRead = { stockRefs = stockRefs }
+end
+
+function R.endExecutionRead()
+    R._executionRead = nil
 end
 
 -- ---------------------------------------------------------
@@ -156,15 +274,17 @@ function R.destinationRole(station, farmId, fillTypeIndex, basisSupported)
         return "UNSUPPORTED", "UNAVAILABLE", R.reasons({ "PROFILE_UNSUPPORTED" })
     end
 
-    -- WHERE THESE TWO ACTUALLY LIVE, since the answer changes how to read this
-    -- function: getStoreGoods and getSkipSell are defined on a ProductionPoint's
-    -- unloading station (engine ProductionPoint.lua:244 and :249), NOT on a plain
-    -- SellingStation. So an ordinary selling station has neither, falls to the
-    -- UNSUPPORTED branch below, and the READY paths here are unreachable for it.
-    -- That is correct rather than broken: both calls are protected and an absent
-    -- method yields UNSUPPORTED, which leaks no favourable default. Recorded so
-    -- the next reader does not spend an afternoon wondering why a selling station
-    -- never reaches STORE_INPUT.
+    -- WHERE THESE TWO LIVE. A plain SellingStation defines both and both answer
+    -- false (1.24.0.0 decompile, objects/SellingStation.lua:343-348), so an
+    -- ordinary selling station reads store=false, skip=false and lands on
+    -- SALE_SPOT / READY below. Its own addFillLevelFromTool reads them the same
+    -- way (:307, :331) before it calls sellFillType. A station class that
+    -- overrides them, such as a production point's selling station, answers with
+    -- its own policy and lands on whichever branch that policy names. An earlier
+    -- version of this comment said a plain SellingStation had neither method and
+    -- could never reach READY; that was wrong. Both calls stay protected, so a
+    -- foreign object without them still yields UNSUPPORTED rather than a
+    -- favourable default.
     local store, skip
     if type(station.getStoreGoods) == "function" then
         pcall(function() store = station:getStoreGoods(farmId, fillTypeIndex) end)
@@ -328,15 +448,39 @@ function R._resolveSaleStocks(trustedActorContext, cursor)
     local readOptions = { rowKinds = { "STOCK" } }
     if cursor ~= nil then readOptions.pageCursor = cursor end
 
-    local view
+    -- A DOT call, and the answer is a WRAPPER. getManagementView is a dot
+    -- closure (StockGuard.lua buildHandle); the colon form this used to be
+    -- handed the handle in as the actor, so the real actor became the selection
+    -- and every read was refused. It returns { state, reason, view }
+    -- (SGViews.lua getManagementView): the state is on the wrapper, and the page
+    -- fields (pagingVersion, rows, viewKey, dataRevision, nextPageCursor) are on
+    -- .view, never at the top level.
+    local result
     local ok = pcall(function()
-        view = sg:getManagementView(trustedActorContext,
+        result = sg.getManagementView(trustedActorContext,
             { route = "STOCK", selectionKind = "FARM" }, readOptions)
     end)
-    if not ok or type(view) ~= "table" or view.state ~= "READY" then
+    if not ok or type(result) ~= "table" then
         return { schemaVersion = R.SCHEMA_VERSION, availability = "UNAVAILABLE", reasons = R.reasons({ "PUBLIC_UNAVAILABLE" }) }
     end
-    if view.pagingVersion ~= 1 then
+    if result.state == "DENIED" then
+        return { schemaVersion = R.SCHEMA_VERSION, availability = "DENIED", reasons = R.reasons({ "ACTOR_DENIED" }) }
+    end
+    local view = result.view
+    if result.state ~= "READY" or type(view) ~= "table" then
+        return { schemaVersion = R.SCHEMA_VERSION, availability = "UNAVAILABLE", reasons = R.reasons({ "PUBLIC_UNAVAILABLE" }) }
+    end
+    -- SG_APPLICATION_2 STOCK view, schema 2, READY, FARM, paging version 1, with
+    -- its own actor-bound selection key (brief :111). Anything else is not the
+    -- page this reader understands.
+    if view.route ~= "STOCK" or view.schemaVersion ~= 2 or view.availability ~= "READY"
+        or view.selectionKind ~= "FARM" or type(view.selectionKey) ~= "string"
+        or view.pagingVersion ~= 1 then
+        return { schemaVersion = R.SCHEMA_VERSION, availability = "UNAVAILABLE", reasons = R.reasons({ "PUBLIC_UNAVAILABLE" }) }
+    end
+    -- Both revisions are opaque owner strings and are copied as strings, never
+    -- converted (brief :113).
+    if type(view.viewKey) ~= "string" or type(view.dataRevision) ~= "string" then
         return { schemaVersion = R.SCHEMA_VERSION, availability = "UNAVAILABLE", reasons = R.reasons({ "PUBLIC_UNAVAILABLE" }) }
     end
 
@@ -360,7 +504,7 @@ function R._resolveSaleStocks(trustedActorContext, cursor)
     local page = {
         schemaVersion = R.SCHEMA_VERSION,
         availability = "READY",
-        viewRevision = { viewKey = tostring(view.viewKey), dataRevision = tostring(view.dataRevision) },
+        viewRevision = { viewKey = view.viewKey, dataRevision = view.dataRevision },
         rows = rows,
         nextCursor = view.nextPageCursor,
         reasons = R.reasons({}),
@@ -372,11 +516,15 @@ function R._resolveSaleStocks(trustedActorContext, cursor)
     return valid
 end
 
---- The server-local sale quote.
--- Today this always reaches the unavailable path, because the SG-2 facade it
--- needs does not exist. That is the correct answer and not a stub shortcut:
--- with no proved matching material source there is no material addition to
--- estimate, and the native rate stands.
+--- The server-local sale quote (the PREVIEW, before any haul).
+-- This stays BASELINE_ONLY, and that is not the sale path. The material
+-- addition a farmer is actually PAID is decided inside the native paid phase,
+-- from the facade's EXECUTION record (Md16SalePhase, called from PriceHook's
+-- sellFillType wrap). A preview has no paid phase: the facade answers
+-- NO_SALE_PHASE outside one, and a displayed estimate is never sale evidence
+-- (brief :43, :57; Iris's MD16 A4 answer). Estimating here needs the PREVIEW
+-- read context over the resident stock and the Wizard load-value surface,
+-- neither of which this build carries.
 -- @return table|nil preview, string|nil reason
 function R._resolveSaleQuote(destinationId, stockRef, trustedActorContext)
     if type(trustedActorContext) ~= "table" then
@@ -398,9 +546,9 @@ function R._resolveSaleQuote(destinationId, stockRef, trustedActorContext)
         return R.unavailablePreview(destinationId, stockRef, { why }, "BASELINE_ONLY")
     end
 
-    -- The admitted path is owner work in the SG-2 handoff and is not reachable
-    -- from this subset. Refusing here is deliberate: a preview built without the
-    -- facade would be an invented estimate.
+    -- The facade is present, but it answers only inside a paid phase, and a
+    -- preview is never one. Refusing here is deliberate: a preview built without
+    -- an admitted PREVIEW read would be an invented estimate.
     return R.unavailablePreview(destinationId, stockRef, { "SOURCE_UNAVAILABLE" }, "BASELINE_ONLY")
 end
 
@@ -438,4 +586,5 @@ end
 --- lifecycle: owner, source binding, actor, farm or mission change clears it.
 function R.invalidate()
     R._latestOutcome = {}
+    R._executionRead = nil
 end

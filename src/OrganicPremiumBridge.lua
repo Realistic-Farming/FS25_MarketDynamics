@@ -83,10 +83,16 @@ function OrganicPremiumBridge.register()
         -- price. Saying only "registered ... certified premium 1.2" would tell a
         -- reader of log.txt the opposite of what this build actually pays, and
         -- log.txt is the post-deploy diagnostic surface for exactly this.
+        -- What replaces it is per load, not per farm, and only where it is
+        -- proved: Md16SalePhase pays the captured-origin addition inside a
+        -- station sale whose source StockGuard captured with SoilFertilizer's
+        -- harvestOrganicOriginV1 on it. Without StockGuard, or for a load with
+        -- no proved origin, nothing organic is added, so the line says so.
         MDMLog.info("OrganicPremiumBridge: registered '" .. OrganicPremiumBridge.MODIFIER_NAME
             .. "' price modifier and RETIRED it (name reserved; the pooled premium of "
             .. OrganicPremiumBridge.ORGANIC_PREMIUM.CERTIFIED
-            .. " no longer contributes, MD-16 captured origin replaces it)")
+            .. " no longer contributes; MD-16 adds a captured-origin premium at the sale instead,"
+            .. " only for a load whose organic origin StockGuard recorded)")
     else
         MDMLog.warn("OrganicPremiumBridge: registration failed: " .. tostring(err))
     end
