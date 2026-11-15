@@ -206,6 +206,16 @@ function MarketDynamics:onMissionLoaded(mission)
         Md16SaleComponents.verifyRetiredModifierBinding()
     end
 
+    -- [MD-16] Nothing from an earlier mission is open, and the md16.saleInputs
+    -- consumer is registered on THIS mission's StockGuard handle now, on the
+    -- server, so log.txt shows at load whether sale grading can run. A sale
+    -- registers it on first need if StockGuard was not ready yet.
+    if Md16SalePhase ~= nil then Md16SalePhase.reset() end
+    if Md16Resolvers ~= nil then
+        Md16Resolvers.releaseLease()
+        if g_server ~= nil then pcall(Md16Resolvers.saleInputsLease) end
+    end
+
     MDMLog.info("MarketDynamics: mission loaded, system active")
 end
 
@@ -674,6 +684,13 @@ function MarketDynamics:delete()
     OrganicPremiumBridge.unregister()
     -- [MD-16] Drop the captured components with the mission that produced them.
     if Md16SaleComponents ~= nil then Md16SaleComponents.reset() end
+    -- [MD-16] Withdraw the md16.saleInputs consumer from the handle it was
+    -- issued on, and drop any sale entry and derived outcome.
+    if Md16SalePhase ~= nil then Md16SalePhase.reset() end
+    if Md16Resolvers ~= nil then
+        Md16Resolvers.releaseLease()
+        Md16Resolvers.invalidate()
+    end
     MDMLog.info("MarketDynamics: deleted")
 end
 

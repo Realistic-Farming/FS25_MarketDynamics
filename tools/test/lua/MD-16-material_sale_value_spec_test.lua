@@ -3,11 +3,12 @@
 -- ported against the BUILT modules rather than against local copies of the
 -- arithmetic, plus production cases for the parts of this subset the reference
 -- bar does not reach.
---!load: src/OrganicPremiumBridge.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/md16/Md16Values.lua, src/md16/Md16Material.lua, src/md16/Md16SaleComponents.lua, src/md16/Md16FuturesPlan.lua, src/md16/Md16Resolvers.lua, src/md16/MarketDynamicsSalePreviewEvent.lua, src/MarketDynamics.lua
+--!load: tools/test/lua/fixtures/stockguard_handle_mirror.lua, src/OrganicPremiumBridge.lua, src/MarketEngine.lua, src/FuturesMarket.lua, src/md16/Md16Values.lua, src/md16/Md16Material.lua, src/md16/Md16SaleComponents.lua, src/md16/Md16FuturesPlan.lua, src/md16/Md16Resolvers.lua, src/md16/Md16SalePhase.lua, src/md16/MarketDynamicsSalePreviewEvent.lua, src/MarketDynamics.lua
 --
 -- Engine-neutral. Nothing here proves native station execution, GUI, locale,
 -- multiplayer or save behaviour; those are implementation and release
--- observations and this is a DRAFT that must not merge.
+-- observations. The sale path itself, from the station's own entry point, is
+-- MD-16-sale_phase_wiring_spec_test.lua.
 
 local M = Md16Material
 local C = Md16SaleComponents
@@ -370,7 +371,9 @@ E.onRequest = nil
 -- =========================================================
 -- GROUP H: resolvers against absent providers
 -- =========================================================
--- ABSENT IS THE NORMAL PATH. Every provider MD-16 reads is unbuilt today.
+-- ABSENT IS STILL AN ORDINARY PATH. Every provider is built now, but StockGuard
+-- is optional, so a game without it must read as unavailable, never as a
+-- favorable default.
 g_currentMission = { isServer = true }
 T.eq('H1 with no StockGuard there is no sale inputs facade', (R.saleInputsProvider()), nil)
 T.eq('H2 and the reason is a missing source, not a favorable default', select(2, R.saleInputsProvider()), "SOURCE_UNAVAILABLE")
@@ -388,31 +391,89 @@ T.eq('H9 an actorless preview is DENIED', R._resolveSaleQuote("dest:1", { stockI
 T.eq('H10 a preview never invents a grade term when the evaluator is absent', preview.gradeState, "UNAVAILABLE")
 T.eq('H11 nor an organic term', preview.organicState, "UNAVAILABLE")
 
+-- FROM HERE THE PROVIDER IS THE REAL SHAPE (tools/test/lua/fixtures/
+-- stockguard_handle_mirror.lua). These cases used to stub getManagementView as
+-- a function that ignored its arguments and returned a flat page. That stub
+-- could not see the colon call at Md16Resolvers' view read, which handed the
+-- handle in as the actor, nor the unwrapped read of fields that live on .view,
+-- so this group was green while the real read could never succeed.
+local ACTOR = { farmId = 1, userId = 7, actorState = "RESOLVED", isMasterUser = true }
+
 -- A capability that does not advertise the paging version is refused rather
 -- than probed: feeding a first page to an old whole-farm reader is worse.
-g_currentMission.stockGuard = { getManagementView = function() return { state = "READY" } end,
-    getCapabilities = function() return { managementPagingVersion = 0 } end }
+g_currentMission.stockGuard = SGMirror.newHandle({ pagingVersion = 0 })
 T.eq('H12 an old paging capability is explicitly unavailable', (R.managementProvider()), nil)
-g_currentMission.stockGuard = { getManagementView = function() return { state = "READY", pagingVersion = 1, rows = {},
-    viewKey = "vk", dataRevision = "dr" } end, getCapabilities = function() return { managementPagingVersion = 1 } end }
+local viewHandle, viewWorld = SGMirror.newHandle({})
+g_currentMission.stockGuard = viewHandle
 T.ok('H13 a matching capability is accepted', R.managementProvider() ~= nil)
-local readyPage = R._resolveSaleStocks({ farmId = 1 })
-T.eq('H14 a READY page copies the view revision losslessly', readyPage.viewRevision.viewKey .. "/" .. readyPage.viewRevision.dataRevision, "vk/dr")
+local readyPage = R._resolveSaleStocks(ACTOR)
+T.eq('H14 a READY page copies the view revision losslessly, from the wrapped .view',
+    tostring(readyPage.viewRevision and readyPage.viewRevision.viewKey) .. "/" .. tostring(readyPage.viewRevision and readyPage.viewRevision.dataRevision), "vk:1/17")
 T.eq('H15 an empty READY page is READY, not unavailable', readyPage.availability, "READY")
+local viewCall = viewWorld.last("getManagementView")
+T.eq('H15a the view was read with a DOT call: the actor arrives first', viewCall.args[1], ACTOR)
+T.eq('H15b with the FARM selection on the STOCK route',
+    viewCall.args[2].route .. "/" .. viewCall.args[2].selectionKind, "STOCK/FARM")
+T.eq('H15c and the trusted STOCK row filter', viewCall.args[3].rowKinds[1], "STOCK")
+T.eq('H15d DIFFERENCE: the same read with a colon is refused by the provider itself',
+    viewHandle:getManagementView(ACTOR, { route = "STOCK", selectionKind = "FARM" }, { rowKinds = { "STOCK" } }).state ~= "READY", true)
 
 -- The provider's contextual CARRIER row is omitted from the sale-stock list
 -- WITHOUT dropping a STOCK identity.
-g_currentMission.stockGuard.getManagementView = function()
-    return { state = "READY", pagingVersion = 1, viewKey = "vk", dataRevision = "dr", rows = {
-        { rowKind = "CARRIER", label = "context" },
-        { rowKind = "STOCK", stockRef = { stockId = "s1" }, label = "Bin 1", materialRef = { kind = "FILL_TYPE", fillTypeName = "WHEAT" }, amount = 10, amountUnit = "LITRE" },
-        { rowKind = "STOCK", stockRef = { stockId = "s2" }, label = "Bin 2", materialRef = { kind = "FILL_TYPE", fillTypeName = "WHEAT" }, amount = 20, amountUnit = "LITRE" },
-    } }
-end
-local mixedPage = R._resolveSaleStocks({ farmId = 1 })
+local pagedHandle, pagedWorld = SGMirror.newHandle({ viewRows = {
+    { rowKind = "CARRIER", label = "context" },
+    { rowKind = "STOCK", stockRef = { stockId = "s1" }, label = "Bin 1", materialRef = { kind = "FILL_TYPE", fillTypeName = "WHEAT" }, amount = 10, amountUnit = "LITRE", properties = { x = {} } },
+    { rowKind = "STOCK", stockRef = { stockId = "s2" }, label = "Bin 2", materialRef = { kind = "FILL_TYPE", fillTypeName = "WHEAT" }, amount = 20, amountUnit = "LITRE" },
+}, viewNext = "c1.1" })
+g_currentMission.stockGuard = pagedHandle
+local mixedPage = R._resolveSaleStocks(ACTOR, "c1.0")
 T.eq('H16 the contextual carrier row is omitted from the sale-stock list', #mixedPage.rows, 2)
 T.eq('H17 without dropping a STOCK identity', mixedPage.rows[1].stockRef.stockId .. "," .. mixedPage.rows[2].stockRef.stockId, "s1,s2")
 T.eq('H18 rows carry only the public fields', tostring(mixedPage.rows[1].properties), "nil")
+T.eq('H18a the provider continuation is copied from .view.nextPageCursor', mixedPage.nextCursor, "c1.1")
+T.eq('H18b the caller cursor reached the provider as its pageCursor',
+    pagedWorld.last("getManagementView").args[3].pageCursor, "c1.0")
+
+-- What the provider refuses stays refused, with its own meaning.
+g_currentMission.stockGuard = SGMirror.newHandle({})
+T.eq('H18c an actor the provider denies is DENIED, not an empty READY page',
+    R._resolveSaleStocks({ farmId = 1, actorState = "SPECTATOR" }).availability, "DENIED")
+T.eq('H18d an actor still resolving is UNAVAILABLE', R._resolveSaleStocks({ farmId = 1, actorState = "WAITING" }).availability, "UNAVAILABLE")
+do
+    -- DIFFERENCE: the old flat answer, page fields at the top level and no
+    -- .view, is not a view this reader accepts.
+    local flat = SGMirror.newHandle({})
+    flat.getManagementView = function() return { state = "READY", pagingVersion = 1, rows = {}, viewKey = "vk", dataRevision = "dr" } end
+    g_currentMission.stockGuard = flat
+    T.eq('H18e DIFFERENCE: a flat, unwrapped answer is UNAVAILABLE', R._resolveSaleStocks(ACTOR).availability, "UNAVAILABLE")
+    -- A view of another route or schema is not the STOCK page.
+    local other = SGMirror.newHandle({})
+    local real = other.getManagementView
+    other.getManagementView = function(...)
+        local res = real(...)
+        if res.view ~= nil then res.view.schemaVersion = 3 end
+        return res
+    end
+    g_currentMission.stockGuard = other
+    T.eq('H18f a view in an unknown schema is UNAVAILABLE', R._resolveSaleStocks(ACTOR).availability, "UNAVAILABLE")
+end
+
+-- SG-3 LIVES ON handle.sg3. The probe used to look on the handle itself, where
+-- nothing is published, so it answered PROFILE_UNSUPPORTED with SG-3 installed.
+do
+    local h = SGMirror.newHandle({ withSg3 = false })
+    h.assessMaterialUse = function() return { state = "READY", grade = "A" } end
+    g_currentMission.stockGuard = h
+    T.eq('H18g DIFFERENCE: a function on the handle top level is not SG-3', select(2, R.assessMaterialUse(nil, {}, "FOOD", "CROP_FOOD_V1")), "PROFILE_UNSUPPORTED")
+    local h2, w2 = SGMirror.newHandle({})
+    g_currentMission.stockGuard = h2
+    local res = R.assessMaterialUse({ leaseId = "x" }, { stockRefs = {} }, "FOOD", "CROP_FOOD_V1")
+    T.ok('H18h the member on handle.sg3 is reached and answers a Result', type(res) == "table" and res.state ~= nil)
+    local c = w2.last("sg3.assessMaterialUse")
+    T.eq('H18i with its four arguments in their own slots, dot form', c ~= nil and c.args[3] .. "/" .. c.args[4], "FOOD/CROP_FOOD_V1")
+    T.eq('H18j an unregistered lease reads nothing: SG-3 reports the read refused', res.reasons[1], "DISCLOSURE_DENIED")
+end
+g_currentMission.stockGuard = nil
 
 -- The destination role table, all four combinations.
 local function station(store, skip)
@@ -670,6 +731,11 @@ do
 
     -- Load side. A component captured by the previous mission must not survive
     -- into the next one; this is the "second savegame in one process" bug.
+    -- [MD-16 wiring] The same load registers the md16.saleInputs consumer on
+    -- THIS mission's StockGuard handle, and delete withdraws it.
+    local lifeHandle, lifeWorld = SGMirror.newHandle({})
+    g_currentMission.stockGuard = lifeHandle
+    Md16Resolvers.releaseLease()
     C.reset()
     C.capture(11, "WHEAT", 100, 2)
     T.ok('J8 a component is captured before the mission loads', C.get(11) ~= nil)
@@ -685,6 +751,11 @@ do
     T.ok('J8d the real delete runs in the bench: ' .. tostring(whyDel), okDel)
     T.eq('J8e and teardown dropped the components with its mission',
         select(2, C.get(12)), "NO_MARKET")
+    T.eq('J8f the real onMissionLoaded registered the md16.saleInputs consumer once',
+        lifeWorld.count("registerConsumer"), 1)
+    T.eq('J8g and the real delete withdrew it from that handle', lifeWorld.byId["md16.saleInputs"], nil)
+    T.eq('J8h with nothing left open in the sale phase', #Md16SalePhase._stack, 0)
+    g_currentMission.stockGuard = nil
 
     BCIntegration, UPIntegration = savedBC, savedUP
     MDMSettingsPanel             = savedPanel

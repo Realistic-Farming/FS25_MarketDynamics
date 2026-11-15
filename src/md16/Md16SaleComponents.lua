@@ -21,13 +21,13 @@
 -- material terms compose (Md16Material.partRate), so a component record that had
 -- already clamped would make the correct composition unreachable.
 --
--- THE ORGANIC PREMIUM RETIREMENT LIVES HERE AND IS WHY THIS PR CANNOT MERGE
--- EARLY. The MD-16 brief retires the pooled OrganicPremium modifier in every
--- mode, including when MD-16 itself is disabled or unavailable, because the
--- pooled farm-average premium is the wrong answer to "what is THIS load worth".
--- Its replacement is the captured-origin term, which needs SG-1, SG-2, SG-4,
--- SG-3 and FP-1 Organic to exist. Merging this before those land removes the
--- live organic premium with nothing in its place.
+-- THE ORGANIC PREMIUM RETIREMENT LIVES HERE. The MD-16 brief retires the pooled
+-- OrganicPremium modifier in every mode, including when MD-16 itself is disabled
+-- or unavailable, because the pooled farm-average premium is the wrong answer to
+-- "what is THIS load worth". Its replacement is the captured-origin term, paid
+-- inside the station sale by Md16SalePhase from StockGuard's SG-2 sale record and
+-- SoilFertilizer's harvestOrganicOriginV1 (SG-3 adds the grade term beside it).
+-- SG-4 is not read: the sale path needs no composition record.
 -- =========================================================
 
 Md16SaleComponents = Md16SaleComponents or {}
